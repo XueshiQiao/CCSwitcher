@@ -10,6 +10,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 struct CCSwitcherApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var appState = AppState()
+    @StateObject private var updateChecker = UpdateChecker()
     @AppStorage("showAccountName") private var showAccountName = true
 
     var body: some Scene {
@@ -17,6 +18,10 @@ struct CCSwitcherApp: App {
         // shows the native toolbar tabs even though the UI is AppKit-based.
         WindowGroup("CCSwitcherKeepalive") {
             HiddenWindowView()
+                .onAppear {
+                    // Check for updates silently on app launch
+                    updateChecker.checkForUpdates(manual: false)
+                }
         }
         .defaultSize(width: 20, height: 20)
         .windowStyle(.hiddenTitleBar)
@@ -24,6 +29,7 @@ struct CCSwitcherApp: App {
         MenuBarExtra {
             MainMenuView()
                 .environmentObject(appState)
+                .environmentObject(updateChecker)
         } label: {
             menuBarLabel
         }
@@ -32,6 +38,7 @@ struct CCSwitcherApp: App {
         Settings {
             SettingsView()
                 .environmentObject(appState)
+                .environmentObject(updateChecker)
         }
     }
 

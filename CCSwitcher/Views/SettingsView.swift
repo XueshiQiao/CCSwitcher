@@ -4,6 +4,7 @@ import ServiceManagement
 /// Settings window for configuring the app.
 struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var updateChecker: UpdateChecker
     @AppStorage("refreshInterval") private var refreshInterval: Double = 300
     @AppStorage("showAccountName") private var showAccountName = true
     @AppStorage("showInDock") private var showInDock = false
@@ -74,9 +75,15 @@ struct SettingsView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
-            Text("Version 1.0.0")
+            Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0")")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
+
+            Button(updateChecker.isChecking ? "Checking..." : "Check for Updates") {
+                updateChecker.checkForUpdates(manual: true)
+            }
+            .disabled(updateChecker.isChecking)
+            .padding(.top, 4)
 
             Spacer()
 
