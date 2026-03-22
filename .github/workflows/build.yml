@@ -1,0 +1,46 @@
+name: Build macOS App
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode Project
+        run: xcodegen generate
+
+      - name: Build App
+        run: |
+          xcodebuild -project CCSwitcher.xcodeproj \
+            -scheme CCSwitcher \
+            -configuration Release \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            build \
+            SYMROOT=$(PWD)/build
+
+      - name: Zip App
+        run: |
+          cd build/Release
+          zip -r ../../CCSwitcher-macOS.zip CCSwitcher.app
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CCSwitcher-App
+          path: CCSwitcher-macOS.zip
