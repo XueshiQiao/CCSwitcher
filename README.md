@@ -2,6 +2,22 @@
 
 CCSwitcher is a lightweight, pure menu bar macOS application designed to help developers seamlessly manage and switch between multiple Claude Code accounts. It monitors API usage, gracefully handles background token refreshes, and circumvents common macOS menu bar app limitations.
 
+## Features
+
+- **Multi-Account Management**: Easily add and switch between different Claude Code accounts with a single click from the macOS menu bar.
+- **Usage Dashboard**: Real-time monitoring of your Claude API usage limits (session and weekly) directly in the menu bar dropdown.
+- **Privacy-Focused UI**: Automatically obfuscates email addresses and account names in screenshots or screen recordings to protect your identity.
+- **Zero-Interaction Token Refresh**: Intelligently handles Claude's OAuth token expiration by delegating the refresh process to the official CLI in the background.
+- **Seamless Login Flow**: Add new accounts without ever opening a terminal. The app silently invokes the CLI and handles the browser OAuth loop for you.
+- **System-Native UX**: A clean, native SwiftUI interface that behaves exactly like a first-class macOS menu bar utility, complete with a fully functional settings window.
+
+## Screenshots
+
+<p align="center">
+  <img src="assets/screenshot1.png" width="45%" alt="Menu Bar View" />
+  <img src="assets/screenshot2.png" width="45%" alt="Settings View" />
+</p>
+
 ## Key Features & Architecture
 
 This application employs several specific architectural strategies, some uniquely tailored to its operation and others drawing inspiration from the open-source community.
