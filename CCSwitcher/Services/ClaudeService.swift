@@ -48,9 +48,15 @@ final class ClaudeService: Sendable {
 
     // MARK: - Usage API
 
+    enum UsageError: Error {
+        case expired
+        case network(String)
+        case decode(String)
+    }
+
     /// Fetch usage for a specific access token
-    func getUsageLimits(accessToken: String) async -> UsageAPIResponse? {
-        guard let url = URL(string: "https://api.anthropic.com/api/oauth/usage") else { return nil }
+    func getUsageLimits(accessToken: String) async throws -> UsageAPIResponse {
+        guard let url = URL(string: "https://api.anthropic.com/api/oauth/usage") else { throw UsageError.network("invalid url") }
         var request = URLRequest(url: url)
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
@@ -58,20 +64,25 @@ final class ClaudeService: Sendable {
         log.debug("[getUsageLimits] REQUEST URL: \(url.absoluteString)")
         log.debug("[getUsageLimits] REQUEST HEADERS: \(request.allHTTPHeaderFields ?? [:])")
 
-        do {
-            let (responseData, response) = try await URLSession.shared.data(for: request)
-            let httpResponse = response as? HTTPURLResponse
-            guard httpResponse?.statusCode == 200 else {
-                let responseString = String(data: responseData, encoding: .utf8) ?? ""
-                log.error("[getUsageLimits] HTTP \(httpResponse?.statusCode ?? 0) Error Response: \(responseString)")
-                return nil
+        let (responseData, response) = try await URLSession.shared.data(for: request)
+        let httpResponse = response as? HTTPURLResponse
+        guard httpResponse?.statusCode == 200 else {
+            let responseString = String(data: responseData, encoding: .utf8) ?? ""
+            log.error("[getUsageLimits] HTTP \(httpResponse?.statusCode ?? 0) Error Response: \(responseString)")
+            
+            if httpResponse?.statusCode == 401 || responseString.contains("token_expired") {
+                throw UsageError.expired
             }
+            throw UsageError.network("HTTP \(httpResponse?.statusCode ?? 0)")
+        }
+        
+        do {
             let usage = try JSONDecoder().decode(UsageAPIResponse.self, from: responseData)
             log.info("[getUsageLimits] session=\(usage.fiveHour?.utilization ?? -1)%, weekly=\(usage.sevenDay?.utilization ?? -1)%")
             return usage
         } catch {
-            log.error("[getUsageLimits] Error: \(error.localizedDescription)")
-            return nil
+            log.error("[getUsageLimits] Decode Error: \(error.localizedDescription)")
+            throw UsageError.decode(error.localizedDescription)
         }
     }
 

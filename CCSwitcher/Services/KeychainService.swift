@@ -89,12 +89,16 @@ final class KeychainService: Sendable {
             "-a", claudeAccount,
             "-w"
         ])
+        
         if let token {
-            log.info("[readClaudeToken] Found, length=\(token.count)")
+            // Clean up possible trailing newlines from security CLI output
+            let sanitized = token.trimmingCharacters(in: .whitespacesAndNewlines)
+            log.info("[readClaudeToken] Found via security CLI, length=\(sanitized.count)")
+            return sanitized
         } else {
             log.error("[readClaudeToken] No token found!")
+            return nil
         }
-        return token
     }
 
     func writeClaudeToken(_ token: String) -> Bool {

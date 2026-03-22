@@ -364,9 +364,42 @@ final class AppState: ObservableObject {
                 log.warning("[fetchUsage] No token for \(account.email), skipping")
                 continue
             }
-            if let usage = await claudeService.getUsageLimits(accessToken: accessToken) {
+            if let usage = try? await claudeService.getUsageLimits(accessToken: accessToken) {
                 accountUsage[account.id] = usage
                 log.info("[fetchUsage] \(account.email): session=\(usage.fiveHour?.utilization ?? -1)%, weekly=\(usage.sevenDay?.utilization ?? -1)%")
+            } else {
+                do {
+                    _ = try await claudeService.getUsageLimits(accessToken: accessToken)
+                } catch ClaudeService.UsageError.expired {
+                    log.warning("[fetchUsage] Token expired for \(account.email), attempting delegated refresh via Claude CLI...")
+                    // If the token is expired, we trigger a background `claude auth status` 
+                    // which acts as a "Delegated Refresh". The Claude CLI will see the expired token,
+                    // refresh it using its own refresh_token logic and client ID, and write the new
+                    // token JSON back to the system keychain.
+                    do {
+                        _ = try await claudeService.getAuthStatus()
+                        log.info("[fetchUsage] Delegated refresh command completed, reloading token from Keychain...")
+                        // Now the keychain should contain the fresh token.
+                        let refreshedTokenJSON: String?
+                        if account.isActive {
+                            refreshedTokenJSON = keychain.readClaudeToken()
+                        } else {
+                            refreshedTokenJSON = keychain.getAccountBackup(forAccountId: account.id.uuidString)?.token
+                        }
+                        
+                        if let refreshedTokenJSON, let refreshedAccessToken = ClaudeService.extractAccessToken(from: refreshedTokenJSON) {
+                            if let refreshedUsage = try? await claudeService.getUsageLimits(accessToken: refreshedAccessToken) {
+                                accountUsage[account.id] = refreshedUsage
+                                log.info("[fetchUsage] Recovered \(account.email) via delegated refresh.")
+                            }
+                        }
+                    } catch {
+                        log.error("[fetchUsage] Delegated refresh failed: \(error.localizedDescription)")
+                        accountUsage[account.id] = nil
+                    }
+                } catch {
+                    log.error("[fetchUsage] Failed to get usage for \(account.email): \(error.localizedDescription)")
+                }
             }
         }
     }
