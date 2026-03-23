@@ -16,6 +16,10 @@ struct MainMenuView: View {
             // Header
             headerView
 
+            if isPromoActive() {
+                promoBannerView
+            }
+
             Divider()
 
             // Tab selector
@@ -44,6 +48,77 @@ struct MainMenuView: View {
             await appState.refresh()
             appState.startAutoRefresh(interval: refreshInterval)
         }
+    }
+
+    // MARK: - Promo Banner
+    
+    private var promoBannerView: some View {
+        HStack {
+            Image(systemName: "gift.fill")
+                .foregroundStyle(.purple)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Double Usage Active")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                Text(localOffPeakTimeString)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(Color.purple.opacity(0.1))
+    }
+    
+    private func isPromoActive() -> Bool {
+        let date = Date()
+        let calendar = Calendar(identifier: .gregorian)
+        
+        var promoStartComponents = DateComponents()
+        promoStartComponents.year = 2026
+        promoStartComponents.month = 3
+        promoStartComponents.day = 13
+        
+        var promoEndComponents = DateComponents()
+        promoEndComponents.year = 2026
+        promoEndComponents.month = 3
+        promoEndComponents.day = 29 // up to March 28 inclusive
+        
+        guard let start = calendar.date(from: promoStartComponents),
+              let end = calendar.date(from: promoEndComponents) else {
+            return false
+        }
+        
+        return date >= start && date < end
+    }
+    
+    private var localOffPeakTimeString: String {
+        guard let etTimeZone = TimeZone(identifier: "America/New_York") else {
+            return "Double limits: 2 PM - 8 AM ET & Weekends"
+        }
+        
+        let today = Date()
+        var etCalendar = Calendar(identifier: .gregorian)
+        etCalendar.timeZone = etTimeZone
+        
+        // The double usage starts at 2:00 PM (14:00) ET and ends at 8:00 AM ET next day
+        guard let etStartOffPeak = etCalendar.date(bySettingHour: 14, minute: 0, second: 0, of: today),
+              let etEndOffPeak = etCalendar.date(bySettingHour: 8, minute: 0, second: 0, of: today) else {
+            return "Double limits: 2 PM - 8 AM ET & Weekends"
+        }
+        
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        formatter.dateStyle = .none
+        formatter.timeZone = TimeZone.current
+        
+        let localStart = formatter.string(from: etStartOffPeak)
+        let localEnd = formatter.string(from: etEndOffPeak)
+        
+        return "\(localStart) - \(localEnd) (Weekdays) & Weekends"
     }
 
     // MARK: - Header
