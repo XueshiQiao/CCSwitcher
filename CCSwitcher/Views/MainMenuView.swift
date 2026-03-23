@@ -44,9 +44,6 @@ struct MainMenuView: View {
             footerView
         }
         .frame(width: 360, height: 480)
-        .task {
-            appState.startAutoRefresh(interval: refreshInterval)
-        }
     }
 
     // MARK: - Promo Banner

@@ -20,6 +20,15 @@ final class AppState: ObservableObject {
     @Published var claudeAvailable = false
     @Published var lastUsageRefresh: Date?
 
+    // Store errors as special struct to surface in UI
+    struct UsageErrorState {
+        let isExpired: Bool
+        let isRateLimited: Bool
+        let message: String
+    }
+    
+    @Published var accountUsageErrors: [UUID: UsageErrorState] = [:]
+
     // MARK: - Services
 
     private let claudeService = ClaudeService.shared
@@ -351,6 +360,7 @@ final class AppState: ObservableObject {
     // MARK: - Usage
 
     private func fetchAllAccountUsage() async {
+        accountUsageErrors.removeAll()
         // For active account: use live keychain token
         // For other accounts: use backup token
         for account in accounts {
@@ -406,15 +416,24 @@ final class AppState: ObservableObject {
                         if let refreshedTokenJSON, let refreshedAccessToken = ClaudeService.extractAccessToken(from: refreshedTokenJSON) {
                             if let refreshedUsage = try? await claudeService.getUsageLimits(accessToken: refreshedAccessToken) {
                                 accountUsage[account.id] = refreshedUsage
+                                accountUsageErrors[account.id] = nil
                                 log.info("[fetchUsage] Recovered \(account.email) via delegated refresh.")
                             }
                         }
                     } catch {
                         log.error("[fetchUsage] Delegated refresh failed: \(error.localizedDescription)")
                         accountUsage[account.id] = nil
+                        accountUsageErrors[account.id] = UsageErrorState(isExpired: true, isRateLimited: false, message: "Token expired. Auto-refresh failed.")
                     }
                 } catch {
                     log.error("[fetchUsage] Failed to get usage for \(account.email): \(error.localizedDescription)")
+                    accountUsage[account.id] = nil
+                    
+                    if let usageError = error as? ClaudeService.UsageError, case .network(let msg) = usageError, msg.contains("429") {
+                        accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: true, message: "API Rate Limited. Try again later.")
+                    } else {
+                        accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: false, message: "Could not fetch usage: \(error.localizedDescription)")
+                    }
                 }
             }
         }
