@@ -372,14 +372,30 @@ final class AppState: ObservableObject {
                     _ = try await claudeService.getUsageLimits(accessToken: accessToken)
                 } catch ClaudeService.UsageError.expired {
                     log.warning("[fetchUsage] Token expired for \(account.email), attempting delegated refresh via Claude CLI...")
-                    // If the token is expired, we trigger a background `claude auth status` 
-                    // which acts as a "Delegated Refresh". The Claude CLI will see the expired token,
-                    // refresh it using its own refresh_token logic and client ID, and write the new
-                    // token JSON back to the system keychain.
+                    // If the token is expired, we trigger a background refresh.
+                    // For the active account, `claude auth status` is enough.
+                    // For non-active accounts, we must silently swap it to active, trigger refresh, and swap back.
                     do {
-                        _ = try await claudeService.getAuthStatus()
-                        log.info("[fetchUsage] Delegated refresh command completed, reloading token from Keychain...")
-                        // Now the keychain should contain the fresh token.
+                        if account.isActive {
+                            _ = try await claudeService.getAuthStatus()
+                            log.info("[fetchUsage] Delegated refresh command completed for active account.")
+                        } else {
+                            if let currentActive = self.activeAccount {
+                                log.info("[fetchUsage] Initiating silent swap refresh for non-active account: \(account.email)")
+                                // 1. Swap to the expired account (this also triggers `getAuthStatus` verifying the swap and refreshing the token)
+                                try await claudeService.switchAccount(from: currentActive, to: account)
+                                // 2. Capture the newly refreshed credentials back into our backup
+                                _ = claudeService.captureCurrentCredentials(forAccountId: account.id.uuidString)
+                                // 3. Swap back to the original active account immediately
+                                try await claudeService.switchAccount(from: account, to: currentActive)
+                                log.info("[fetchUsage] Silent swap refresh completed successfully.")
+                            } else {
+                                log.error("[fetchUsage] Cannot silently refresh non-active account without an active account to return to.")
+                                throw ClaudeService.UsageError.expired
+                            }
+                        }
+                        
+                        // Now the keychain/backup should contain the fresh token.
                         let refreshedTokenJSON: String?
                         if account.isActive {
                             refreshedTokenJSON = keychain.readClaudeToken()
