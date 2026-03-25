@@ -8,6 +8,7 @@ struct MainMenuView: View {
 
     enum Tab: String, CaseIterable {
         case usage = "Usage"
+        case costs = "Costs"
         case accounts = "Accounts"
     }
 
@@ -32,6 +33,8 @@ struct MainMenuView: View {
                 switch selectedTab {
                 case .usage:
                     UsageDashboardView()
+                case .costs:
+                    CostDetailView()
                 case .accounts:
                     AccountSwitcherView()
                 }

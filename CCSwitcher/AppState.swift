@@ -19,6 +19,7 @@ final class AppState: ObservableObject {
     @Published var errorMessage: String?
     @Published var claudeAvailable = false
     @Published var lastUsageRefresh: Date?
+    @Published var costSummary: CostSummary = .empty
 
     // Store errors as special struct to surface in UI
     struct UsageErrorState {
@@ -33,6 +34,7 @@ final class AppState: ObservableObject {
 
     private let claudeService = ClaudeService.shared
     private let statsParser = StatsParser.shared
+    private let costParser = CostParser.shared
     private let keychain = KeychainService.shared
 
     private let accountsKey = "com.ccswitcher.accounts"
@@ -79,7 +81,13 @@ final class AppState: ObservableObject {
         usageSummary = statsParser.getUsageSummary()
         recentActivity = statsParser.getRecentActivity(days: 7)
         activeSessions = statsParser.getActiveSessions()
-        log.info("[refresh] Usage: weekly=\(self.usageSummary.weeklyMessages) msgs, \(self.activeSessions.count) active sessions")
+
+        // Heavy JSONL parsing off main thread
+        let parser = costParser
+        let cost = await Task.detached { parser.getCostSummary() }.value
+        costSummary = cost
+
+        log.info("[refresh] Usage: weekly=\(self.usageSummary.weeklyMessages) msgs, \(self.activeSessions.count) active sessions, today=$\(String(format: "%.2f", cost.todayCost))")
 
         isLoading = false
     }
@@ -361,8 +369,8 @@ final class AppState: ObservableObject {
 
     private func fetchAllAccountUsage() async {
         accountUsageErrors.removeAll()
-        // For active account: use live keychain token
-        // For other accounts: use backup token
+        // For active account: use live keychain token (with delegated refresh on expiry)
+        // For other accounts: use backup token (no silent swap — just mark expired)
         for account in accounts {
             let tokenJSON: String?
             if account.isActive {
@@ -374,66 +382,45 @@ final class AppState: ObservableObject {
                 log.warning("[fetchUsage] No token for \(account.email), skipping")
                 continue
             }
-            if let usage = try? await claudeService.getUsageLimits(accessToken: accessToken) {
+            do {
+                let usage = try await claudeService.getUsageLimits(accessToken: accessToken)
                 accountUsage[account.id] = usage
+                accountUsageErrors[account.id] = nil
                 log.info("[fetchUsage] \(account.email): session=\(usage.fiveHour?.utilization ?? -1)%, weekly=\(usage.sevenDay?.utilization ?? -1)%")
-            } else {
-                do {
-                    _ = try await claudeService.getUsageLimits(accessToken: accessToken)
-                } catch ClaudeService.UsageError.expired {
-                    log.warning("[fetchUsage] Token expired for \(account.email), attempting delegated refresh via Claude CLI...")
-                    // If the token is expired, we trigger a background refresh.
-                    // For the active account, `claude auth status` is enough.
-                    // For non-active accounts, we must silently swap it to active, trigger refresh, and swap back.
+            } catch ClaudeService.UsageError.expired {
+                log.warning("[fetchUsage] Token expired for \(account.email)")
+                if account.isActive {
+                    // Active account: delegated refresh via `claude auth status` is safe (no keychain swap)
                     do {
-                        if account.isActive {
-                            _ = try await claudeService.getAuthStatus()
-                            log.info("[fetchUsage] Delegated refresh command completed for active account.")
-                        } else {
-                            if let currentActive = self.activeAccount {
-                                log.info("[fetchUsage] Initiating silent swap refresh for non-active account: \(account.email)")
-                                // 1. Swap to the expired account (this also triggers `getAuthStatus` verifying the swap and refreshing the token)
-                                try await claudeService.switchAccount(from: currentActive, to: account)
-                                // 2. Capture the newly refreshed credentials back into our backup
-                                _ = claudeService.captureCurrentCredentials(forAccountId: account.id.uuidString)
-                                // 3. Swap back to the original active account immediately
-                                try await claudeService.switchAccount(from: account, to: currentActive)
-                                log.info("[fetchUsage] Silent swap refresh completed successfully.")
-                            } else {
-                                log.error("[fetchUsage] Cannot silently refresh non-active account without an active account to return to.")
-                                throw ClaudeService.UsageError.expired
-                            }
-                        }
-                        
-                        // Now the keychain/backup should contain the fresh token.
-                        let refreshedTokenJSON: String?
-                        if account.isActive {
-                            refreshedTokenJSON = keychain.readClaudeToken()
-                        } else {
-                            refreshedTokenJSON = keychain.getAccountBackup(forAccountId: account.id.uuidString)?.token
-                        }
-                        
-                        if let refreshedTokenJSON, let refreshedAccessToken = ClaudeService.extractAccessToken(from: refreshedTokenJSON) {
-                            if let refreshedUsage = try? await claudeService.getUsageLimits(accessToken: refreshedAccessToken) {
-                                accountUsage[account.id] = refreshedUsage
-                                accountUsageErrors[account.id] = nil
-                                log.info("[fetchUsage] Recovered \(account.email) via delegated refresh.")
-                            }
+                        _ = try await claudeService.getAuthStatus()
+                        log.info("[fetchUsage] Delegated refresh completed for active account.")
+                        // Re-read refreshed token and retry
+                        if let refreshedJSON = keychain.readClaudeToken(),
+                           let refreshedToken = ClaudeService.extractAccessToken(from: refreshedJSON),
+                           let usage = try? await claudeService.getUsageLimits(accessToken: refreshedToken) {
+                            accountUsage[account.id] = usage
+                            accountUsageErrors[account.id] = nil
+                            log.info("[fetchUsage] Recovered \(account.email) via delegated refresh.")
                         }
                     } catch {
-                        log.error("[fetchUsage] Delegated refresh failed: \(error.localizedDescription)")
+                        log.error("[fetchUsage] Delegated refresh failed for active account: \(error.localizedDescription)")
                         accountUsage[account.id] = nil
-                        accountUsageErrors[account.id] = UsageErrorState(isExpired: true, isRateLimited: false, message: "Token expired. Auto-refresh failed.")
+                        accountUsageErrors[account.id] = UsageErrorState(isExpired: true, isRateLimited: false, message: "Token expired. Switch to refresh.")
                     }
-                } catch {
-                    log.error("[fetchUsage] Failed to get usage for \(account.email): \(error.localizedDescription)")
+                } else {
+                    // Non-active account: do NOT silent-swap keychain — just mark as expired.
+                    // Token will be refreshed when the user explicitly switches to this account.
+                    log.info("[fetchUsage] Non-active account \(account.email) token expired, skipping silent swap to avoid race condition with Claude Code CLI.")
                     accountUsage[account.id] = nil
-                    
-                    if let usageError = error as? ClaudeService.UsageError, case .network(let msg) = usageError, msg.contains("429") {
-                        accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: true, message: "API Rate Limited. Try again later.")
-                    } else {
-                        accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: false, message: "Could not fetch usage: \(error.localizedDescription)")
-                    }
+                    accountUsageErrors[account.id] = UsageErrorState(isExpired: true, isRateLimited: false, message: "Token expired. Switch to this account to refresh.")
+                }
+            } catch {
+                log.error("[fetchUsage] Failed to get usage for \(account.email): \(error.localizedDescription)")
+                accountUsage[account.id] = nil
+                if let usageError = error as? ClaudeService.UsageError, case .network(let msg) = usageError, msg.contains("429") {
+                    accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: true, message: "API Rate Limited. Try again later.")
+                } else {
+                    accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: false, message: "Could not fetch usage: \(error.localizedDescription)")
                 }
             }
         }

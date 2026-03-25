@@ -29,6 +29,9 @@ struct UsageDashboardView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 40)
                 } else {
+                    // Today's cost banner
+                    todayCostBanner
+
                     ForEach(appState.accounts) { account in
                         accountUsageCard(account: account, usage: appState.accountUsage[account.id])
                     }
@@ -48,6 +51,37 @@ struct UsageDashboardView: View {
             .padding(.vertical, 12)
         }
     }
+
+    // MARK: - Today Cost Banner
+
+    private var todayCostBanner: some View {
+        let cost = appState.costSummary.todayCost
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "dollarsign.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.green)
+                Text("Today's API-Equivalent Cost")
+                    .font(.caption.weight(.medium))
+                    .lineLimit(1)
+                Spacer()
+            }
+
+            Text(cost >= 1 ? String(format: "$%.2f", cost) : String(format: "$%.4f", cost))
+                .font(.title.weight(.semibold).monospacedDigit())
+                .foregroundStyle(.green)
+
+            Text(Self.costDisclaimer)
+                .font(.system(size: 9))
+                .foregroundStyle(.tertiary)
+                .lineLimit(2)
+        }
+        .padding(12)
+        .background(cardBackground(isActive: true))
+        .padding(.horizontal, 16)
+    }
+
+    private static let costDisclaimer = "Estimated API-equivalent cost of your Claude Code usage, for reference only."
 
     // MARK: - Per-Account Card
 
