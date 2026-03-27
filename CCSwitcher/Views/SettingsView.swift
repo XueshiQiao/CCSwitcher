@@ -66,7 +66,7 @@ struct SettingsView: View {
         VStack(spacing: 12) {
             Image(systemName: "brain.head.profile")
                 .font(.system(size: 48))
-                .foregroundStyle(.purple)
+                .foregroundStyle(.brand)
 
             Text("CCSwitcher")
                 .font(.title2.weight(.bold))

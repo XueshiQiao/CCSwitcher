@@ -43,7 +43,7 @@ struct UsageChartView: View {
 
     private func barColor(for activity: DailyActivity) -> Color {
         let isToday = activity.date == todayString()
-        return isToday ? .purple : .blue.opacity(0.7)
+        return isToday ? .brand : .blue.opacity(0.7)
     }
 
     private func shortDate(_ dateStr: String) -> String {

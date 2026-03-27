@@ -165,17 +165,17 @@ struct CostDetailView: View {
         return HStack(spacing: 8) {
             Text(shortDate(day.date))
                 .font(.caption2.monospacedDigit())
-                .foregroundStyle(isToday ? .purple : .secondary)
+                .foregroundStyle(isToday ? .brand : .secondary)
                 .frame(width: 40, alignment: .leading)
 
             Text(formatCost(day.totalCost))
                 .font(.caption2.weight(.medium).monospacedDigit())
-                .foregroundStyle(isToday ? .purple : .primary)
+                .foregroundStyle(isToday ? .brand : .primary)
                 .frame(width: 56, alignment: .trailing)
 
             GeometryReader { geo in
                 RoundedRectangle(cornerRadius: 2)
-                    .fill(isToday ? Color.purple : Color.blue.opacity(0.6))
+                    .fill(isToday ? Color.brand : Color.blue.opacity(0.6))
                     .frame(width: max(2, geo.size.width * barRatio), height: 8)
             }
             .frame(height: 8)
@@ -189,7 +189,7 @@ struct CostDetailView: View {
         }
         .padding(.vertical, 4)
         .padding(.horizontal, 8)
-        .background(isToday ? Color.purple.opacity(0.05) : .clear)
+        .background(isToday ? Color.brand.opacity(0.05) : .clear)
         .clipShape(RoundedRectangle(cornerRadius: 4))
     }
 

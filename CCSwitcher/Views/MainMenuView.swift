@@ -54,7 +54,7 @@ struct MainMenuView: View {
     private var promoBannerView: some View {
         HStack {
             Image(systemName: "gift.fill")
-                .foregroundStyle(.purple)
+                .foregroundStyle(.brand)
             
             VStack(alignment: .leading, spacing: 2) {
                 Text("Double Usage Active")
@@ -69,7 +69,7 @@ struct MainMenuView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-        .background(Color.purple.opacity(0.1))
+        .background(Color.brand.opacity(0.1))
     }
     
     private func isPromoActive() -> Bool {
@@ -126,7 +126,7 @@ struct MainMenuView: View {
         HStack(spacing: 10) {
             Image(systemName: "brain.head.profile")
                 .font(.title2)
-                .foregroundStyle(.purple)
+                .foregroundStyle(.brand)
 
             VStack(alignment: .leading, spacing: 2) {
                 if let account = appState.activeAccount {
@@ -139,10 +139,10 @@ struct MainMenuView: View {
                         if let sub = account.subscriptionType {
                             Text("(\(sub))")
                                 .font(.caption2)
-                                .foregroundStyle(.purple)
+                                .foregroundStyle(.brand)
                                 .padding(.horizontal, 4)
                                 .padding(.vertical, 1)
-                                .background(.purple.opacity(0.1), in: Capsule())
+                                .background(.brand.opacity(0.1), in: Capsule())
                         }
                     }
                 } else {

@@ -110,7 +110,7 @@ struct UsageDashboardView: View {
             HStack(spacing: 8) {
                 Image(systemName: "waveform.path.ecg")
                     .font(.caption)
-                    .foregroundStyle(.purple)
+                    .foregroundStyle(.brand)
                 Text("Today's Activity")
                     .font(.caption.weight(.medium))
                 Spacer()
@@ -139,8 +139,8 @@ struct UsageDashboardView: View {
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(Color.purple.opacity(0.03))
-                .strokeBorder(Color.purple.opacity(0.15), lineWidth: 1)
+                .fill(Color.brand.opacity(0.03))
+                .strokeBorder(Color.brand.opacity(0.15), lineWidth: 1)
         )
         .padding(.horizontal, 16)
     }
@@ -184,7 +184,7 @@ struct UsageDashboardView: View {
 
     private func modelColor(_ name: String) -> Color {
         switch name {
-        case "Opus": return .purple
+        case "Opus": return .brand
         case "Sonnet": return .blue
         case "Haiku": return .green
         default: return .gray
@@ -232,7 +232,7 @@ struct UsageDashboardView: View {
         HStack(spacing: 8) {
             Image(systemName: account.provider.iconName)
                 .font(.caption)
-                .foregroundStyle(account.isActive ? .purple : .secondary)
+                .foregroundStyle(account.isActive ? .brand : .secondary)
 
             Text(account.obfuscatedEmail)
                 .font(.caption.weight(.medium))
@@ -252,10 +252,10 @@ struct UsageDashboardView: View {
             if let sub = account.subscriptionType {
                 Text(sub)
                     .font(.caption2)
-                    .foregroundStyle(.purple)
+                    .foregroundStyle(.brand)
                     .padding(.horizontal, 5)
                     .padding(.vertical, 1)
-                    .background(.purple.opacity(0.1), in: Capsule())
+                    .background(.brand.opacity(0.1), in: Capsule())
             }
         }
     }
@@ -293,8 +293,8 @@ struct UsageDashboardView: View {
 
     private func cardBackground(isActive: Bool) -> some View {
         RoundedRectangle(cornerRadius: 10)
-            .fill(isActive ? Color.purple.opacity(0.03) : Color.gray.opacity(0.03))
-            .strokeBorder(isActive ? Color.purple.opacity(0.15) : Color.gray.opacity(0.12), lineWidth: 1)
+            .fill(isActive ? Color.brand.opacity(0.03) : Color.gray.opacity(0.03))
+            .strokeBorder(isActive ? Color.brand.opacity(0.15) : Color.gray.opacity(0.12), lineWidth: 1)
     }
 
     // MARK: - Usage Row

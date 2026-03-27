@@ -49,7 +49,7 @@ struct AccountSwitcherView: View {
             // Provider icon
             Image(systemName: account.provider.iconName)
                 .font(.title2)
-                .foregroundStyle(account.isActive ? .purple : .secondary)
+                .foregroundStyle(account.isActive ? .brand : .secondary)
                 .frame(width: 32, height: 32)
 
             // Account info
@@ -93,7 +93,7 @@ struct AccountSwitcherView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
-                .tint(.purple)
+                .tint(.brand)
             }
 
             Button {
@@ -119,8 +119,8 @@ struct AccountSwitcherView: View {
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(account.isActive ? Color.purple.opacity(0.05) : Color.clear)
-                .strokeBorder(account.isActive ? Color.purple.opacity(0.2) : Color.gray.opacity(0.15), lineWidth: 1)
+                .fill(account.isActive ? Color.brand.opacity(0.05) : Color.clear)
+                .strokeBorder(account.isActive ? Color.brand.opacity(0.2) : Color.gray.opacity(0.15), lineWidth: 1)
         )
     }
 
@@ -168,15 +168,15 @@ struct AccountSwitcherView: View {
                         Task { await appState.addAccount() }
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(.purple)
+                    .tint(.brand)
                     .controlSize(.small)
                 }
             }
             .padding(12)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.purple.opacity(0.05))
-                    .strokeBorder(Color.purple.opacity(0.2), lineWidth: 1)
+                    .fill(Color.brand.opacity(0.05))
+                    .strokeBorder(Color.brand.opacity(0.2), lineWidth: 1)
             )
         } else {
             VStack(spacing: 8) {
@@ -190,7 +190,7 @@ struct AccountSwitcherView: View {
                         .padding(.vertical, 8)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.purple)
+                .tint(.brand)
 
                 // Secondary: Capture already-logged-in account
                 Button {
