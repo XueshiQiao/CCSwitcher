@@ -13,8 +13,7 @@ private struct StatWithTooltip<Content: View>: View {
                 Text(tooltip)
                     .font(.caption)
                     .padding(8)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: 200)
+                    .frame(width: 200)
             }
     }
 }
