@@ -11,12 +11,9 @@ CCSwitcher is a lightweight, pure menu bar macOS application designed to help de
 - **Seamless Login Flow**: Add new accounts without ever opening a terminal. The app silently invokes the CLI and handles the browser OAuth loop for you.
 - **System-Native UX**: A clean, native SwiftUI interface that behaves exactly like a first-class macOS menu bar utility, complete with a fully functional settings window.
 
-## Screenshots
+## Demo
 
-<p align="center">
-  <img src="assets/screenshot1.png" width="45%" alt="Menu Bar View" />
-  <img src="assets/screenshot2.png" width="45%" alt="Settings View" />
-</p>
+https://github.com/XueshiQiao/CCSwitcher/raw/main/assets/CCSwitcher-screen-high-quality-1.1.0.mp4
 
 ## Key Features & Architecture
 
