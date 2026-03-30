@@ -72,7 +72,7 @@ struct CostDetailView: View {
         .background(
             RoundedRectangle(cornerRadius: 10)
                 .fill(Color.green.opacity(0.03))
-                .strokeBorder(Color.green.opacity(0.15), lineWidth: 1)
+                .strokeBorder(Color.green.opacity(0.25), lineWidth: 1)
         )
         .padding(.horizontal, 16)
     }
@@ -107,7 +107,7 @@ struct CostDetailView: View {
         .background(
             RoundedRectangle(cornerRadius: 10)
                 .fill(Color.gray.opacity(0.03))
-                .strokeBorder(Color.gray.opacity(0.12), lineWidth: 1)
+                .strokeBorder(Color.gray.opacity(0.2), lineWidth: 1)
         )
     }
 
@@ -220,8 +220,8 @@ struct CostDetailView: View {
                     }
                 }
                 .background(Color.gray.opacity(0.03))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.gray.opacity(0.12), lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.gray.opacity(0.2), lineWidth: 1))
 
                 Text("Cache write = 5-min tier (1.25× base input). Cache read = 0.1× base input.")
                     .font(.system(size: 9))
@@ -244,7 +244,7 @@ struct CostDetailView: View {
             .background(
                 RoundedRectangle(cornerRadius: 10)
                     .fill(Color.gray.opacity(0.03))
-                    .strokeBorder(Color.gray.opacity(0.12), lineWidth: 1)
+                    .strokeBorder(Color.gray.opacity(0.2), lineWidth: 1)
             )
             .padding(.horizontal, 16)
         }

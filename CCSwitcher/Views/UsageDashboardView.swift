@@ -139,7 +139,7 @@ struct UsageDashboardView: View {
         .background(
             RoundedRectangle(cornerRadius: 10)
                 .fill(Color.brand.opacity(0.03))
-                .strokeBorder(Color.brand.opacity(0.15), lineWidth: 1)
+                .strokeBorder(Color.brand.opacity(0.25), lineWidth: 1)
         )
         .padding(.horizontal, 16)
     }
@@ -293,7 +293,7 @@ struct UsageDashboardView: View {
     private func cardBackground(isActive: Bool) -> some View {
         RoundedRectangle(cornerRadius: 10)
             .fill(isActive ? Color.brand.opacity(0.03) : Color.gray.opacity(0.03))
-            .strokeBorder(isActive ? Color.brand.opacity(0.15) : Color.gray.opacity(0.12), lineWidth: 1)
+            .strokeBorder(isActive ? Color.brand.opacity(0.25) : Color.gray.opacity(0.2), lineWidth: 1)
     }
 
     // MARK: - Usage Row
