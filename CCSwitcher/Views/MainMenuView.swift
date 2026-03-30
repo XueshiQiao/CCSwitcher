@@ -65,7 +65,7 @@ struct MainMenuView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-        .background(Color.brand.opacity(0.1))
+        .background(.subtleBrand)
     }
     
     private func isPromoActive() -> Bool {
@@ -138,7 +138,7 @@ struct MainMenuView: View {
                                 .foregroundStyle(.brand)
                                 .padding(.horizontal, 4)
                                 .padding(.vertical, 1)
-                                .background(.brand.opacity(0.1), in: Capsule())
+                                .background(.subtleBrand, in: Capsule())
                         }
                     }
                 } else {
@@ -179,14 +179,14 @@ struct MainMenuView: View {
                     }
             }
         }
-        .background(Color.brand.opacity(0.06), in: Capsule())
+        .background(.tabBackground, in: Capsule())
         .overlay {
             GeometryReader { geo in
                 let count = CGFloat(Tab.allCases.count)
                 let tabWidth = geo.size.width / count
                 let index = CGFloat(Tab.allCases.firstIndex(of: selectedTab) ?? 0)
                 Capsule()
-                    .fill(Color.brand.opacity(0.12))
+                    .fill(.tabSelected)
                     .padding(2)
                     .frame(width: tabWidth)
                     .offset(x: tabWidth * index)

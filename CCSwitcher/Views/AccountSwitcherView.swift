@@ -119,8 +119,8 @@ struct AccountSwitcherView: View {
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(account.isActive ? Color.brand.opacity(0.05) : Color.clear)
-                .strokeBorder(account.isActive ? Color.brand.opacity(0.25) : Color.gray.opacity(0.2), lineWidth: 1)
+                .fill(account.isActive ? .cardFillStrong : .clear)
+                .strokeBorder(account.isActive ? .cardBorderBrand : .cardBorderNeutral, lineWidth: 1)
         )
     }
 
@@ -145,8 +145,8 @@ struct AccountSwitcherView: View {
             .padding(12)
             .background(
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.brand.opacity(0.05))
-                    .strokeBorder(Color.brand.opacity(0.25), lineWidth: 1)
+                    .fill(.cardFillStrong)
+                    .strokeBorder(.cardBorderBrand, lineWidth: 1)
             )
         } else if showingAddConfirm {
             // Inline confirmation for "Add Current"
@@ -175,8 +175,8 @@ struct AccountSwitcherView: View {
             .padding(12)
             .background(
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.brand.opacity(0.05))
-                    .strokeBorder(Color.brand.opacity(0.25), lineWidth: 1)
+                    .fill(.cardFillStrong)
+                    .strokeBorder(.cardBorderBrand, lineWidth: 1)
             )
         } else {
             VStack(spacing: 8) {

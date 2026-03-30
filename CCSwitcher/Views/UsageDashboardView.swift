@@ -138,8 +138,8 @@ struct UsageDashboardView: View {
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(Color.brand.opacity(0.03))
-                .strokeBorder(Color.brand.opacity(0.25), lineWidth: 1)
+                .fill(.cardFill)
+                .strokeBorder(.cardBorderBrand, lineWidth: 1)
         )
         .padding(.horizontal, 16)
     }
@@ -254,7 +254,7 @@ struct UsageDashboardView: View {
                     .foregroundStyle(.brand)
                     .padding(.horizontal, 5)
                     .padding(.vertical, 1)
-                    .background(.brand.opacity(0.1), in: Capsule())
+                    .background(.subtleBrand, in: Capsule())
             }
         }
     }
@@ -292,8 +292,8 @@ struct UsageDashboardView: View {
 
     private func cardBackground(isActive: Bool) -> some View {
         RoundedRectangle(cornerRadius: 10)
-            .fill(isActive ? Color.brand.opacity(0.03) : Color.gray.opacity(0.03))
-            .strokeBorder(isActive ? Color.brand.opacity(0.25) : Color.gray.opacity(0.2), lineWidth: 1)
+            .fill(isActive ? .cardFill : .cardFillNeutral)
+            .strokeBorder(isActive ? .cardBorderBrand : .cardBorderNeutral, lineWidth: 1)
     }
 
     // MARK: - Usage Row
@@ -316,7 +316,7 @@ struct UsageDashboardView: View {
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 3)
-                            .fill(Color.gray.opacity(0.15))
+                            .fill(.progressTrack)
                             .frame(height: 6)
 
                         RoundedRectangle(cornerRadius: 3)

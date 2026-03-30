@@ -71,8 +71,8 @@ struct CostDetailView: View {
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(Color.green.opacity(0.03))
-                .strokeBorder(Color.green.opacity(0.25), lineWidth: 1)
+                .fill(.cardFillGreen)
+                .strokeBorder(.cardBorderGreen, lineWidth: 1)
         )
         .padding(.horizontal, 16)
     }
@@ -106,8 +106,8 @@ struct CostDetailView: View {
         .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(Color.gray.opacity(0.03))
-                .strokeBorder(Color.gray.opacity(0.2), lineWidth: 1)
+                .fill(.cardFillNeutral)
+                .strokeBorder(.cardBorderNeutral, lineWidth: 1)
         )
     }
 
@@ -189,7 +189,7 @@ struct CostDetailView: View {
         }
         .padding(.vertical, 4)
         .padding(.horizontal, 8)
-        .background(isToday ? Color.brand.opacity(0.05) : .clear)
+        .background(isToday ? .cardFillStrong : .clear)
         .clipShape(RoundedRectangle(cornerRadius: 4))
     }
 
@@ -219,9 +219,9 @@ struct CostDetailView: View {
                         Divider()
                     }
                 }
-                .background(Color.gray.opacity(0.03))
+                .background(.cardFillNeutral)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
-                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.gray.opacity(0.2), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.cardBorderNeutral, lineWidth: 1))
 
                 Text("Cache write = 5-min tier (1.25× base input). Cache read = 0.1× base input.")
                     .font(.system(size: 9))
@@ -243,8 +243,8 @@ struct CostDetailView: View {
             .padding(12)
             .background(
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.gray.opacity(0.03))
-                    .strokeBorder(Color.gray.opacity(0.2), lineWidth: 1)
+                    .fill(.cardFillNeutral)
+                    .strokeBorder(.cardBorderNeutral, lineWidth: 1)
             )
             .padding(.horizontal, 16)
         }
