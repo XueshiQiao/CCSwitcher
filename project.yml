@@ -37,8 +37,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: me.xueshi.ccswitcher
         CODE_SIGN_ENTITLEMENTS: CCSwitcher/Resources/CCSwitcher.entitlements
         PRODUCT_NAME: CCSwitcher
-        MARKETING_VERSION: "1.1.1"
-        CURRENT_PROJECT_VERSION: "31"
+        MARKETING_VERSION: "1.1.2"
+        CURRENT_PROJECT_VERSION: "32"
         COMBINE_HIDPI_IMAGES: true
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
