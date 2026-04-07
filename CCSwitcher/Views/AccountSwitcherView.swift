@@ -55,7 +55,7 @@ struct AccountSwitcherView: View {
             // Account info
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text(account.obfuscatedDisplayName)
+                    Text(account.displayName)
                         .font(.subheadline.weight(.medium))
 
                     if account.isActive {
@@ -68,7 +68,7 @@ struct AccountSwitcherView: View {
                     }
                 }
 
-                Text(account.obfuscatedEmail)
+                Text(account.email)
                     .font(.caption)
                     .foregroundStyle(.secondary)
 

@@ -11,8 +11,8 @@ struct CCSwitcherApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var appState = AppState()
     @StateObject private var updateChecker = UpdateChecker()
-    @AppStorage("showAccountName") private var showAccountName = true
     @AppStorage("refreshInterval") private var refreshInterval: Double = 300
+    @AppStorage("showUsageInMenuBar") private var showUsageInMenuBar = false
     
     @State private var isDoubleUsageActive = false
     let timer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
@@ -58,9 +58,12 @@ struct CCSwitcherApp: App {
     private var menuBarLabel: some View {
         HStack(spacing: 4) {
             Image(systemName: isDoubleUsageActive ? "brain.head.profile.fill" : "brain.head.profile")
-            if showAccountName {
-                if let account = appState.activeAccount {
-                    Text(account.obfuscatedDisplayName)
+            if showUsageInMenuBar,
+               let account = appState.activeAccount {
+                let utilization = appState.accountUsage[account.id]?.fiveHour?.utilization
+                    ?? appState.cachedUsage[account.id]?.effectiveSessionUtilization()
+                if let utilization {
+                    Text("\(Int(utilization))")
                         .font(.caption)
                 }
             }
