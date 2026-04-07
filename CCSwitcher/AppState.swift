@@ -30,6 +30,12 @@ final class AppState: ObservableObject {
     }
     
     @Published var accountUsageErrors: [UUID: UsageErrorState] = [:]
+    @Published var cachedUsage: [UUID: CachedUsageEntry] = [:]
+
+    /// Whether auto-switch is enabled (persisted via AppStorage in SettingsView)
+    @AppStorage("autoSwitchEnabled") var autoSwitchEnabled = false
+    /// Usage threshold (0-100) that triggers auto-switch
+    @AppStorage("autoSwitchThreshold") var autoSwitchThreshold = 90
 
     // MARK: - Services
 
@@ -40,24 +46,47 @@ final class AppState: ObservableObject {
     private let keychain = KeychainService.shared
 
     private let accountsKey = "com.ccswitcher.accounts"
+    private let usageCacheKey = "com.ccswitcher.usageCache"
     private var refreshTimer: Timer?
+    private var lastAutoSwitchTime: Date?
+    private let autoSwitchCooldown: TimeInterval = 600
+    /// Track last-abandoned account to prevent A→B→A oscillation
+    private var lastAbandonedAccountId: UUID?
 
     // MARK: - Initialization
 
     init() {
         log.info("[init] Loading accounts from UserDefaults...")
         loadAccounts()
-        log.info("[init] Loaded \(self.accounts.count) accounts, active: \(self.activeAccount?.id.uuidString ?? "none")")
+        loadUsageCache()
+        // Pre-populate accountUsage from cache so UI renders immediately
+        // Use even stale cache — better to show old data than nothing
+        for (id, entry) in cachedUsage {
+            accountUsage[id] = entry.usage
+        }
+
+        log.info("[init] Loaded \(self.accounts.count) accounts, \(self.cachedUsage.count) cached, active: \(self.activeAccount?.id.uuidString ?? "none")")
     }
 
     // MARK: - Refresh
 
+    /// When true, `refresh()` skips `autoSwitchIfNeeded()` to prevent recursion.
+    private var isAutoSwitching = false
+
+    private var isRefreshing = false
+
     func refresh() async {
+        guard !isRefreshing else {
+            log.info("[refresh] Skipping: already refreshing")
+            return
+        }
         guard !isLoggingIn else {
             log.info("[refresh] Skipping: login in progress")
             return
         }
+        isRefreshing = true
         isLoading = true
+        defer { isLoading = false; isRefreshing = false }
         errorMessage = nil
 
         claudeAvailable = await claudeService.isClaudeAvailable()
@@ -80,6 +109,11 @@ final class AppState: ObservableObject {
         await fetchAllAccountUsage()
         lastUsageRefresh = Date()
 
+        // Auto-switch when current account exceeds threshold (skip if called from switchTo during auto-switch)
+        if !isAutoSwitching {
+            await autoSwitchIfNeeded()
+        }
+
         usageSummary = statsParser.getUsageSummary()
         recentActivity = statsParser.getRecentActivity(days: 7)
         activeSessions = statsParser.getActiveSessions()
@@ -93,8 +127,6 @@ final class AppState: ObservableObject {
         activityStats = activity
 
         log.info("[refresh] Usage: weekly=\(self.usageSummary.weeklyMessages) msgs, \(self.activeSessions.count) active sessions, today=$\(String(format: "%.2f", cost.todayCost)) turns=\(activity.conversationTurns)")
-
-        isLoading = false
     }
 
     func startAutoRefresh(interval: TimeInterval = 300) {
@@ -180,6 +212,7 @@ final class AppState: ObservableObject {
         }
 
         isLoggingIn = true
+        defer { isLoggingIn = false }
         errorMessage = nil
 
         do {
@@ -203,17 +236,30 @@ final class AppState: ObservableObject {
             guard status.loggedIn, let email = status.email else {
                 errorMessage = "Login did not complete"
                 log.error("[loginNewAccount] Step 3: Not logged in after login!")
-                isLoggingIn = false
                 return
             }
             log.info("[loginNewAccount] Step 3: Logged in as \(email)")
 
-            // 4. Check for duplicate — if exists, just refresh its backup
+            // 4. Check for duplicate — if exists, refresh its backup and usage
             if let existing = accounts.firstIndex(where: { $0.email == email }) {
                 log.info("[loginNewAccount] Step 4: Account already exists, refreshing backup")
                 _ = claudeService.captureCurrentCredentials(forAccountId: accounts[existing].id.uuidString)
-                errorMessage = "Account already exists - credentials refreshed"
+
+                // Clear expired error and mark as active
+                accountUsageErrors.removeValue(forKey: accounts[existing].id)
+
+                // Ensure this account is marked active
+                for i in accounts.indices {
+                    accounts[i].isActive = (i == existing)
+                }
+                activeAccount = accounts[existing]
+                saveAccounts()
+
+                // Must clear before refresh() — refresh() has `guard !isLoggingIn` that would skip otherwise.
+                // The defer at function scope will set it to false again harmlessly.
                 isLoggingIn = false
+                await refresh()
+                log.info("[loginNewAccount] Step 4: Existing account credentials refreshed and usage updated")
                 return
             }
 
@@ -232,7 +278,6 @@ final class AppState: ObservableObject {
             if !captured {
                 errorMessage = "Could not capture credentials"
                 log.error("[loginNewAccount] Step 5: Capture failed!")
-                isLoggingIn = false
                 return
             }
 
@@ -250,7 +295,6 @@ final class AppState: ObservableObject {
             log.info("[loginNewAccount] ===== Login completed =====")
         } catch {
             errorMessage = error.localizedDescription
-            isLoggingIn = false
             log.error("[loginNewAccount] Error: \(error.localizedDescription)")
         }
     }
@@ -258,6 +302,8 @@ final class AppState: ObservableObject {
     func removeAccount(_ account: Account) {
         log.info("[removeAccount] Removing account \(account.id)")
         keychain.removeAccountBackup(forAccountId: account.id.uuidString)
+        cachedUsage.removeValue(forKey: account.id)
+        saveUsageCache()
         accounts.removeAll { $0.id == account.id }
         if account.isActive, let first = accounts.first {
             accounts[accounts.startIndex].isActive = true
@@ -315,6 +361,7 @@ final class AppState: ObservableObject {
         }
 
         isLoggingIn = true
+        defer { isLoggingIn = false }
         errorMessage = nil
 
         do {
@@ -332,20 +379,19 @@ final class AppState: ObservableObject {
             let status = try await claudeService.getAuthStatus()
             guard status.loggedIn, let email = status.email else {
                 errorMessage = "Login did not complete"
-                isLoggingIn = false
                 return
             }
 
             guard email == account.email else {
                 errorMessage = "Logged in as \(email), but expected \(account.email). Credentials not updated."
                 log.error("[reauth] Email mismatch: got \(email), expected \(account.email)")
-                isLoggingIn = false
                 return
             }
 
-            // 4. Capture the fresh token
+            // 4. Capture the fresh token and clear expired state
             let captured = claudeService.captureCurrentCredentials(forAccountId: account.id.uuidString)
             log.info("[reauth] Token capture result: \(captured)")
+            accountUsageErrors.removeValue(forKey: account.id)
 
             // 5. Update account metadata
             if let index = accounts.firstIndex(where: { $0.id == account.id }) {
@@ -365,17 +411,88 @@ final class AppState: ObservableObject {
             log.info("[reauth] ===== Re-authentication completed =====")
         } catch {
             errorMessage = error.localizedDescription
-            isLoggingIn = false
             log.error("[reauth] Error: \(error.localizedDescription)")
         }
+    }
+
+    // MARK: - Auto Switch
+
+    private func autoSwitchIfNeeded() async {
+        guard autoSwitchEnabled else { return }
+        guard let current = activeAccount else { return }
+        guard accounts.count > 1 else { return }
+
+        // Anti-oscillation cooldown
+        if let lastSwitch = lastAutoSwitchTime,
+           Date().timeIntervalSince(lastSwitch) < autoSwitchCooldown {
+            log.info("[autoSwitch] Cooldown active, skipping")
+            return
+        }
+
+        let currentUtilization = resolveSessionUtilization(for: current.id) ?? 0
+        guard currentUtilization >= Double(autoSwitchThreshold) else { return }
+
+        log.info("[autoSwitch] Current account \(current.email) at \(Int(currentUtilization))% (threshold: \(autoSwitchThreshold)%), looking for alternative...")
+
+        // Exclude expired tokens (truly unknown); allow 429'd accounts (have cache)
+        // Deprioritize (don't exclude) the last-abandoned account to prevent A→B→A oscillation
+        let threshold = Double(autoSwitchThreshold)
+        let candidates = accounts
+            .filter { $0.id != current.id }
+            .filter { !(accountUsageErrors[$0.id]?.isExpired ?? false) }
+            .compactMap { account -> (Account, Double, TimeInterval)? in
+                guard let util = resolveSessionUtilization(for: account.id) else { return nil }
+                let resetInterval = resolveWeeklyResetInterval(for: account.id)
+                return (account, util, resetInterval)
+            }
+            .filter { $0.1 < threshold }
+            .sorted { a, b in
+                // Primary: lower utilization. Tiebreaker (<10% diff): sooner weekly reset
+                if abs(a.1 - b.1) < 10.0 {
+                    return a.2 < b.2
+                }
+                return a.1 < b.1
+            }
+
+        // Prefer non-abandoned candidate; fall back to abandoned only if it's the sole option
+        let candidate = candidates.first(where: { $0.0.id != lastAbandonedAccountId })
+            ?? candidates.first
+
+        guard let (target, targetUtil, _) = candidate else {
+            log.info("[autoSwitch] No suitable account found (all above threshold or unavailable)")
+            return
+        }
+
+        log.info("[autoSwitch] Switching to \(target.email) at \(Int(targetUtil))%")
+        lastAbandonedAccountId = current.id
+        lastAutoSwitchTime = Date()
+        isAutoSwitching = true
+        defer { isAutoSwitching = false }
+        await switchTo(target)
+    }
+
+    /// Resolve session utilization: live data first, then cache with reset-awareness.
+    private func resolveSessionUtilization(for accountId: UUID) -> Double? {
+        if accountUsageErrors[accountId] == nil,
+           let usage = accountUsage[accountId],
+           let util = usage.fiveHour?.utilization {
+            return util
+        }
+        return cachedUsage[accountId]?.effectiveSessionUtilization()
+    }
+
+    /// Time until weekly reset (seconds). Returns .infinity if unknown.
+    private func resolveWeeklyResetInterval(for accountId: UUID) -> TimeInterval {
+        let usage = accountUsage[accountId] ?? cachedUsage[accountId]?.usage
+        guard let resetDate = usage?.sevenDay?.resetsAtDate else { return .infinity }
+        let interval = resetDate.timeIntervalSinceNow
+        return interval > 0 ? interval : 0
     }
 
     // MARK: - Usage
 
     private func fetchAllAccountUsage() async {
         accountUsageErrors.removeAll()
-        // For active account: use live keychain token (with delegated refresh on expiry)
-        // For other accounts: use backup token (no silent swap — just mark expired)
         for account in accounts {
             let tokenJSON: String?
             if account.isActive {
@@ -387,48 +504,91 @@ final class AppState: ObservableObject {
                 log.warning("[fetchUsage] No token for \(account.email), skipping")
                 continue
             }
+            // Stagger requests to avoid 429 rate limiting (1.5s between each)
+            if account.id != accounts.first?.id {
+                try? await Task.sleep(for: .milliseconds(1500))
+            }
             do {
                 let usage = try await claudeService.getUsageLimits(accessToken: accessToken)
                 accountUsage[account.id] = usage
+                cachedUsage[account.id] = CachedUsageEntry(usage: usage, fetchedAt: Date())
                 accountUsageErrors[account.id] = nil
                 log.info("[fetchUsage] \(account.email): session=\(usage.fiveHour?.utilization ?? -1)%, weekly=\(usage.sevenDay?.utilization ?? -1)%")
             } catch ClaudeService.UsageError.expired {
                 log.warning("[fetchUsage] Token expired for \(account.email)")
                 if account.isActive {
-                    // Active account: delegated refresh via `claude auth status` is safe (no keychain swap)
+                    // Try refreshing via CLI: run `auth status` which may internally refresh the token
+                    var recovered = false
                     do {
                         _ = try await claudeService.getAuthStatus()
-                        log.info("[fetchUsage] Delegated refresh completed for active account.")
-                        // Re-read refreshed token and retry
+                        log.info("[fetchUsage] Auth status check done for active account.")
                         if let refreshedJSON = keychain.readClaudeToken(),
                            let refreshedToken = ClaudeService.extractAccessToken(from: refreshedJSON),
+                           refreshedToken != accessToken,
                            let usage = try? await claudeService.getUsageLimits(accessToken: refreshedToken) {
                             accountUsage[account.id] = usage
+                            cachedUsage[account.id] = CachedUsageEntry(usage: usage, fetchedAt: Date())
                             accountUsageErrors[account.id] = nil
-                            log.info("[fetchUsage] Recovered \(account.email) via delegated refresh.")
+                            // Update backup with the refreshed token
+                            _ = claudeService.captureCurrentCredentials(forAccountId: account.id.uuidString)
+                            log.info("[fetchUsage] Recovered \(account.email) via token refresh.")
+                            recovered = true
                         }
                     } catch {
-                        log.error("[fetchUsage] Delegated refresh failed for active account: \(error.localizedDescription)")
-                        accountUsage[account.id] = nil
-                        accountUsageErrors[account.id] = UsageErrorState(isExpired: true, isRateLimited: false, message: "Token expired. Switch to refresh.")
+                        log.error("[fetchUsage] Auth status check failed: \(error.localizedDescription)")
+                    }
+                    if !recovered {
+                        log.warning("[fetchUsage] Could not refresh token for active account \(account.email)")
+                        fallbackToCache(for: account.id)
+                        accountUsageErrors[account.id] = UsageErrorState(isExpired: true, isRateLimited: false, message: "Token expired. Click ↻ to re-authenticate.")
                     }
                 } else {
-                    // Non-active account: do NOT silent-swap keychain — just mark as expired.
-                    // Token will be refreshed when the user explicitly switches to this account.
-                    log.info("[fetchUsage] Non-active account \(account.email) token expired, skipping silent swap to avoid race condition with Claude Code CLI.")
-                    accountUsage[account.id] = nil
-                    accountUsageErrors[account.id] = UsageErrorState(isExpired: true, isRateLimited: false, message: "Token expired. Switch to this account to refresh.")
+                    log.info("[fetchUsage] Non-active account \(account.email) token expired.")
+                    fallbackToCache(for: account.id)
+                    accountUsageErrors[account.id] = UsageErrorState(isExpired: true, isRateLimited: false, message: "Token expired. Switch to refresh.")
                 }
             } catch {
                 log.error("[fetchUsage] Failed to get usage for \(account.email): \(error.localizedDescription)")
-                accountUsage[account.id] = nil
-                if let usageError = error as? ClaudeService.UsageError, case .network(let msg) = usageError, msg.contains("429") {
-                    accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: true, message: "API Rate Limited. Try again later.")
+                let is429 = (error as? ClaudeService.UsageError).flatMap {
+                    if case .network(let msg) = $0 { return msg.contains("429") }
+                    return false
+                } ?? false
+
+                if is429 && accountUsage[account.id] == nil && cachedUsage[account.id] == nil {
+                    // No data at all — retry once after delay to build initial cache
+                    log.info("[fetchUsage] 429 with no cache for \(account.email), retrying after 3s...")
+                    try? await Task.sleep(for: .seconds(3))
+                    if let retryUsage = try? await claudeService.getUsageLimits(accessToken: accessToken) {
+                        accountUsage[account.id] = retryUsage
+                        cachedUsage[account.id] = CachedUsageEntry(usage: retryUsage, fetchedAt: Date())
+                        accountUsageErrors[account.id] = nil
+                        log.info("[fetchUsage] Retry succeeded for \(account.email)")
+                        continue
+                    }
+                }
+
+                if is429 {
+                    // Rate limited: keep any cached data (even stale) so weekly bar still shows
+                    if accountUsage[account.id] == nil {
+                        accountUsage[account.id] = cachedUsage[account.id]?.usage
+                    }
+                    accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: true, message: "Rate limited")
                 } else {
-                    accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: false, message: "Could not fetch usage: \(error.localizedDescription)")
+                    fallbackToCache(for: account.id)
+                    accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: false, message: error.localizedDescription)
                 }
             }
         }
+        saveUsageCache()
+    }
+
+    /// On error, preserve cached data in accountUsage — even stale cache is better than nil.
+    /// The view will show a "stale" indicator when needed.
+    private func fallbackToCache(for accountId: UUID) {
+        if let cached = cachedUsage[accountId] {
+            accountUsage[accountId] = cached.usage
+        }
+        // If no cache exists at all, leave accountUsage as-is (may already have data from previous fetch)
     }
 
     // MARK: - Diagnostics
@@ -478,6 +638,23 @@ final class AppState: ObservableObject {
         if let data = try? JSONEncoder().encode(accounts) {
             UserDefaults.standard.set(data, forKey: accountsKey)
             log.debug("[saveAccounts] Saved \(self.accounts.count) accounts to UserDefaults")
+        }
+    }
+
+    private func loadUsageCache() {
+        guard let data = UserDefaults.standard.data(forKey: usageCacheKey),
+              let decoded = try? JSONDecoder().decode([UUID: CachedUsageEntry].self, from: data) else {
+            log.info("[loadUsageCache] No saved usage cache found")
+            return
+        }
+        cachedUsage = decoded
+        log.info("[loadUsageCache] Loaded cache for \(decoded.count) accounts")
+    }
+
+    private func saveUsageCache() {
+        if let data = try? JSONEncoder().encode(cachedUsage) {
+            UserDefaults.standard.set(data, forKey: usageCacheKey)
+            log.debug("[saveUsageCache] Saved cache for \(self.cachedUsage.count) accounts")
         }
     }
 

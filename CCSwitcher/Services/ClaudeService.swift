@@ -9,13 +9,20 @@ final class ClaudeService: Sendable {
     private let claudePath: String
 
     private init() {
+        // Discover nvm-managed node bin paths
+        let nvmPaths: [String] = {
+            let nvmDir = "\(NSHomeDirectory())/.nvm/versions/node"
+            guard let nodes = try? FileManager.default.contentsOfDirectory(atPath: nvmDir) else { return [] }
+            return nodes.sorted().reversed().map { "\(nvmDir)/\($0)/bin/claude" }
+        }()
+
         let possiblePaths = [
             "/usr/local/bin/claude",
             "/opt/homebrew/bin/claude",
             "\(NSHomeDirectory())/.npm-global/bin/claude",
             "\(NSHomeDirectory())/.local/bin/claude",
             "\(NSHomeDirectory())/.claude/local/claude"
-        ]
+        ] + nvmPaths
         self.claudePath = possiblePaths.first { FileManager.default.fileExists(atPath: $0) }
             ?? "claude"
         log.info("Claude binary path: \(self.claudePath)")
@@ -152,6 +159,12 @@ final class ClaudeService: Sendable {
             throw ClaudeServiceError.switchWrongAccount(expected: targetAccount.email, actual: status.email ?? "unknown")
         }
         log.info("[switchAccount] Step 4: Switch verified — logged in as \(status.email ?? "")")
+
+        // 5. Re-capture credentials — the CLI may have internally refreshed the access token
+        //    during the auth status check. Update backup so we have the freshest token.
+        log.info("[switchAccount] Step 5: Re-capturing credentials after switch...")
+        let recaptured = captureCurrentCredentials(forAccountId: targetAccount.id.uuidString)
+        log.info("[switchAccount] Step 5: Re-capture result: \(recaptured)")
     }
 
     /// Capture the current Claude auth token + oauthAccount and associate with an account
@@ -174,13 +187,29 @@ final class ClaudeService: Sendable {
     }
 
     /// Run `claude auth login` which opens browser for OAuth.
+    /// Note: The CLI may exit with non-zero status even when login succeeds
+    /// (e.g., when running without a TTY). We verify success via `auth status` instead.
     func login() async throws {
         log.info("[login] Starting `claude auth login`... (will open browser)")
-        _ = try await runClaude(args: ["auth", "login"])
-        log.info("[login] `claude auth login` process exited")
+        do {
+            _ = try await runClaude(args: ["auth", "login"])
+            log.info("[login] `claude auth login` process exited normally")
+        } catch let error as ClaudeServiceError {
+            switch error {
+            case .cliError(let output) where output.contains("Opening browser") || output.contains("sign in"):
+                // CLI exits non-zero after opening browser — expected.
+                // The OAuth flow completes in the browser and writes to keychain directly.
+                log.warning("[login] CLI exited after opening browser (expected): \(output.prefix(100))")
+            case .processLaunchFailed:
+                // Binary not found or not executable — this is a real failure
+                throw error
+            default:
+                log.warning("[login] CLI exited with error (may still succeed): \(error.localizedDescription)")
+            }
+        }
 
         // Give keychain a moment to sync after CLI writes
-        try await Task.sleep(for: .seconds(1))
+        try await Task.sleep(for: .seconds(2))
         log.info("[login] Post-login delay complete, ready for token capture")
     }
 
@@ -207,7 +236,11 @@ final class ClaudeService: Sendable {
 
                 var env = ProcessInfo.processInfo.environment
                 let homeDir = NSHomeDirectory()
+                // Include the directory containing the resolved claude binary
+                // so that `node` (and other dependencies) are also on PATH
+                let claudeBinDir = (claudePath as NSString).deletingLastPathComponent
                 let extraPaths = [
+                    claudeBinDir,
                     "/opt/homebrew/bin",
                     "/usr/local/bin",
                     "\(homeDir)/.local/bin",

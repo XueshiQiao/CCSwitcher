@@ -50,15 +50,20 @@ struct UsageWindow: Codable {
         let hours = Int(remaining) / 3600
         let minutes = (Int(remaining) % 3600) / 60
 
-        if hours > 24 {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "EEE h:mm a"
-            return formatter.string(from: date)
-        } else if hours > 0 {
+        if hours > 0 {
             return "\(hours) hr \(minutes) min"
         } else {
             return "\(minutes) min"
         }
+    }
+
+    /// Absolute reset time in Beijing time, e.g. "04/06 18:00"
+    var resetDateString: String? {
+        guard let date = resetsAtDate else { return nil }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MM/dd HH:mm"
+        formatter.timeZone = TimeZone(identifier: "Asia/Shanghai")
+        return formatter.string(from: date)
     }
 }
 
@@ -73,6 +78,39 @@ struct ExtraUsage: Codable {
         case monthlyLimit = "monthly_limit"
         case usedCredits = "used_credits"
         case utilization
+    }
+}
+
+// MARK: - Cached Usage Entry (persisted to UserDefaults)
+
+struct CachedUsageEntry: Codable {
+    let usage: UsageAPIResponse
+    let fetchedAt: Date
+
+    /// Cache is stale if the weekly window has already reset, or if data is older than 2 hours.
+    var isStale: Bool {
+        if let resetDate = usage.sevenDay?.resetsAtDate, Date() > resetDate {
+            return true
+        }
+        return Date().timeIntervalSince(fetchedAt) > 7200
+    }
+
+    /// If the 5-hour window reset time has passed, utilization is effectively 0%.
+    func effectiveSessionUtilization() -> Double? {
+        guard let fiveHour = usage.fiveHour else { return nil }
+        if let resetDate = fiveHour.resetsAtDate, Date() > resetDate {
+            return 0.0
+        }
+        return fiveHour.utilization
+    }
+
+    /// If the weekly window reset time has passed, utilization is effectively 0%.
+    func effectiveWeeklyUtilization() -> Double? {
+        guard let sevenDay = usage.sevenDay else { return nil }
+        if let resetDate = sevenDay.resetsAtDate, Date() > resetDate {
+            return 0.0
+        }
+        return sevenDay.utilization
     }
 }
 

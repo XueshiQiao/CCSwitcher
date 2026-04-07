@@ -39,11 +39,11 @@ struct Account: Identifiable, Codable, Hashable {
     var lastUsed: Date?
 
     var obfuscatedEmail: String {
-        return email.obfuscatedEmail()
+        return email
     }
 
     var obfuscatedDisplayName: String {
-        return displayName.obfuscatedEmail()
+        return displayName
     }
 
     init(

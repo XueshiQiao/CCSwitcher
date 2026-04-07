@@ -6,8 +6,17 @@ struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var updateChecker: UpdateChecker
     @AppStorage("refreshInterval") private var refreshInterval: Double = 300
-    @AppStorage("showAccountName") private var showAccountName = true
+    @AppStorage("autoSwitchEnabled") private var autoSwitchEnabled = false
+    @AppStorage("autoSwitchThreshold") private var autoSwitchThreshold = 90
     @AppStorage("showInDock") private var showInDock = false
+    @AppStorage("showUsageInMenuBar") private var showUsageInMenuBar = false
+
+    private var autoSwitchThresholdDouble: Binding<Double> {
+        Binding(
+            get: { Double(autoSwitchThreshold) },
+            set: { autoSwitchThreshold = Int($0) }
+        )
+    }
     @State private var launchAtLogin = false
 
     var body: some View {
@@ -45,8 +54,20 @@ struct SettingsView: View {
                 }
             }
 
-            Section("Appearance") {
-                Toggle("Show account name in menu bar", isOn: $showAccountName)
+            Section("Auto Switch") {
+                Toggle("Auto-switch when usage exceeds threshold", isOn: $autoSwitchEnabled)
+                if autoSwitchEnabled {
+                    HStack {
+                        Slider(value: autoSwitchThresholdDouble, in: 10...100, step: 5)
+                        Text("\(autoSwitchThreshold)%")
+                            .monospacedDigit()
+                            .frame(width: 40, alignment: .trailing)
+                    }
+                }
+            }
+
+            Section("Menu Bar") {
+                Toggle("Show usage in menu bar", isOn: $showUsageInMenuBar)
             }
 
             Section("System") {
