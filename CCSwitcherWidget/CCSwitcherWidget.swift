@@ -373,7 +373,7 @@ private struct LargeWidgetView: View {
     let data: WidgetData
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 8) {
             // Header
             HStack(spacing: 5) {
                 Image(systemName: "brain.head.profile")
@@ -387,40 +387,36 @@ private struct LargeWidgetView: View {
                     .foregroundStyle(.tertiary)
             }
 
-            Spacer(minLength: 4)
+            // Today's activity + model usage
+            VStack(spacing: 6) {
+                HStack(spacing: 0) {
+                    activityStat(icon: "bubble.left.and.bubble.right", value: "\(data.conversationTurns)", label: "Turns")
+                    activityStat(icon: "clock", value: data.activeCodingTime, label: "Active")
+                    activityStat(icon: "doc.text", value: "\(data.linesWritten)", label: "Lines")
+                    activityStat(icon: "dollarsign.circle.fill", value: formatCost(data.todayCost), label: "Cost", valueColor: .green)
+                }
 
-            // Today's activity row
-            HStack(spacing: 0) {
-                activityStat(icon: "bubble.left.and.bubble.right", value: "\(data.conversationTurns)", label: "Turns")
-                activityStat(icon: "clock", value: data.activeCodingTime, label: "Active")
-                activityStat(icon: "doc.text", value: "\(data.linesWritten)", label: "Lines")
-                activityStat(icon: "dollarsign.circle.fill", value: formatCost(data.todayCost), label: "Cost", valueColor: .green)
+                if !data.modelUsage.isEmpty {
+                    Rectangle()
+                        .fill(.quaternary)
+                        .frame(height: 0.5)
+                        .padding(.horizontal, 8)
+
+                    HStack(spacing: 0) {
+                        modelStat(name: "Opus", count: data.modelUsage["Opus"] ?? 0, color: brandColor)
+                        modelStat(name: "Sonnet", count: data.modelUsage["Sonnet"] ?? 0, color: .blue)
+                        modelStat(name: "Haiku", count: data.modelUsage["Haiku"] ?? 0, color: .green)
+                    }
+                }
             }
-            .padding(.vertical, 8)
+            .padding(.vertical, 10)
             .background(brandColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
 
-            Spacer(minLength: 4)
-
-            // Model usage row
-            if !data.modelUsage.isEmpty {
-                HStack(spacing: 0) {
-                    modelStat(name: "Opus", count: data.modelUsage["Opus"] ?? 0, color: brandColor)
-                    modelStat(name: "Sonnet", count: data.modelUsage["Sonnet"] ?? 0, color: .blue)
-                    modelStat(name: "Haiku", count: data.modelUsage["Haiku"] ?? 0, color: .green)
-                }
-
-                Spacer(minLength: 4)
-            }
-
-            // Per-account cards
-            ForEach(Array(data.accounts.enumerated()), id: \.offset) { index, account in
+            // Per-account cards — expand to fill remaining space
+            ForEach(Array(data.accounts.enumerated()), id: \.offset) { _, account in
                 accountCard(account)
-                if index < data.accounts.count - 1 {
-                    Spacer(minLength: 4)
-                }
+                    .frame(maxHeight: .infinity)
             }
-
-            Spacer(minLength: 0)
         }
     }
 
@@ -459,9 +455,9 @@ private struct LargeWidgetView: View {
     }
 
     private func accountCard(_ account: WidgetAccountData) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 10) {
             // Account header
-            HStack(spacing: 5) {
+            HStack(spacing: 6) {
                 Image(systemName: "brain.head.profile")
                     .font(.caption2)
                     .foregroundStyle(account.isActive ? brandColor : .secondary)
@@ -469,12 +465,15 @@ private struct LargeWidgetView: View {
                     .font(.caption.weight(.medium))
                     .lineLimit(1)
                 if account.isActive {
-                    Text("Active")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
-                        .background(.green, in: Capsule())
+                    Text("ACTIVE")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.green)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .overlay(
+                            Capsule()
+                                .stroke(Color.green, lineWidth: 1)
+                        )
                 }
                 Spacer()
                 if let sub = account.subscriptionType {
@@ -499,11 +498,12 @@ private struct LargeWidgetView: View {
                 accountUsageBar(label: "Weekly", utilization: account.weeklyUtilization, resetTime: account.weeklyResetTime)
             }
         }
-        .padding(10)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(account.isActive ? brandColor.opacity(0.08) : Color.gray.opacity(0.08))
-                .strokeBorder(account.isActive ? brandColor.opacity(0.25) : Color.gray.opacity(0.15), lineWidth: 0.5)
+                .fill(account.isActive ? brandColor.opacity(0.22) : Color.white.opacity(0.04))
+                .strokeBorder(account.isActive ? brandColor.opacity(0.6) : Color.white.opacity(0.08), lineWidth: account.isActive ? 1.0 : 0.5)
         )
     }
 
