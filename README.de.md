@@ -41,7 +41,7 @@ CCSwitcher ist eine leichtgewichtige, reine Menüleisten-Anwendung für macOS, d
 
 ## Demo
 
-<video src="assets/CCSwitcher-screen-high-quality-1.1.0.mp4" controls width="900"></video>
+https://github.com/XueshiQiao/CCSwitcher/raw/main/assets/CCSwitcher-screen-high-quality-1.1.0.mp4
 
 ## Zentrale Funktionen & Architektur
 

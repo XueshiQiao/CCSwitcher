@@ -41,7 +41,7 @@ CCSwitcher est une application macOS légère, fonctionnant exclusivement dans l
 
 ## Démonstration
 
-<video src="assets/CCSwitcher-screen-high-quality-1.1.0.mp4" controls width="900"></video>
+https://github.com/XueshiQiao/CCSwitcher/raw/main/assets/CCSwitcher-screen-high-quality-1.1.0.mp4
 
 ## Fonctionnalités clés et architecture
 
