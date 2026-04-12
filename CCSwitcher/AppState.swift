@@ -119,7 +119,7 @@ final class AppState: ObservableObject {
     func addAccount() async {
         log.info("[addAccount] Starting add current account flow...")
         guard claudeAvailable else {
-            errorMessage = String(localized: "Claude CLI not found")
+            errorMessage = String(localized: "Claude CLI not found", bundle: L10n.bundle)
             log.error("[addAccount] Aborted: Claude CLI not found")
             return
         }
@@ -127,14 +127,14 @@ final class AppState: ObservableObject {
         do {
             let status = try await claudeService.getAuthStatus()
             guard status.loggedIn, let email = status.email else {
-                errorMessage = String(localized: "Not logged in to Claude. Run 'claude auth login' first.")
+                errorMessage = String(localized: "Not logged in to Claude. Run 'claude auth login' first.", bundle: L10n.bundle)
                 log.error("[addAccount] Aborted: not logged in")
                 return
             }
             log.info("[addAccount] Current auth: logged in, sub=\(status.subscriptionType ?? "nil")")
 
             if accounts.contains(where: { $0.email == email }) {
-                errorMessage = String(localized: "Account already exists")
+                errorMessage = String(localized: "Account already exists", bundle: L10n.bundle)
                 log.warning("[addAccount] Aborted: duplicate account")
                 return
             }
@@ -152,7 +152,7 @@ final class AppState: ObservableObject {
             log.info("[addAccount] Capturing token from keychain...")
             let captured = claudeService.captureCurrentCredentials(forAccountId: account.id.uuidString)
             if !captured {
-                errorMessage = String(localized: "Could not capture auth token from keychain")
+                errorMessage = String(localized: "Could not capture auth token from keychain", bundle: L10n.bundle)
                 log.error("[addAccount] Token capture failed!")
                 return
             }
@@ -176,7 +176,7 @@ final class AppState: ObservableObject {
     func loginNewAccount() async {
         log.info("[loginNewAccount] ===== Starting login new account flow =====")
         guard claudeAvailable else {
-            errorMessage = String(localized: "Claude CLI not found")
+            errorMessage = String(localized: "Claude CLI not found", bundle: L10n.bundle)
             log.error("[loginNewAccount] Aborted: Claude CLI not found")
             return
         }
@@ -203,7 +203,7 @@ final class AppState: ObservableObject {
             log.info("[loginNewAccount] Step 3: Reading post-login state...")
             let status = try await claudeService.getAuthStatus()
             guard status.loggedIn, let email = status.email else {
-                errorMessage = String(localized: "Login did not complete")
+                errorMessage = String(localized: "Login did not complete", bundle: L10n.bundle)
                 log.error("[loginNewAccount] Step 3: Not logged in after login!")
                 isLoggingIn = false
                 return
@@ -214,7 +214,7 @@ final class AppState: ObservableObject {
             if let existing = accounts.firstIndex(where: { $0.email == email }) {
                 log.info("[loginNewAccount] Step 4: Account already exists, refreshing backup")
                 _ = claudeService.captureCurrentCredentials(forAccountId: accounts[existing].id.uuidString)
-                errorMessage = String(localized: "Account already exists - credentials refreshed")
+                errorMessage = String(localized: "Account already exists - credentials refreshed", bundle: L10n.bundle)
                 isLoggingIn = false
                 return
             }
@@ -232,7 +232,7 @@ final class AppState: ObservableObject {
 
             let captured = claudeService.captureCurrentCredentials(forAccountId: account.id.uuidString)
             if !captured {
-                errorMessage = String(localized: "Could not capture credentials")
+                errorMessage = String(localized: "Could not capture credentials", bundle: L10n.bundle)
                 log.error("[loginNewAccount] Step 5: Capture failed!")
                 isLoggingIn = false
                 return
@@ -294,7 +294,7 @@ final class AppState: ObservableObject {
         // Pre-switch: verify target has a backup
         guard keychain.getAccountBackup(forAccountId: account.id.uuidString) != nil else {
             log.error("[switchTo] ABORT: no backup for target account")
-            errorMessage = String(localized: "No stored credentials for \(account.email). Use re-authenticate to fix.")
+            errorMessage = String(localized: "No stored credentials for \(account.email). Use re-authenticate to fix.", bundle: L10n.bundle)
             return
         }
 
@@ -324,7 +324,7 @@ final class AppState: ObservableObject {
     func reauthenticateAccount(_ account: Account) async {
         log.info("[reauth] ===== Re-authenticating account \(account.id) (\(account.email)) =====")
         guard claudeAvailable else {
-            errorMessage = String(localized: "Claude CLI not found")
+            errorMessage = String(localized: "Claude CLI not found", bundle: L10n.bundle)
             return
         }
 
@@ -345,13 +345,13 @@ final class AppState: ObservableObject {
             // 3. Verify the login result matches the target account
             let status = try await claudeService.getAuthStatus()
             guard status.loggedIn, let email = status.email else {
-                errorMessage = String(localized: "Login did not complete")
+                errorMessage = String(localized: "Login did not complete", bundle: L10n.bundle)
                 isLoggingIn = false
                 return
             }
 
             guard email == account.email else {
-                errorMessage = String(localized: "Logged in as \(email), but expected \(account.email). Credentials not updated.")
+                errorMessage = String(localized: "Logged in as \(email), but expected \(account.email). Credentials not updated.", bundle: L10n.bundle)
                 log.error("[reauth] Email mismatch: got \(email), expected \(account.email)")
                 isLoggingIn = false
                 return
@@ -424,22 +424,22 @@ final class AppState: ObservableObject {
                     } catch {
                         log.error("[fetchUsage] Delegated refresh failed for active account: \(error.localizedDescription)")
                         accountUsage[account.id] = nil
-                        accountUsageErrors[account.id] = UsageErrorState(isExpired: true, isRateLimited: false, message: String(localized: "Token expired. Switch to refresh."))
+                        accountUsageErrors[account.id] = UsageErrorState(isExpired: true, isRateLimited: false, message: String(localized: "Token expired. Switch to refresh.", bundle: L10n.bundle))
                     }
                 } else {
                     // Non-active account: do NOT silent-swap keychain — just mark as expired.
                     // Token will be refreshed when the user explicitly switches to this account.
                     log.info("[fetchUsage] Non-active account \(account.email) token expired, skipping silent swap to avoid race condition with Claude Code CLI.")
                     accountUsage[account.id] = nil
-                    accountUsageErrors[account.id] = UsageErrorState(isExpired: true, isRateLimited: false, message: String(localized: "Token expired. Switch to this account to refresh."))
+                    accountUsageErrors[account.id] = UsageErrorState(isExpired: true, isRateLimited: false, message: String(localized: "Token expired. Switch to this account to refresh.", bundle: L10n.bundle))
                 }
             } catch {
                 log.error("[fetchUsage] Failed to get usage for \(account.email): \(error.localizedDescription)")
                 accountUsage[account.id] = nil
                 if let usageError = error as? ClaudeService.UsageError, case .network(let msg) = usageError, msg.contains("429") {
-                    accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: true, message: String(localized: "API Rate Limited. Try again later."))
+                    accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: true, message: String(localized: "API Rate Limited. Try again later.", bundle: L10n.bundle))
                 } else {
-                    accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: false, message: String(localized: "Could not fetch usage: \(error.localizedDescription)"))
+                    accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: false, message: String(localized: "Could not fetch usage: \(error.localizedDescription)", bundle: L10n.bundle))
                 }
             }
         }

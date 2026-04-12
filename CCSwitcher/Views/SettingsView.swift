@@ -115,19 +115,12 @@ struct SettingsView: View {
     // MARK: - Helpers
 
     private func applyLanguage(_ lang: String) {
+        // Set AppleLanguages for next launch; .environment(\.locale) handles live update
         if lang == "auto" {
             UserDefaults.standard.removeObject(forKey: "AppleLanguages")
         } else {
             UserDefaults.standard.set([lang], forKey: "AppleLanguages")
         }
-        UserDefaults.standard.synchronize()
-        // Relaunch after a short delay so the app fully quits first
-        let bundlePath = Bundle.main.bundleURL.path
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/bin/sh")
-        task.arguments = ["-c", "sleep 1 && open \"\(bundlePath)\""]
-        try? task.run()
-        NSApp.terminate(nil)
     }
 
     private func toggleLaunchAtLogin(_ enable: Bool) {

@@ -5,6 +5,7 @@ private struct StatWithTooltip<Content: View>: View {
     let tooltip: LocalizedStringKey
     @ViewBuilder let content: Content
     @State private var isHovering = false
+    @Environment(\.locale) private var locale
 
     var body: some View {
         content
@@ -14,6 +15,7 @@ private struct StatWithTooltip<Content: View>: View {
                     .font(.caption)
                     .padding(8)
                     .frame(width: 200)
+                    .environment(\.locale, locale)
             }
     }
 }

@@ -100,7 +100,7 @@ struct MainMenuView: View {
     
     private var localOffPeakTimeString: String {
         guard let etTimeZone = TimeZone(identifier: "America/New_York") else {
-            return String(localized: "Double limits: 2 PM - 8 AM ET & Weekends")
+            return String(localized: "Double limits: 2 PM - 8 AM ET & Weekends", bundle: L10n.bundle)
         }
 
         let today = Date()
@@ -110,7 +110,7 @@ struct MainMenuView: View {
         // The double usage starts at 2:00 PM (14:00) ET and ends at 8:00 AM ET next day
         guard let etStartOffPeak = etCalendar.date(bySettingHour: 14, minute: 0, second: 0, of: today),
               let etEndOffPeak = etCalendar.date(bySettingHour: 8, minute: 0, second: 0, of: today) else {
-            return String(localized: "Double limits: 2 PM - 8 AM ET & Weekends")
+            return String(localized: "Double limits: 2 PM - 8 AM ET & Weekends", bundle: L10n.bundle)
         }
 
         let formatter = DateFormatter()
@@ -121,7 +121,7 @@ struct MainMenuView: View {
         let localStart = formatter.string(from: etStartOffPeak)
         let localEnd = formatter.string(from: etEndOffPeak)
 
-        return String(localized: "\(localStart) - \(localEnd) (Weekdays) & Weekends")
+        return String(localized: "\(localStart) - \(localEnd) (Weekdays) & Weekends", bundle: L10n.bundle)
     }
 
     // MARK: - Header

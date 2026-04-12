@@ -25,7 +25,8 @@ struct CCSwitcherApp: App {
     @AppStorage("showAccountName") private var showAccountName = true
     @AppStorage("showFullEmail") private var showFullEmail = false
     @AppStorage("refreshInterval") private var refreshInterval: Double = 300
-    
+    @AppStorage("appLanguage") private var appLanguage = "auto"
+
     @State private var isDoubleUsageActive = false
     let timer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
 
@@ -55,6 +56,7 @@ struct CCSwitcherApp: App {
             MainMenuView()
                 .environmentObject(appState)
                 .environmentObject(updateChecker)
+                .environment(\.locale, currentLocale)
         } label: {
             menuBarLabel
         }
@@ -64,7 +66,12 @@ struct CCSwitcherApp: App {
             SettingsView()
                 .environmentObject(appState)
                 .environmentObject(updateChecker)
+                .environment(\.locale, currentLocale)
         }
+    }
+
+    private var currentLocale: Locale {
+        appLanguage == "auto" ? .autoupdatingCurrent : Locale(identifier: appLanguage)
     }
 
     private var menuBarLabel: some View {
