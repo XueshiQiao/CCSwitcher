@@ -55,6 +55,19 @@ struct Account: Identifiable, Codable, Hashable {
         return obfuscatedDisplayName
     }
 
+    /// Returns the email, optionally obfuscated.
+    func displayEmail(obfuscated: Bool) -> String {
+        obfuscated ? obfuscatedEmail : email
+    }
+
+    /// Returns the effective display name, optionally obfuscating the fallback.
+    func effectiveDisplayName(obfuscated: Bool) -> String {
+        if let label = customLabel, !label.isEmpty {
+            return label
+        }
+        return obfuscated ? obfuscatedDisplayName : displayName
+    }
+
     init(
         id: UUID = UUID(),
         email: String,

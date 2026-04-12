@@ -12,6 +12,7 @@ struct CCSwitcherApp: App {
     @StateObject private var appState = AppState()
     @StateObject private var updateChecker = UpdateChecker()
     @AppStorage("showAccountName") private var showAccountName = true
+    @AppStorage("showFullEmail") private var showFullEmail = false
     @AppStorage("refreshInterval") private var refreshInterval: Double = 300
     
     @State private var isDoubleUsageActive = false
@@ -60,7 +61,7 @@ struct CCSwitcherApp: App {
             Image(systemName: isDoubleUsageActive ? "brain.head.profile.fill" : "brain.head.profile")
             if showAccountName {
                 if let account = appState.activeAccount {
-                    Text(account.effectiveDisplayName)
+                    Text(account.effectiveDisplayName(obfuscated: !showFullEmail))
                         .font(.caption)
                 }
             }

@@ -3,6 +3,7 @@ import SwiftUI
 /// Lists all configured accounts with switching and management.
 struct AccountSwitcherView: View {
     @EnvironmentObject private var appState: AppState
+    @AppStorage("showFullEmail") private var showFullEmail = false
     @State private var showingAddConfirm = false
     @State private var editingAccountId: UUID?
     @State private var editingLabel = ""
@@ -81,7 +82,7 @@ struct AccountSwitcherView: View {
                     }
                 } else {
                     HStack(spacing: 6) {
-                        Text(account.effectiveDisplayName)
+                        Text(account.effectiveDisplayName(obfuscated: !showFullEmail))
                             .font(.subheadline.weight(.medium))
 
                         Button {
@@ -106,7 +107,7 @@ struct AccountSwitcherView: View {
                     }
                 }
 
-                Text(account.obfuscatedEmail)
+                Text(account.displayEmail(obfuscated: !showFullEmail))
                     .font(.caption)
                     .foregroundStyle(.secondary)
 

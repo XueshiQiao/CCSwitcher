@@ -21,6 +21,7 @@ private struct StatWithTooltip<Content: View>: View {
 /// Shows real usage limits from Claude API, one card per account.
 struct UsageDashboardView: View {
     @EnvironmentObject private var appState: AppState
+    @AppStorage("showFullEmail") private var showFullEmail = false
 
     var body: some View {
         ScrollView {
@@ -233,7 +234,7 @@ struct UsageDashboardView: View {
                 .font(.subheadline)
                 .foregroundStyle(account.isActive ? .brand : .secondary)
 
-            Text(account.obfuscatedEmail)
+            Text(account.displayEmail(obfuscated: !showFullEmail))
                 .font(.subheadline.weight(.medium))
                 .lineLimit(1)
 

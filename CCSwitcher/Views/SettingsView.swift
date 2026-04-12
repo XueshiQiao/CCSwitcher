@@ -7,6 +7,7 @@ struct SettingsView: View {
     @EnvironmentObject private var updateChecker: UpdateChecker
     @AppStorage("refreshInterval") private var refreshInterval: Double = 300
     @AppStorage("showAccountName") private var showAccountName = true
+    @AppStorage("showFullEmail") private var showFullEmail = false
     @AppStorage("showInDock") private var showInDock = false
     @State private var launchAtLogin = false
 
@@ -47,6 +48,7 @@ struct SettingsView: View {
 
             Section("Appearance") {
                 Toggle("Show account name in menu bar", isOn: $showAccountName)
+                Toggle("Show full email address", isOn: $showFullEmail)
             }
 
             Section("System") {

@@ -4,6 +4,7 @@ import SwiftUI
 struct MainMenuView: View {
     @EnvironmentObject private var appState: AppState
     @AppStorage("refreshInterval") private var refreshInterval: Double = 300
+    @AppStorage("showFullEmail") private var showFullEmail = false
     @State private var selectedTab: Tab = .usage
 
     enum Tab: String, CaseIterable {
@@ -127,10 +128,10 @@ struct MainMenuView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 if let account = appState.activeAccount {
-                    Text(account.effectiveDisplayName)
+                    Text(account.effectiveDisplayName(obfuscated: !showFullEmail))
                         .font(.headline)
                     HStack(spacing: 4) {
-                        Text(account.obfuscatedEmail)
+                        Text(account.displayEmail(obfuscated: !showFullEmail))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         if let sub = account.subscriptionType {

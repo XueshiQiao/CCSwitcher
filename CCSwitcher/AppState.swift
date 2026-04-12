@@ -482,8 +482,8 @@ final class AppState: ObservableObject {
             let usage = accountUsage[account.id]
             let error = accountUsageErrors[account.id]
             return WidgetAccountData(
-                email: account.obfuscatedEmail,
-                displayName: account.effectiveDisplayName,
+                email: account.displayEmail(obfuscated: !UserDefaults.standard.bool(forKey: "showFullEmail")),
+                displayName: account.effectiveDisplayName(obfuscated: !UserDefaults.standard.bool(forKey: "showFullEmail")),
                 subscriptionType: account.subscriptionType,
                 isActive: account.isActive,
                 sessionUtilization: usage?.fiveHour?.utilization,
