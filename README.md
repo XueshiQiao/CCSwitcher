@@ -1,4 +1,10 @@
-<p align="center">[English](README.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md) | [Deutsch](README.de.md) | [Français](README.fr.md)</p>
+<p align="center">
+  <a href="README.md"><img src="https://img.shields.io/badge/English%20✓-blue" alt="English"></a>
+  <a href="README.zh-CN.md"><img src="https://img.shields.io/badge/简体中文-gray" alt="简体中文"></a>
+  <a href="README.ja.md"><img src="https://img.shields.io/badge/日本語-gray" alt="日本語"></a>
+  <a href="README.de.md"><img src="https://img.shields.io/badge/Deutsch-gray" alt="Deutsch"></a>
+  <a href="README.fr.md"><img src="https://img.shields.io/badge/Français-gray" alt="Français"></a>
+</p>
 
 # CCSwitcher
 

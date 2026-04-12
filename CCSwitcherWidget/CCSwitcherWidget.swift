@@ -122,7 +122,7 @@ private struct SmallWidgetView: View {
                     .foregroundStyle(brandColor)
                     .widgetAccentable()
                 if let account = activeAccount {
-                    Text(account.email)
+                    Text(account.displayName)
                         .font(.caption.weight(.semibold))
                         .lineLimit(1)
                     Spacer()
@@ -227,7 +227,7 @@ private struct MediumWidgetView: View {
                     .foregroundStyle(brandColor)
                     .widgetAccentable()
                 if let account = activeAccount {
-                    Text(account.email)
+                    Text(account.displayName)
                         .font(.caption.weight(.medium))
                         .lineLimit(1)
                     if let sub = account.subscriptionType {
@@ -454,7 +454,7 @@ private struct LargeWidgetView: View {
                 Image(systemName: "brain.head.profile")
                     .font(.caption2)
                     .foregroundStyle(account.isActive ? brandColor : .secondary)
-                Text(account.email)
+                Text(account.displayName)
                     .font(.caption.weight(.medium))
                     .lineLimit(1)
                 if account.isActive {
@@ -543,7 +543,7 @@ private struct CircleWidgetView: View {
                     .font(.caption)
                     .foregroundStyle(brandColor)
                     .widgetAccentable()
-                Text(activeAccount?.email ?? "CCSwitcher")
+                Text(activeAccount?.displayName ?? "CCSwitcher")
                     .font(.caption.weight(.semibold))
                     .lineLimit(1)
                 Spacer()

@@ -528,6 +528,7 @@ final class AppState: ObservableObject {
             UserDefaults.standard.set(data, forKey: accountsKey)
             log.debug("[saveAccounts] Saved \(self.accounts.count) accounts to UserDefaults")
         }
+        updateWidgetData()
     }
 
     private func updateActiveAccount(from status: AuthStatus) {
