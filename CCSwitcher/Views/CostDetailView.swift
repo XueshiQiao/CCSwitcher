@@ -73,7 +73,7 @@ struct CostDetailView: View {
             RoundedRectangle(cornerRadius: 10)
                 .fill(.cardFillGreen)
                 .strokeBorder(.cardBorderGreen, lineWidth: 1)
-                .shadow(color: .black.opacity(0.06), radius: 5, x: 0, y: 6)
+                .shadow(color: .black.opacity(0.10), radius: 5, x: 0, y: 6)
         )
         .padding(.horizontal, 16)
     }
@@ -109,7 +109,7 @@ struct CostDetailView: View {
             RoundedRectangle(cornerRadius: 10)
                 .fill(.cardFillNeutral)
                 .strokeBorder(.cardBorderNeutral, lineWidth: 1)
-                .shadow(color: .black.opacity(0.06), radius: 5, x: 0, y: 6)
+                .shadow(color: .black.opacity(0.10), radius: 5, x: 0, y: 6)
         )
     }
 
@@ -247,7 +247,7 @@ struct CostDetailView: View {
                 RoundedRectangle(cornerRadius: 10)
                     .fill(.cardFillNeutral)
                     .strokeBorder(.cardBorderNeutral, lineWidth: 1)
-                    .shadow(color: .black.opacity(0.06), radius: 5, x: 0, y: 6)
+                    .shadow(color: .black.opacity(0.10), radius: 5, x: 0, y: 6)
             )
             .padding(.horizontal, 16)
         }

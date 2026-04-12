@@ -143,7 +143,7 @@ struct UsageDashboardView: View {
             RoundedRectangle(cornerRadius: 10)
                 .fill(.cardFill)
                 .strokeBorder(.cardBorderBrand, lineWidth: 1)
-                .shadow(color: .black.opacity(0.06), radius: 5, x: 0, y: 6)
+                .shadow(color: .black.opacity(0.10), radius: 5, x: 0, y: 6)
         )
         .padding(.horizontal, 16)
     }
@@ -298,7 +298,7 @@ struct UsageDashboardView: View {
         RoundedRectangle(cornerRadius: 10)
             .fill(isActive ? .cardFill : .cardFillNeutral)
             .strokeBorder(isActive ? .cardBorderBrand : .cardBorderNeutral, lineWidth: 1)
-            .shadow(color: .black.opacity(0.06), radius: 5, x: 0, y: 6)
+            .shadow(color: .black.opacity(0.10), radius: 5, x: 0, y: 6)
     }
 
     // MARK: - Usage Row
