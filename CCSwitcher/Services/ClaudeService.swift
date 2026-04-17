@@ -25,11 +25,14 @@ final class ClaudeService: Sendable {
     /// NVM stores node versions at ~/.nvm/versions/node/<version>/bin/.
     private static func nvmPaths() -> [String] {
         let nvmDir = "\(NSHomeDirectory())/.nvm/versions/node"
+        guard FileManager.default.fileExists(atPath: nvmDir) else { return [] }
         guard let versions = try? FileManager.default.contentsOfDirectory(atPath: nvmDir) else {
+            log.warning("[nvmPaths] NVM directory exists but could not be read: \(nvmDir)")
             return []
         }
-        // Sort descending so newer node versions are checked first
-        return versions.sorted().reversed().map { "\(nvmDir)/\($0)/bin/claude" }
+        return versions
+            .filter { !$0.hasPrefix(".") }
+            .map { "\(nvmDir)/\($0)/bin/claude" }
     }
 
     // MARK: - Auth Status
@@ -219,15 +222,18 @@ final class ClaudeService: Sendable {
                 var env = ProcessInfo.processInfo.environment
                 let homeDir = NSHomeDirectory()
                 // Include the parent directory of the discovered claude binary
-                // so that `node` is on PATH for NVM-installed scripts
-                let claudeBinDir = URL(fileURLWithPath: claudePath).deletingLastPathComponent().path
-                let extraPaths = [
-                    claudeBinDir,
+                // so that `node` is on PATH for NVM-installed scripts.
+                // Only add it when claudePath is absolute (skip the bare "claude" fallback).
+                var extraPaths = [
                     "/opt/homebrew/bin",
                     "/usr/local/bin",
                     "\(homeDir)/.local/bin",
                     "\(homeDir)/.npm-global/bin"
                 ]
+                if claudePath.contains("/") {
+                    let claudeBinDir = URL(fileURLWithPath: claudePath).deletingLastPathComponent().path
+                    extraPaths.insert(claudeBinDir, at: 0)
+                }
                 let existingPath = env["PATH"] ?? "/usr/bin:/bin"
                 env["PATH"] = (extraPaths + [existingPath]).joined(separator: ":")
                 env["HOME"] = homeDir
