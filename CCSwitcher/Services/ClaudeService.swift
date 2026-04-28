@@ -9,16 +9,35 @@ final class ClaudeService: Sendable {
     private let claudePath: String
 
     private init() {
+        let home = NSHomeDirectory()
         let possiblePaths = [
+            // Homebrew cask / system prefix
             "/usr/local/bin/claude",
             "/opt/homebrew/bin/claude",
-            "\(NSHomeDirectory())/.npm-global/bin/claude",
-            "\(NSHomeDirectory())/.local/bin/claude",
-            "\(NSHomeDirectory())/.claude/local/claude"
+            // MacPorts
+            "/opt/local/bin/claude",
+            // Native installer (Anthropic-recommended) and legacy migrate-installer
+            "\(home)/.local/bin/claude",
+            "\(home)/.claude/local/claude",
+            // npm with custom prefix
+            "\(home)/.npm-global/bin/claude",
+            // Alternative JS package managers / Node version managers
+            "\(home)/.volta/bin/claude",
+            "\(home)/Library/pnpm/claude",
+            "\(home)/.bun/bin/claude",
+            "\(home)/.yarn/bin/claude"
         ] + Self.nvmPaths()
-        self.claudePath = possiblePaths.first { FileManager.default.fileExists(atPath: $0) }
-            ?? "claude"
-        log.info("Claude binary path: \(self.claudePath)")
+
+        if let found = possiblePaths.first(where: { FileManager.default.fileExists(atPath: $0) }) {
+            self.claudePath = found
+            log.info("Claude binary path: \(self.claudePath) (curated)")
+        } else if let shellPath = Self.shellPathLookup() {
+            self.claudePath = shellPath
+            log.info("Claude binary path: \(self.claudePath) (resolved via user shell PATH)")
+        } else {
+            self.claudePath = "claude"
+            log.warning("Claude binary not found in curated paths or user shell PATH; falling back to bare 'claude'")
+        }
     }
 
     /// Discover Claude binaries installed via NVM (Node Version Manager).
@@ -33,6 +52,53 @@ final class ClaudeService: Sendable {
         return versions
             .filter { !$0.hasPrefix(".") }
             .map { "\(nvmDir)/\($0)/bin/claude" }
+    }
+
+    /// Last-resort lookup: ask the user's interactive login shell where `claude` lives.
+    /// Catches install layouts the curated list doesn't enumerate (asdf shims, fnm, n,
+    /// pnpm/yarn/bun/Volta with non-default prefixes, custom npm prefixes, etc.).
+    /// Bounded by a short timeout so a slow .zshrc can't block app launch.
+    private static func shellPathLookup() -> String? {
+        let process = Process()
+        let stdout = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/bin/zsh")
+        process.arguments = ["-ilc", "command -v claude"]
+        process.standardOutput = stdout
+        process.standardError = Pipe()
+        process.environment = ProcessInfo.processInfo.environment
+
+        do {
+            try process.run()
+        } catch {
+            log.warning("[shellPathLookup] Failed to launch /bin/zsh: \(error.localizedDescription)")
+            return nil
+        }
+
+        // Hard timeout — don't let a heavy shell rc file block forever.
+        let deadline = Date().addingTimeInterval(3.0)
+        while process.isRunning && Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        if process.isRunning {
+            process.terminate()
+            log.warning("[shellPathLookup] zsh exceeded 3s timeout; aborting")
+            return nil
+        }
+
+        guard process.terminationStatus == 0 else { return nil }
+        let data = stdout.fileHandleForReading.readDataToEndOfFile()
+        let raw = String(data: data, encoding: .utf8) ?? ""
+        // `command -v` may emit multiple lines if claude is shadowed; take the first.
+        let candidate = raw
+            .split(whereSeparator: \.isNewline)
+            .first
+            .map(String.init)?
+            .trimmingCharacters(in: .whitespaces) ?? ""
+        guard candidate.hasPrefix("/"),
+              FileManager.default.isExecutableFile(atPath: candidate) else {
+            return nil
+        }
+        return candidate
     }
 
     // MARK: - Auth Status
