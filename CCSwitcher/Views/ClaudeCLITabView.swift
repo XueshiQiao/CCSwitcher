@@ -112,7 +112,15 @@ struct ClaudeCLITabView: View {
     private func refreshAll() async {
         isLoading = true
         defer { isLoading = false }
-        detected = ClaudeService.detectedPaths()
+        // detectedPaths() last-resorts to an interactive zsh spawn that can
+        // block for up to 3 seconds (heavy .zshrc setups, iTerm integration,
+        // nvm/asdf hooks). Hoist it off the MainActor so the tab renders
+        // immediately and the picker fills in once the result arrives —
+        // same pattern reloadVersions() already uses.
+        let paths = await Task.detached(priority: .userInitiated) {
+            ClaudeService.detectedPaths()
+        }.value
+        detected = paths
         syncSelectionToPreference()
         await reloadVersions()
     }
