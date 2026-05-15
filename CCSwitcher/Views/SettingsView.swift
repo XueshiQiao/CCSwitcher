@@ -19,12 +19,17 @@ struct SettingsView: View {
                     Label("General", systemImage: "gear")
                 }
 
+            ClaudeCLITabView()
+                .tabItem {
+                    Label("Claude CLI", systemImage: "terminal")
+                }
+
             aboutTab
                 .tabItem {
                     Label("About", systemImage: "info.circle")
                 }
         }
-        .frame(width: 450, height: 300)
+        .frame(width: 520, height: 440)
         .onAppear {
             launchAtLogin = SMAppService.mainApp.status == .enabled
         }
