@@ -88,7 +88,7 @@ final class AppState: ObservableObject {
         // JSONL parsing: walk filesystem once via the shared cache, then
         // pull aggregated outputs. The actor's executor is off the main
         // thread, so awaiting these does not block the UI.
-        await SessionParseCache.shared.refreshFromFilesystem()
+        await SessionParseCacheV2.shared.refreshFromFilesystem()
         let cost = await costParser.getCostSummary()
         let activity = await activityParser.getTodayStats()
         costSummary = cost

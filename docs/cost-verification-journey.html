@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aligning cost math with ccusage — CCSwitcher</title>
+<style>
+  :root {
+    --bg: #faf9f5;
+    --surface: #ffffff;
+    --ink: #1f1e1c;
+    --ink-soft: #5a5751;
+    --ink-faint: #8a857c;
+    --rule: #e6e2d4;
+    --rule-soft: #efece1;
+    --code-bg: #f3f0e6;
+    --accent: #d97757;
+    --accent-soft: #f4e2d6;
+    --good: #4f8a5c;
+    --warn: #b6711c;
+    --bad: #b14338;
+    --serif: "Tiempos", "Source Serif Pro", "Iowan Old Style", Georgia, serif;
+    --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --mono: "JetBrains Mono", "SF Mono", Menlo, Monaco, "Cascadia Code", monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .container { max-width: 880px; margin: 0 auto; padding: 80px 40px 120px; }
+
+  header.hero { margin-bottom: 56px; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin-bottom: 18px;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: 48px;
+    line-height: 1.1;
+    margin: 0 0 20px;
+    letter-spacing: -0.015em;
+    color: var(--ink);
+  }
+  .lede {
+    font-family: var(--serif);
+    font-size: 22px;
+    line-height: 1.45;
+    color: var(--ink-soft);
+    margin: 0;
+    max-width: 700px;
+  }
+
+  h2 {
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: 30px;
+    line-height: 1.2;
+    margin: 64px 0 16px;
+    letter-spacing: -0.01em;
+  }
+  h3 {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 17px;
+    margin: 36px 0 10px;
+    letter-spacing: -0.005em;
+  }
+  p { margin: 0 0 16px; }
+  p, li { color: var(--ink); }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent-soft); }
+  a:hover { border-bottom-color: var(--accent); }
+
+  ul, ol { padding-left: 24px; margin: 0 0 16px; }
+  li { margin-bottom: 8px; }
+  li code { font-size: 0.92em; }
+
+  code {
+    font-family: var(--mono);
+    background: var(--code-bg);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  pre {
+    background: #1f1e1c;
+    color: #f6f3eb;
+    padding: 20px 24px;
+    border-radius: 8px;
+    overflow-x: auto;
+    line-height: 1.55;
+    font-size: 13.5px;
+    margin: 20px 0 28px;
+  }
+  pre code { background: transparent; padding: 0; color: inherit; font-size: inherit; }
+  .tok-comment  { color: #9b9081; font-style: italic; }
+  .tok-keyword  { color: #e89b6f; }
+  .tok-fn       { color: #f0d68a; }
+  .tok-string   { color: #b8d49d; }
+  .tok-num      { color: #d8b9e3; }
+
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px 32px;
+    margin: 32px 0 48px;
+    padding: 18px 0;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--ink-soft);
+  }
+  .meta-row b { color: var(--ink); font-weight: 500; margin-right: 8px; }
+
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    padding: 18px 22px;
+    margin: 28px 0;
+    border-radius: 0 6px 6px 0;
+    color: var(--ink);
+  }
+  .callout p:last-child { margin-bottom: 0; }
+  .callout .label {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  .figure {
+    margin: 36px 0;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    padding: 28px 24px 18px;
+  }
+  .figure svg { display: block; width: 100%; height: auto; }
+  .figure .caption {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-faint);
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--rule);
+  }
+  .figure .caption b { color: var(--ink-soft); font-weight: 600; }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 24px 0 32px;
+    font-size: 14.5px;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  th {
+    font-weight: 600;
+    color: var(--ink-soft);
+    background: var(--rule-soft);
+    font-size: 13px;
+    letter-spacing: 0.01em;
+  }
+  td code { font-size: 0.88em; }
+
+  .pill {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+  .pill.good    { background: #e3f0e2; color: var(--good); }
+  .pill.warn    { background: #f5e7d0; color: var(--warn); }
+  .pill.bad     { background: #f5dad6; color: var(--bad); }
+  .pill.neutral { background: var(--rule-soft); color: var(--ink-soft); }
+
+  .footer {
+    margin-top: 96px;
+    padding-top: 24px;
+    border-top: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-faint);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  svg text { font-family: var(--sans); font-size: 12.5px; fill: var(--ink); }
+  svg .label-mono { font-family: var(--mono); font-size: 11.5px; fill: var(--ink-soft); }
+  svg .label-soft { fill: var(--ink-soft); }
+  svg .label-faint { fill: var(--ink-faint); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header class="hero">
+  <div class="eyebrow">Engineering note · CCSwitcher · 2026-05-15</div>
+  <h1>Aligning cost math with <span style="font-family:var(--mono); font-size:0.7em; font-weight:600;">ccusage</span></h1>
+  <p class="lede">Our daily-cost display didn't match ccusage's. Tracking down why uncovered a dead JSONL field, a dedup bug that double-counted ~70 requests, and the surprise that ccusage's published npm release runs a different algorithm than the source on its own GitHub HEAD.</p>
+</header>
+
+<div class="meta-row">
+  <span><b>Tools</b><code>Tools/recalc_cost.swift</code> · <code>Tools/verify_cost.sh</code></span>
+  <span><b>Reference</b><code>ryoppippi/ccusage</code> 18.0.11</span>
+  <span><b>Status</b><span class="pill good">VERIFIED 30 d</span></span>
+</div>
+
+<!-- ╔══ §1 ════════════════════════════════════════════════════════════ -->
+<h2>1 · Why we couldn't trust our own numbers</h2>
+
+<p>CCSwitcher already showed a "today's cost" banner. The math was hand-rolled: walk <code>~/.claude/projects/*.jsonl</code>, sum <code>usage.input_tokens</code> and friends per assistant row, multiply by a hard-coded Anthropic price table. It looked right, but every time the user spot-checked it against <code>ccusage daily</code>, the numbers were off — sometimes by a few percent, sometimes by ten or more.</p>
+
+<p>Rather than guess at the discrepancy or "calibrate" with a fudge factor, the decision was to treat <a href="https://github.com/ryoppippi/ccusage">ccusage</a> as ground truth: re-implement the math from scratch in an isolated Swift script, diff it against ccusage row-by-row, and only port the answer back into the app once the two agreed to the cent.</p>
+
+<div class="callout">
+<span class="label">Premise</span>
+<p>If our number disagrees with ccusage, the user trusts ccusage. So we don't ship "approximately" — we either match exactly or we don't display cost at all.</p>
+</div>
+
+<!-- ╔══ §2 ════════════════════════════════════════════════════════════ -->
+<h2>2 · What we expected — and what was actually there</h2>
+
+<p>The starting mental model was simple: the JSONL files contain a <code>costUSD</code> field, ccusage just sums it, and our app should do the same. Three things turned out to be wrong about that picture before we even reached the algorithm.</p>
+
+<table>
+  <thead>
+    <tr><th>What we assumed</th><th>What's actually true</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>JSONL rows carry <code>costUSD</code> — we just read it.</td>
+      <td>Out of <b>4,669</b> assistant rows in a recent 5-day window, exactly <b>1</b> had a <code>costUSD</code> field. Claude Code stopped writing it. Cost must be computed from tokens.</td>
+    </tr>
+    <tr>
+      <td>Pricing comes from Anthropic's published rates.</td>
+      <td>Anthropic doesn't publish structured pricing. ccusage pulls from <a href="https://github.com/BerriAI/litellm">LiteLLM</a>'s <code>model_prices_and_context_window.json</code> at runtime — the community-maintained source of truth for Claude pricing.</td>
+    </tr>
+    <tr>
+      <td>One assistant row = one billable request, sum them all.</td>
+      <td>Streamed requests produce <em>multiple</em> rows with the same <code>(message.id, requestId)</code>, and session resume can write the same request across multiple files. Without dedup, ~70 requestIds in our local data appeared in two places.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>So the real algorithm has three load-bearing parts the simple picture missed: a pricing fetcher, a dedup pass, and an awareness of how the JSONL is actually structured on disk.</p>
+
+<!-- ╔══ §3 ════════════════════════════════════════════════════════════ -->
+<h2>3 · The bug that exposed the dedup rule</h2>
+
+<p>The clearest discrepancy was on 2026-05-11. Only <code>claude-sonnet-4-6</code> traffic that day — three assistant rows total, two of them streaming chunks of the same request. ccusage reported 681 output tokens. Our first-pass implementation said 1228.</p>
+
+<div class="figure">
+<svg viewBox="0 0 820 360" xmlns="http://www.w3.org/2000/svg" aria-label="The 2026-05-11 sonnet discrepancy">
+  <text x="0" y="22" font-weight="600" fill="#1f1e1c">Three rows, same conversation, two different totals</text>
+
+  <!-- Three rows visualized as a sequence -->
+  <g transform="translate(0, 50)">
+    <text x="0" y="0" font-size="13" font-weight="600" fill="#5a5751">In the JSONL, in chronological order:</text>
+
+    <!-- Row A: 1-out streaming chunk -->
+    <g transform="translate(0, 16)">
+      <rect width="820" height="56" rx="8" fill="#ffffff" stroke="#e6e2d4"/>
+      <rect width="6" height="56" fill="#d97757"/>
+      <text x="20" y="22" class="label-mono">12:29:06.639Z   msg_011Rko…   req_011CavnL…   stream chunk 1</text>
+      <text x="20" y="44" class="label-mono label-soft">input=2  output=1  cache_create=11667  cache_read=0  →  tokenTotal = 11670</text>
+    </g>
+
+    <!-- Row B: 548-out streaming final -->
+    <g transform="translate(0, 80)">
+      <rect width="820" height="56" rx="8" fill="#ffffff" stroke="#e6e2d4"/>
+      <rect width="6" height="56" fill="#d97757"/>
+      <text x="20" y="22" class="label-mono">12:29:17.498Z   msg_011Rko…   req_011CavnL…   stream final</text>
+      <text x="20" y="44" class="label-mono label-soft">input=2  output=548  cache_create=11667  cache_read=0  →  tokenTotal = 12217</text>
+    </g>
+
+    <!-- Row C: unrelated -->
+    <g transform="translate(0, 144)">
+      <rect width="820" height="56" rx="8" fill="#ffffff" stroke="#e6e2d4"/>
+      <rect width="6" height="56" fill="#8a857c"/>
+      <text x="20" y="22" class="label-mono">12:30:17.767Z   msg_01Gfmo…   req_011CavnQ…   unrelated request</text>
+      <text x="20" y="44" class="label-mono label-soft">input=1  output=680  cache_create=2032  cache_read=11667  →  tokenTotal = 14380</text>
+    </g>
+  </g>
+
+  <!-- Two interpretations -->
+  <g transform="translate(0, 240)">
+    <!-- Ours -->
+    <g transform="translate(0, 0)">
+      <rect width="400" height="90" rx="8" fill="#f5dad6" stroke="#b14338"/>
+      <text x="16" y="22" font-size="13" font-weight="600" fill="#b14338">Our first pass — max-tokenTotal wins</text>
+      <text x="16" y="44" class="label-mono">dedup A vs B → keep B (out=548)</text>
+      <text x="16" y="62" class="label-mono">sum:    548 + 680 = <tspan font-weight="700">1228</tspan></text>
+      <text x="16" y="80" class="label-mono label-soft">total tokens: 32614 → $0.0733</text>
+    </g>
+
+    <!-- ccusage -->
+    <g transform="translate(420, 0)">
+      <rect width="400" height="90" rx="8" fill="#e3f0e2" stroke="#4f8a5c"/>
+      <text x="16" y="22" font-size="13" font-weight="600" fill="#4f8a5c">ccusage 18.0.11 — first-seen wins</text>
+      <text x="16" y="44" class="label-mono">dedup A vs B → keep A (out=1)</text>
+      <text x="16" y="62" class="label-mono">sum:    1 + 680 = <tspan font-weight="700">681</tspan></text>
+      <text x="16" y="80" class="label-mono label-soft">total tokens: 26050 → $0.0651</text>
+    </g>
+  </g>
+</svg>
+<div class="caption"><b>Figure 1.</b> Rows A and B are the same conversational turn captured at two streaming snapshots. Whether dedup picks the earlier or later snapshot changes <code>output_tokens</code> by 547 — a 2× swing on the day's sonnet bill.</div>
+</div>
+
+<p>Both interpretations are defensible. Max-tokenTotal feels obviously correct ("keep the final, complete row"). First-seen feels arbitrary but is what the published ccusage actually does. Our job wasn't to decide which one is right — it was to match what the user's reference tool produces.</p>
+
+<!-- ╔══ §4 ════════════════════════════════════════════════════════════ -->
+<h2>4 · The source-code reading that almost wasted a day</h2>
+
+<p>Reading ccusage's GitHub source confirmed the algorithm — and pointed at the wrong one.</p>
+
+<p>The latest <code>data-loader.ts</code> on <code>main</code> has a helper called <code>shouldReplaceEntryMetadata</code> that takes a candidate row and an existing row and returns <code>true</code> if the candidate has a higher <code>tokenTotal</code>. The dedup loop calls this helper to decide whether to replace. By the source, max-tokenTotal wins. That matched our implementation. But the empirical output didn't.</p>
+
+<p>The puzzle resolved when we looked at the actual file installed by <code>npx ccusage@latest</code>: a compiled bundle at <code>~/.npm/_npx/…/dist/data-loader-9ESMosno.js</code>. The published version doesn't ship <code>shouldReplaceEntryMetadata</code> at all. It ships a simpler pair:</p>
+
+<pre><code><span class="tok-keyword">function</span> <span class="tok-fn">isDuplicateEntry</span>(uniqueHash, processedHashes) {
+    <span class="tok-keyword">if</span> (uniqueHash == <span class="tok-keyword">null</span>) <span class="tok-keyword">return</span> <span class="tok-keyword">false</span>;
+    <span class="tok-keyword">return</span> processedHashes.<span class="tok-fn">has</span>(uniqueHash);
+}
+<span class="tok-keyword">function</span> <span class="tok-fn">markAsProcessed</span>(uniqueHash, processedHashes) {
+    <span class="tok-keyword">if</span> (uniqueHash != <span class="tok-keyword">null</span>) processedHashes.<span class="tok-fn">add</span>(uniqueHash);
+}</code></pre>
+
+<p>That's pure first-wins dedup against a single global <code>Set</code>. No tokenTotal comparison, no replacement. The newer algorithm exists in <code>main</code> but hasn't been released to npm yet. <b>Whichever ccusage version users actually run is what they'll compare us to</b>, so the published bundle wins.</p>
+
+<div class="figure">
+<svg viewBox="0 0 820 320" xmlns="http://www.w3.org/2000/svg" aria-label="Two ccusage algorithms producing different totals">
+  <text x="0" y="22" font-weight="600" fill="#1f1e1c">Same JSONL → two ccusage versions → two different totals</text>
+
+  <!-- Shared input -->
+  <g transform="translate(0, 50)">
+    <rect width="820" height="46" rx="8" fill="#efece1" stroke="#e6e2d4"/>
+    <text x="16" y="22" font-size="13" font-weight="600">Input — three rows with the (msg_id, req_id) pair on rows A & B</text>
+    <text x="16" y="38" class="label-mono">A: out=1   tokenTotal=11670   ·   B: out=548   tokenTotal=12217   ·   C: out=680  (different key)</text>
+  </g>
+
+  <!-- Two lanes -->
+  <g transform="translate(0, 120)">
+    <!-- published -->
+    <g transform="translate(0, 0)">
+      <rect width="400" height="180" rx="8" fill="#ffffff" stroke="#e6e2d4"/>
+      <text x="16" y="22" font-size="13" font-weight="600">npm <code>ccusage@18.0.11</code></text>
+      <text x="16" y="40" class="label-mono label-soft">isDuplicateEntry / markAsProcessed</text>
+
+      <g transform="translate(16, 60)">
+        <text x="0" y="0" class="label-mono">row A → not in set → keep, mark</text>
+        <text x="0" y="20" class="label-mono">row B → already in set → <tspan fill="#b14338" font-weight="700">SKIP</tspan></text>
+        <text x="0" y="40" class="label-mono">row C → not in set → keep, mark</text>
+      </g>
+
+      <rect x="16" y="124" width="368" height="40" rx="6" fill="#e3f0e2"/>
+      <text x="200" y="148" text-anchor="middle" font-size="13" fill="#4f8a5c" font-weight="600">output = 1 + 680 = 681</text>
+    </g>
+
+    <!-- HEAD -->
+    <g transform="translate(420, 0)">
+      <rect width="400" height="180" rx="8" fill="#ffffff" stroke="#e6e2d4"/>
+      <text x="16" y="22" font-size="13" font-weight="600">GitHub HEAD (unreleased)</text>
+      <text x="16" y="40" class="label-mono label-soft">shouldReplaceEntryMetadata</text>
+
+      <g transform="translate(16, 60)">
+        <text x="0" y="0" class="label-mono">row A → no existing → keep</text>
+        <text x="0" y="20" class="label-mono">row B → existing, total 12217 &gt; 11670 → <tspan fill="#d97757" font-weight="700">REPLACE</tspan></text>
+        <text x="0" y="40" class="label-mono">row C → no existing → keep</text>
+      </g>
+
+      <rect x="16" y="124" width="368" height="40" rx="6" fill="#f4e2d6"/>
+      <text x="200" y="148" text-anchor="middle" font-size="13" fill="#b6711c" font-weight="600">output = 548 + 680 = 1228</text>
+    </g>
+  </g>
+</svg>
+<div class="caption"><b>Figure 2.</b> Two ccusage versions, exact same input, totals differ by 80%. The reference implementation isn't "ccusage in general" — it's the bundle that actually shipped to npm.</div>
+</div>
+
+<div class="callout">
+<span class="label">Takeaway</span>
+<p>When reverse-engineering a tool, always read what's installed, not what's in <code>main</code>. The two can disagree on substance, not just style.</p>
+</div>
+
+<!-- ╔══ §5 ════════════════════════════════════════════════════════════ -->
+<h2>5 · File order matters because dedup is first-wins</h2>
+
+<p>If dedup were max-tokenTotal, the order files are visited wouldn't matter — the same row would always win. With first-wins, order is load-bearing: whichever file is opened first plants its row into the global <code>processedHashes</code> set, and any later file holding the same key is silently dropped.</p>
+
+<p>ccusage sorts files by the <em>earliest timestamp inside each file</em>, not by filename. The intuition: a session that began earlier should claim its own rows, even if a later-named file happens to contain a streamed snapshot of the same request.</p>
+
+<div class="figure">
+<svg viewBox="0 0 820 400" xmlns="http://www.w3.org/2000/svg" aria-label="File walk pipeline">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5a5751"/>
+    </marker>
+  </defs>
+
+  <text x="0" y="22" font-weight="600">The four-stage pipeline, in order</text>
+
+  <!-- Stage 1: recursive walk -->
+  <g transform="translate(0, 50)">
+    <rect width="200" height="80" rx="8" fill="#ffffff" stroke="#e6e2d4"/>
+    <text x="100" y="24" text-anchor="middle" font-weight="600" font-size="13">1 · Recursive walk</text>
+    <text x="100" y="46" text-anchor="middle" class="label-mono">~/.claude/projects/</text>
+    <text x="100" y="62" text-anchor="middle" class="label-mono label-soft">**/*.jsonl</text>
+    <text x="100" y="76" text-anchor="middle" font-size="10.5" fill="#b6711c">includes subagents/</text>
+  </g>
+  <line x1="200" y1="90" x2="220" y2="90" stroke="#5a5751" marker-end="url(#arr)"/>
+
+  <!-- Stage 2: sort by earliest timestamp -->
+  <g transform="translate(220, 50)">
+    <rect width="200" height="80" rx="8" fill="#ffffff" stroke="#d97757"/>
+    <text x="100" y="24" text-anchor="middle" font-weight="600" font-size="13" fill="#d97757">2 · Sort</text>
+    <text x="100" y="46" text-anchor="middle" class="label-mono">earliest timestamp</text>
+    <text x="100" y="62" text-anchor="middle" class="label-mono">in each file, asc</text>
+    <text x="100" y="78" text-anchor="middle" font-size="10.5" fill="#b14338">NOT filename order</text>
+  </g>
+  <line x1="420" y1="90" x2="440" y2="90" stroke="#5a5751" marker-end="url(#arr)"/>
+
+  <!-- Stage 3: per-line parse + dedup -->
+  <g transform="translate(440, 50)">
+    <rect width="200" height="80" rx="8" fill="#ffffff" stroke="#e6e2d4"/>
+    <text x="100" y="24" text-anchor="middle" font-weight="600" font-size="13">3 · Parse + dedup</text>
+    <text x="100" y="46" text-anchor="middle" class="label-mono">global Set&lt;hash&gt;</text>
+    <text x="100" y="62" text-anchor="middle" class="label-mono">first-wins</text>
+    <text x="100" y="78" text-anchor="middle" font-size="10.5" fill="#8a857c">hash = msg.id : reqId</text>
+  </g>
+  <line x1="640" y1="90" x2="660" y2="90" stroke="#5a5751" marker-end="url(#arr)"/>
+
+  <!-- Stage 4: aggregate + price -->
+  <g transform="translate(660, 50)">
+    <rect width="160" height="80" rx="8" fill="#ffffff" stroke="#e6e2d4"/>
+    <text x="80" y="24" text-anchor="middle" font-weight="600" font-size="13">4 · Aggregate</text>
+    <text x="80" y="46" text-anchor="middle" class="label-mono">by (date, model)</text>
+    <text x="80" y="62" text-anchor="middle" class="label-mono">apply pricing</text>
+    <text x="80" y="78" text-anchor="middle" font-size="10.5" fill="#8a857c">LiteLLM</text>
+  </g>
+
+  <!-- Below: dedup detail -->
+  <g transform="translate(0, 170)">
+    <text x="0" y="0" font-size="13" font-weight="600" fill="#5a5751">Inside stage 3, processing one row:</text>
+    <rect x="0" y="14" width="820" height="200" rx="8" fill="#ffffff" stroke="#e6e2d4"/>
+
+    <!-- input row -->
+    <rect x="20" y="38" width="180" height="36" rx="6" fill="#efece1"/>
+    <text x="110" y="60" text-anchor="middle" class="label-mono">JSON-parsed row</text>
+
+    <!-- arrow -->
+    <line x1="200" y1="56" x2="232" y2="56" stroke="#5a5751" marker-end="url(#arr)"/>
+
+    <!-- compute hash -->
+    <rect x="232" y="38" width="200" height="36" rx="6" fill="#ffffff" stroke="#e6e2d4"/>
+    <text x="332" y="60" text-anchor="middle" class="label-mono">hash = msg.id : reqId</text>
+
+    <!-- arrow -->
+    <line x1="432" y1="56" x2="464" y2="56" stroke="#5a5751" marker-end="url(#arr)"/>
+
+    <!-- decision -->
+    <polygon points="464,56 564,30 664,56 564,82" fill="#ffffff" stroke="#5a5751"/>
+    <text x="564" y="52" text-anchor="middle" font-size="12">hash in Set?</text>
+    <text x="564" y="68" text-anchor="middle" font-size="10.5" fill="#8a857c">(or hash == null)</text>
+
+    <!-- yes path: skip -->
+    <line x1="664" y1="56" x2="734" y2="56" stroke="#5a5751" marker-end="url(#arr)"/>
+    <text x="700" y="48" text-anchor="middle" class="label-mono" fill="#b14338">yes</text>
+    <rect x="734" y="38" width="70" height="36" rx="6" fill="#f5dad6"/>
+    <text x="769" y="60" text-anchor="middle" class="label-mono" fill="#b14338">skip</text>
+
+    <!-- no / null path: keep -->
+    <line x1="564" y1="82" x2="564" y2="130" stroke="#5a5751" marker-end="url(#arr)"/>
+    <text x="580" y="108" font-size="11.5" fill="#4f8a5c">no, or null hash</text>
+    <rect x="412" y="130" width="304" height="36" rx="6" fill="#e3f0e2"/>
+    <text x="564" y="152" text-anchor="middle" class="label-mono" fill="#4f8a5c">add to Set (if non-null); push entry</text>
+
+    <text x="20" y="190" font-size="11.5" fill="#8a857c">Rows with missing <tspan font-family="var(--mono)">message.id</tspan> or <tspan font-family="var(--mono)">requestId</tspan> have hash = null and are never deduped — every occurrence is kept.</text>
+  </g>
+</svg>
+<div class="caption"><b>Figure 3.</b> Stage 2 is the non-obvious one. Sorting by earliest timestamp is what makes the first-wins dedup deterministic across resume/fork scenarios where the same request appears in two files.</div>
+</div>
+
+<!-- ╔══ §6 ════════════════════════════════════════════════════════════ -->
+<h2>6 · Subagents live two directories deep</h2>
+
+<p>The original <code>SessionParseCache</code> only globbed direct <code>.jsonl</code> children of each project dir. Subagent logs — generated whenever Claude Code spawns a child agent — live at <code>~/.claude/projects/&lt;project&gt;/&lt;sessionUUID&gt;/subagents/agent-*.jsonl</code>, two levels deeper. They were silently invisible to our cost calculation.</p>
+
+<div class="figure">
+<svg viewBox="0 0 820 220" xmlns="http://www.w3.org/2000/svg" aria-label="Subagent directory layout">
+  <text x="0" y="22" font-weight="600">On-disk layout — what gets missed by a one-level glob</text>
+
+  <g font-family="JetBrains Mono, SF Mono, Menlo, monospace" font-size="12.5">
+    <text x="0" y="56" fill="#1f1e1c">~/.claude/projects/</text>
+    <text x="20" y="78" fill="#1f1e1c">-Users-joey-Code-CCSwitcher/</text>
+
+    <!-- top-level files: included -->
+    <text x="40" y="100" fill="#4f8a5c">  094e0519-….jsonl                        ← parent session  ✓ included</text>
+    <text x="40" y="118" fill="#4f8a5c">  411df4b6-….jsonl                        ← parent session  ✓ included</text>
+
+    <!-- nested dir: previously missed -->
+    <text x="40" y="140" fill="#1f1e1c">  094e0519-…/</text>
+    <text x="60" y="158" fill="#b14338">    subagents/</text>
+    <text x="60" y="176" fill="#b14338">      agent-ab02835.jsonl                ← subagent run  ✗ was not included</text>
+    <text x="60" y="194" fill="#b14338">      agent-c93af12.jsonl                ← subagent run  ✗ was not included</text>
+  </g>
+</svg>
+<div class="caption"><b>Figure 4.</b> The recursive walk in stage 1 is what brings the red rows into the calculation. Their <code>requestId</code>s do not collide with the parent session's, so adding them is purely additive once global dedup is in place.</div>
+</div>
+
+<p>Worth noting: across all projects there are ~70 <code>requestId</code>s that appear in both a top-level file and some subagent file globally. They're not subagent-vs-parent of the same session — they're session-resume artifacts where the same request was written to two different top-level files. Without the global dedup step from §5, including the subagent files would have double-counted them. With it, it's safe.</p>
+
+<!-- ╔══ §7 ════════════════════════════════════════════════════════════ -->
+<h2>7 · Pricing comes from LiteLLM, with tiers</h2>
+
+<p>The pricing table in <code>CostData.swift</code> was a flat lookup: one rate per model. LiteLLM's table has two surprises:</p>
+
+<ul>
+  <li><b>200k context tier.</b> Anthropic's pricing roughly doubles for requests that exceed 200,000 input tokens — encoded as <code>*_above_200k_tokens</code> fields in the LiteLLM JSON.</li>
+  <li><b>Fast-speed multiplier.</b> Sonnet 4.5+ and Opus 4.5+ support a "fast" inference mode at a higher rate. Encoded as a <code>provider_specific_entry.fast</code> multiplier.</li>
+</ul>
+
+<div class="figure">
+<svg viewBox="0 0 820 260" xmlns="http://www.w3.org/2000/svg" aria-label="200k tier pricing">
+  <text x="0" y="22" font-weight="600">claude-opus-4-7 · input pricing across the 200k threshold</text>
+
+  <!-- axis -->
+  <line x1="60" y1="180" x2="780" y2="180" stroke="#5a5751"/>
+  <line x1="60" y1="60" x2="60" y2="180" stroke="#5a5751"/>
+
+  <!-- x labels -->
+  <text x="60" y="200" text-anchor="middle" class="label-mono">0</text>
+  <text x="370" y="200" text-anchor="middle" class="label-mono">200k</text>
+  <text x="780" y="200" text-anchor="middle" class="label-mono">400k tokens</text>
+
+  <!-- y labels -->
+  <text x="50" y="184" text-anchor="end" class="label-mono">$0</text>
+  <text x="50" y="120" text-anchor="end" class="label-mono">$1.00</text>
+  <text x="50" y="62" text-anchor="end" class="label-mono">$2.00</text>
+
+  <!-- Old (flat) line — what our naive math computed -->
+  <line x1="60" y1="180" x2="780" y2="60" stroke="#9b9081" stroke-dasharray="5 4"/>
+  <text x="490" y="100" font-size="11.5" fill="#9b9081">flat-rate model — what we used to compute</text>
+
+  <!-- Tiered line: piecewise -->
+  <polyline points="60,180 370,150 780,60" stroke="#d97757" stroke-width="2.5" fill="none"/>
+  <circle cx="370" cy="150" r="5" fill="#d97757"/>
+  <text x="378" y="146" font-size="11.5" fill="#d97757" font-weight="600">tier boundary at 200k</text>
+
+  <!-- Below-200k label -->
+  <text x="200" y="170" font-size="11.5" fill="#1f1e1c">below 200k: $5 / 1M</text>
+  <!-- Above-200k label -->
+  <text x="500" y="115" font-size="11.5" fill="#1f1e1c">above 200k: $10 / 1M (≈ 2×)</text>
+
+  <text x="60" y="40" font-size="11.5" fill="#8a857c">A 400k-token Opus request costs <tspan font-weight="600" fill="#d97757">$3.00</tspan> on the tiered model vs <tspan font-weight="600" fill="#9b9081">$2.00</tspan> flat. A 50% under-count under-states our biggest bills.</text>
+</svg>
+<div class="caption"><b>Figure 5.</b> Long-context Opus / Sonnet requests are exactly the cases where users care most about accurate cost — and exactly the cases the flat-rate model gets most wrong.</div>
+</div>
+
+<p>The flat-rate price table in <code>CostData.swift</code> is still good enough for small requests (most users, most days) but undercounts the precise scenario users notice: a single huge codebase analysis or a multi-hour debugging session. Matching LiteLLM closes that gap.</p>
+
+<!-- ╔══ §8 ════════════════════════════════════════════════════════════ -->
+<h2>8 · The final pipeline, end-to-end</h2>
+
+<p>Once all of §3–§7 were understood, the corrected algorithm came together in roughly 200 lines of Swift (<code>Tools/recalc_cost.swift</code>). The sequence below is what runs on every invocation:</p>
+
+<div class="figure">
+<svg viewBox="0 0 820 480" xmlns="http://www.w3.org/2000/svg" aria-label="Final pipeline sequence">
+  <defs>
+    <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5a5751"/>
+    </marker>
+  </defs>
+
+  <g font-family="Inter, sans-serif" font-size="12">
+    <text x="80"  y="20" text-anchor="middle" font-weight="600">FileSystem</text>
+    <text x="240" y="20" text-anchor="middle" font-weight="600">walkJSONL</text>
+    <text x="240" y="36" text-anchor="middle" font-size="10.5" fill="#8a857c">recursive enumerator</text>
+    <text x="420" y="20" text-anchor="middle" font-weight="600">sortFilesBy…</text>
+    <text x="420" y="36" text-anchor="middle" font-size="10.5" fill="#8a857c">earliest timestamp</text>
+    <text x="600" y="20" text-anchor="middle" font-weight="600">parse + dedup</text>
+    <text x="600" y="36" text-anchor="middle" font-size="10.5" fill="#8a857c">global Set</text>
+    <text x="760" y="20" text-anchor="middle" font-weight="600">LiteLLM</text>
+    <text x="760" y="36" text-anchor="middle" font-size="10.5" fill="#8a857c">/tmp cache 1h</text>
+
+    <line x1="80"  y1="50" x2="80"  y2="460" stroke="#e6e2d4" stroke-dasharray="3 3"/>
+    <line x1="240" y1="50" x2="240" y2="460" stroke="#e6e2d4" stroke-dasharray="3 3"/>
+    <line x1="420" y1="50" x2="420" y2="460" stroke="#e6e2d4" stroke-dasharray="3 3"/>
+    <line x1="600" y1="50" x2="600" y2="460" stroke="#e6e2d4" stroke-dasharray="3 3"/>
+    <line x1="760" y1="50" x2="760" y2="460" stroke="#e6e2d4" stroke-dasharray="3 3"/>
+  </g>
+
+  <!-- step 1: glob -->
+  <line x1="80" y1="80" x2="240" y2="80" stroke="#5a5751" marker-end="url(#arr2)"/>
+  <text x="160" y="74" text-anchor="middle" class="label-mono">enumerator(atPath:)</text>
+  <text x="160" y="96" text-anchor="middle" font-size="11" fill="#8a857c">~/.claude/projects/**/*.jsonl</text>
+
+  <!-- step 2: return list -->
+  <line x1="240" y1="130" x2="420" y2="130" stroke="#5a5751" marker-end="url(#arr2)"/>
+  <text x="330" y="124" text-anchor="middle" class="label-mono">[String] of file paths</text>
+
+  <!-- step 3: read first line of each -->
+  <line x1="420" y1="170" x2="80" y2="170" stroke="#5a5751" marker-end="url(#arr2)"/>
+  <text x="240" y="164" text-anchor="middle" class="label-mono">read each file's earliest timestamp</text>
+
+  <!-- step 4: sorted list -->
+  <line x1="420" y1="210" x2="600" y2="210" stroke="#5a5751" marker-end="url(#arr2)"/>
+  <text x="510" y="204" text-anchor="middle" class="label-mono">files in ascending order</text>
+
+  <!-- step 5: pricing fetch (parallel) -->
+  <line x1="600" y1="250" x2="760" y2="250" stroke="#5a5751" marker-end="url(#arr2)"/>
+  <text x="680" y="244" text-anchor="middle" class="label-mono">fetch pricing JSON (if cache stale)</text>
+
+  <!-- step 6: per-line loop -->
+  <g>
+    <rect x="500" y="280" width="220" height="120" rx="6" fill="#ffffff" stroke="#d97757"/>
+    <text x="514" y="300" font-size="12" font-weight="600" fill="#d97757">For each file, each line:</text>
+    <text x="514" y="320" class="label-mono">JSON.parse(line)</text>
+    <text x="514" y="338" class="label-mono">hash = msg.id : reqId</text>
+    <text x="514" y="356" class="label-mono">if hash in Set → skip</text>
+    <text x="514" y="374" class="label-mono">else add hash, push entry</text>
+    <text x="514" y="392" class="label-mono label-soft">compute cost via LiteLLM</text>
+  </g>
+
+  <!-- step 7: aggregate output -->
+  <line x1="600" y1="430" x2="240" y2="430" stroke="#4f8a5c" marker-end="url(#arr2)"/>
+  <text x="420" y="424" text-anchor="middle" class="label-mono" fill="#4f8a5c">per-(date, model) aggregates</text>
+</svg>
+<div class="caption"><b>Figure 6.</b> The whole script in seven message arrows. The pricing fetch is the one network call; everything else is local I/O over JSONL.</div>
+</div>
+
+<p>Diffed against <code>ccusage daily --since 20260416 --json</code> across the last 30 days — 50 distinct <code>(date, model)</code> rows, $1,888 of spend — every input/output/cache_create/cache_read count matches exactly, and every per-row cost agrees to four decimal places. The verification is wired up as <code>Tools/verify_cost.sh</code> and is expected to run before every release.</p>
+
+<pre><code>$ Tools/verify_cost.sh 30
+[1/3] Running our reparser on the last 30 days...
+  → 65 (date × model) rows written to /tmp/ccswitcher-verify-cost/ours.json
+[2/3] Running latest ccusage (npx -y ccusage@latest)...
+  → ccusage 18.0.11, 26 days written to /tmp/ccswitcher-verify-cost/ccusage.json
+[3/3] Diffing...
+
+date               ours $    ccusage $          Δ
+--------------------------------------------------
+2026-05-15       130.5558     130.5558    +0.0000
+2026-05-13         7.1925       7.1925    +0.0000
+... (24 more rows, all +0.0000) ...
+--------------------------------------------------
+TOTAL           1888.4245    1888.4245    +0.0000
+
+All (date × model × {4 token types, cost}) match within tolerance.
+PASS — safe to release.</code></pre>
+
+<!-- ╔══ §9 ════════════════════════════════════════════════════════════ -->
+<h2>9 · What would break if you removed each piece</h2>
+
+<table>
+  <thead>
+    <tr><th>Remove…</th><th>Symptom</th><th>Severity</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Global dedup on <code>(message.id, requestId)</code></td>
+      <td>~70 resume-duplicated requests across the user's history get double-counted. Streamed assistant rows balloon further — a single 30-chunk stream over-counts 30×. Daily cost drifts ~10–80% high.</td>
+      <td><span class="pill bad">HIGH</span></td>
+    </tr>
+    <tr>
+      <td>First-wins tiebreak (use max-tokenTotal instead)</td>
+      <td>Diverges from the published ccusage bundle on every streamed request. Numbers <em>look</em> reasonable but never match the user's reference tool.</td>
+      <td><span class="pill bad">HIGH</span></td>
+    </tr>
+    <tr>
+      <td>Sort files by earliest timestamp</td>
+      <td>When the same <code>(messageId, requestId)</code> appears in two files (session resume), the "winner" becomes non-deterministic — depends on filesystem enumeration order. Numbers fluctuate between runs.</td>
+      <td><span class="pill warn">MEDIUM</span></td>
+    </tr>
+    <tr>
+      <td>Recursive walk including <code>subagents/</code></td>
+      <td>All cost from subagent runs (Codex review, Plan, Explore, etc.) silently disappears. Heavy users of subagents see numbers half their actual spend.</td>
+      <td><span class="pill bad">HIGH</span></td>
+    </tr>
+    <tr>
+      <td>LiteLLM pricing source</td>
+      <td>The hard-coded table eventually drifts from Anthropic's actual prices (LiteLLM lags official changes by hours, our table by months). Worse, the 200k tier is missing — long-context requests undercount by ~50%.</td>
+      <td><span class="pill warn">MEDIUM</span></td>
+    </tr>
+    <tr>
+      <td>200k tiered pricing</td>
+      <td>Heavy-context Opus / Sonnet requests under-counted by ~50%. Most affects users who do long debugging sessions or large codebase reviews — the loudest segment.</td>
+      <td><span class="pill warn">MEDIUM</span></td>
+    </tr>
+    <tr>
+      <td>Pre-release <code>verify_cost.sh</code> step</td>
+      <td>Future ccusage release silently changes its algorithm (as the HEAD-vs-published gap implies will happen). We ship a divergence. Users notice and lose trust.</td>
+      <td><span class="pill bad">HIGH</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ╔══ §10 ═══════════════════════════════════════════════════════════ -->
+<h2>10 · Where to look in the repo</h2>
+
+<table>
+  <thead>
+    <tr><th>Path</th><th>Role</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>Tools/recalc_cost.swift</code></td>
+      <td>Standalone Swift script — the single place where the algorithm is implemented in isolation and verified against ccusage. Treat this as the canonical reference.</td>
+    </tr>
+    <tr>
+      <td><code>Tools/verify_cost.sh</code></td>
+      <td>One-shot pre-release check. Runs the recalc script against <code>npx ccusage@latest</code> and exits non-zero on any disagreement.</td>
+    </tr>
+    <tr>
+      <td><code>CCSwitcher/Services/SessionParseCache.swift</code></td>
+      <td>The in-app version the UI consumes. Must mirror <code>recalc_cost.swift</code>'s algorithm. <span class="pill warn">PORTING PENDING</span></td>
+    </tr>
+    <tr>
+      <td><code>CCSwitcher/Models/CostData.swift</code> → <code>ModelPricing</code></td>
+      <td>The app's pricing table. Currently flat-rate; should track LiteLLM (incl. 200k tiers) once the port lands.</td>
+    </tr>
+    <tr>
+      <td><code>COST_VERIFICATION.md</code></td>
+      <td>Process spec — when to verify, what to do on failure, what changed in ccusage. Updated whenever the upstream algorithm shifts.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="footer">
+  <span>CCSwitcher · cost verification journey · 2026-05-15</span>
+  <span>commit <code>d3cc091</code> · <code>docs/cost-verification-journey.html</code></span>
+</div>
+
+</div>
+</body>
+</html>

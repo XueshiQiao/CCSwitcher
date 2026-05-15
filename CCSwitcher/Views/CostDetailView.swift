@@ -4,8 +4,6 @@ import SwiftUI
 struct CostDetailView: View {
     @EnvironmentObject private var appState: AppState
 
-    private static let pricingURL = URL(string: "https://platform.claude.com/docs/en/about-claude/pricing")!
-
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
@@ -196,97 +194,26 @@ struct CostDetailView: View {
             .padding(.horizontal, 16)
 
             VStack(alignment: .leading, spacing: 10) {
-                Text("Cost is computed from Claude Code session logs (~/.claude/projects/), deduplicated by request ID.")
+                Text("Cost is computed from your local Claude Code session logs (jsonl files) under ~/.claude/projects/.")
                     .font(.caption2)
                     .foregroundStyle(.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
 
-                // Pricing table
-                VStack(spacing: 0) {
-                    pricingHeader
-                    Divider()
-                    ForEach(pricingRows, id: \.model) { row in
-                        pricingRow(row)
-                        Divider()
+                if let v = VerifiedAgainst.load() {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.green)
+                        Text("Verified against ccusage \(v.ccusageVersion) on \(v.verifiedOn) — \(v.windowDays)-day total matched to the cent.")
+                            .font(.caption2)
+                            .foregroundStyle(.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                .background(.cardFill)
-                .clipShape(RoundedRectangle(cornerRadius: AppStyle.cardCornerRadius))
-                .overlay(RoundedRectangle(cornerRadius: AppStyle.cardCornerRadius).strokeBorder(.cardBorder, lineWidth: 1))
-
-                Text("Cache write = 5-min tier (1.25× base input). Cache read = 0.1× base input.")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.textSecondary)
-
-                Button {
-                    NSWorkspace.shared.open(Self.pricingURL)
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "link")
-                            .font(.caption2)
-                        Text("Official Pricing — platform.claude.com")
-                            .font(.caption2)
-                    }
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.blue)
             }
             .cardStyle()
             .sectionPadding()
         }
-    }
-
-    private var pricingHeader: some View {
-        HStack(spacing: 0) {
-            Text("Model")
-                .frame(width: 62, alignment: .leading)
-            Text("Input")
-                .frame(maxWidth: .infinity, alignment: .trailing)
-            Text("Output")
-                .frame(maxWidth: .infinity, alignment: .trailing)
-            Text("Cache W")
-                .frame(maxWidth: .infinity, alignment: .trailing)
-            Text("Cache R")
-                .frame(maxWidth: .infinity, alignment: .trailing)
-        }
-        .font(.system(size: 9, weight: .semibold))
-        .foregroundStyle(.textSecondary)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-    }
-
-    private struct PricingRowData {
-        let model: String
-        let input: String
-        let output: String
-        let cacheW: String
-        let cacheR: String
-    }
-
-    private var pricingRows: [PricingRowData] {
-        [
-            PricingRowData(model: "Opus 4.6", input: "$5", output: "$25", cacheW: "$6.25", cacheR: "$0.50"),
-            PricingRowData(model: "Sonnet 4.6", input: "$3", output: "$15", cacheW: "$3.75", cacheR: "$0.30"),
-            PricingRowData(model: "Haiku 4.5", input: "$1", output: "$5", cacheW: "$1.25", cacheR: "$0.10"),
-        ]
-    }
-
-    private func pricingRow(_ row: PricingRowData) -> some View {
-        HStack(spacing: 0) {
-            Text(row.model)
-                .frame(width: 62, alignment: .leading)
-            Text(row.input)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-            Text(row.output)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-            Text(row.cacheW)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-            Text(row.cacheR)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-        }
-        .font(.system(size: 9).monospacedDigit())
-        .foregroundStyle(.textSecondary)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
     }
 
     // MARK: - Helpers

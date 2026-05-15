@@ -1,5 +1,12 @@
 import Foundation
 
+// MARK: - DEPRECATED — superseded by SessionParseCacheV2
+//
+// Kept compiled (no live callers) for one release cycle in case a fast
+// rollback is needed. Remove the whole file after 1.6.x ships and we're
+// confident in v2. The old on-disk cache file `session-parse-cache.json`
+// is harmlessly ignored once v2 takes over.
+
 private let log = FileLog("Cache")
 
 // MARK: - Cache Models
