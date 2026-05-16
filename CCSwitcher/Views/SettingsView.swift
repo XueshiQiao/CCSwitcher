@@ -6,7 +6,6 @@ struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var updateChecker: UpdateChecker
     @AppStorage("refreshInterval") private var refreshInterval: Double = 300
-    @AppStorage("showAccountName") private var showAccountName = true
     @AppStorage("showFullEmail") private var showFullEmail = false
     @AppStorage("showInDock") private var showInDock = false
     @AppStorage("appLanguage") private var appLanguage = "auto"
@@ -52,8 +51,12 @@ struct SettingsView: View {
                 }
             }
 
+            Section("Menu bar") {
+                MenuBarModulesSettingsView()
+                    .environmentObject(appState)
+            }
+
             Section("Appearance") {
-                Toggle("Show account name in menu bar", isOn: $showAccountName)
                 Toggle("Show full email address", isOn: $showFullEmail)
                 Picker("Language", selection: $appLanguage) {
                     Text("Automatic").tag("auto")

@@ -138,3 +138,15 @@
 /* Promo */
 "%@ - %@ (Weekdays) & Weekends" = "%1$@ - %2$@（工作日）及周末";
 "Double limits: 2 PM - 8 AM ET & Weekends" = "双倍额度：美东时间下午 2 点 - 上午 8 点及周末";
+
+/* Menu Bar */
+"Menu bar" = "菜单栏";
+"Menu bar modules" = "菜单栏模块";
+"Drag to reorder, toggle to enable. Disabled modules sit at the bottom." = "拖动排序，勾选启用。未启用的模块排在下方。";
+"Preview" = "预览";
+"Account name" = "账户名称";
+"Session usage (5h)" = "会话用量（5小时）";
+"Weekly usage (7d)" = "每周用量（7天）";
+"Daily cost" = "今日花费";
+"Session reset countdown" = "会话重置倒计时";
+"Weekly reset countdown" = "每周重置倒计时";

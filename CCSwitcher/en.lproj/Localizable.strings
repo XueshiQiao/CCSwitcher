@@ -142,3 +142,15 @@
 /* About */
 "More apps at xueshi.dev" = "More apps at xueshi.dev";
 "© 2026 Xueshi Qiao" = "© 2026 Xueshi Qiao";
+
+/* Menu Bar */
+"Menu bar" = "Menu bar";
+"Menu bar modules" = "Menu bar modules";
+"Drag to reorder, toggle to enable. Disabled modules sit at the bottom." = "Drag to reorder, toggle to enable. Disabled modules sit at the bottom.";
+"Preview" = "Preview";
+"Account name" = "Account name";
+"Session usage (5h)" = "Session usage (5h)";
+"Weekly usage (7d)" = "Weekly usage (7d)";
+"Daily cost" = "Daily cost";
+"Session reset countdown" = "Session reset countdown";
+"Weekly reset countdown" = "Weekly reset countdown";

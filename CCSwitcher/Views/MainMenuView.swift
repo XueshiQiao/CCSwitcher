@@ -210,25 +210,10 @@ struct MainMenuView: View {
     }
     
     private func isPromoActive() -> Bool {
-        let date = Date()
-        let calendar = Calendar(identifier: .gregorian)
-        
-        var promoStartComponents = DateComponents()
-        promoStartComponents.year = 2026
-        promoStartComponents.month = 3
-        promoStartComponents.day = 13
-        
-        var promoEndComponents = DateComponents()
-        promoEndComponents.year = 2026
-        promoEndComponents.month = 3
-        promoEndComponents.day = 29 // up to March 28 inclusive
-        
-        guard let start = calendar.date(from: promoStartComponents),
-              let end = calendar.date(from: promoEndComponents) else {
-            return false
-        }
-        
-        return date >= start && date < end
+        // Banner visibility tracks the campaign window; the menu-bar icon uses
+        // `DoubleUsagePromo.isActive` for the currently-doubled state. Both now
+        // share one source of truth (no duplicated date logic).
+        DoubleUsagePromo.isCampaignActive()
     }
     
     private var localOffPeakTimeString: String {

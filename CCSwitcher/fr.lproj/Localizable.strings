@@ -138,3 +138,15 @@
 /* Promo */
 "%@ - %@ (Weekdays) & Weekends" = "%1$@ - %2$@ (Jours ouvrables) & Week-ends";
 "Double limits: 2 PM - 8 AM ET & Weekends" = "Limites doublées : 14h - 8h ET & week-ends";
+
+/* Menu Bar */
+"Menu bar" = "Barre de menus";
+"Menu bar modules" = "Modules de la barre de menus";
+"Drag to reorder, toggle to enable. Disabled modules sit at the bottom." = "Glissez pour réorganiser, basculez pour activer. Les modules désactivés sont en bas.";
+"Preview" = "Aperçu";
+"Account name" = "Nom du compte";
+"Session usage (5h)" = "Utilisation de la session (5h)";
+"Weekly usage (7d)" = "Utilisation hebdomadaire (7j)";
+"Daily cost" = "Coût quotidien";
+"Session reset countdown" = "Compte à rebours réinitialisation session";
+"Weekly reset countdown" = "Compte à rebours réinitialisation semaine";

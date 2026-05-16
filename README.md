@@ -24,6 +24,7 @@ CCSwitcher is a lightweight, pure menu bar macOS application designed to help de
 - **Non-Interruptive Account Switching**: The native `claude auth logout` clears the current account's credentials, and switching back requires another full OAuth. CCSwitcher keeps a separate backup of each account (keychain token + `~/.claude.json` `oauthAccount` block), atomically swaps both on switch — every added account's credentials stay intact, one-click swap-back, no workflow interruption. (Note: an in-flight `claude` session will pick up the newly-switched credentials on its next API call — this is Claude CLI behavior, not something CCSwitcher controls.)
 - **Multi-Account Management**: Add and switch between different Claude Code accounts with a single click from the macOS menu bar.
 - **Usage Dashboard**: Real-time monitoring of your Claude API usage limits (5-hour session and weekly) directly in the menu bar dropdown, plus today's API-equivalent cost and activity stats (turns, active minutes, lines written, model breakdown).
+- **Configurable Menu Bar Modules**: Build your own iStats-style menu bar readout. Choose any combination of account name, 5-hour session usage, weekly usage, today's cost, and session/weekly reset countdowns — each rendered as a compact two-line module (label over value, with monochrome progress bars for utilization). Drag to reorder and toggle modules in Settings, with a live preview.
 - **Desktop Widgets**: Native macOS desktop widgets in small, medium, and large sizes showing account usage, costs, and activity stats. Includes a circular ring variant for at-a-glance usage monitoring.
 - **In-App Auto-Update**: Powered by [Sparkle 2.x](https://sparkle-project.org/). New versions install silently and atomically — no DMG dragging, no Finder dialogs.
 - **Dark Mode**: Full light and dark mode support with adaptive colors that follow your system appearance.
@@ -48,6 +49,16 @@ CCSwitcher is a lightweight, pure menu bar macOS application designed to help de
 <p align="center">
   <img src="assets/CCSwitcher-widgets.png" alt="CCSwitcher — Desktop Widget" width="900" /><br/>
   <em>Desktop Widget</em>
+</p>
+
+<p align="center">
+  <img src="assets/CCSwitcher-menubar-modules.png" alt="CCSwitcher — Configurable Menu Bar Modules" width="900" /><br/>
+  <em>Configurable menu bar modules — account, session/weekly usage, daily cost, and reset countdowns</em>
+</p>
+
+<p align="center">
+  <img src="assets/CCSwitcher-menubar-settings.png" alt="CCSwitcher — Menu Bar Module Settings" width="640" /><br/>
+  <em>Drag to reorder and toggle modules, with a live preview</em>
 </p>
 
 ## Demo

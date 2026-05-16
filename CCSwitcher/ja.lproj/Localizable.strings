@@ -138,3 +138,15 @@
 /* Promo */
 "%@ - %@ (Weekdays) & Weekends" = "%1$@ - %2$@（平日）& 週末";
 "Double limits: 2 PM - 8 AM ET & Weekends" = "ダブル制限：米国東部時間 午後 2 時〜午前 8 時 & 週末";
+
+/* Menu Bar */
+"Menu bar" = "メニューバー";
+"Menu bar modules" = "メニューバー モジュール";
+"Drag to reorder, toggle to enable. Disabled modules sit at the bottom." = "ドラッグで並び替え、トグルで有効化。無効モジュールは下に表示されます。";
+"Preview" = "プレビュー";
+"Account name" = "アカウント名";
+"Session usage (5h)" = "セッション使用量（5時間）";
+"Weekly usage (7d)" = "週間使用量（7日）";
+"Daily cost" = "本日の料金";
+"Session reset countdown" = "セッション リセット カウントダウン";
+"Weekly reset countdown" = "週間 リセット カウントダウン";

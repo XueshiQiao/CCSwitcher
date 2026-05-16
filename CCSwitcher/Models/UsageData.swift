@@ -60,6 +60,23 @@ struct UsageWindow: Codable {
             return "\(minutes) min"
         }
     }
+
+    /// Compact countdown rendering for narrow menu-bar modules.
+    /// Always returns a fixed-shape string ("now", "5m", "2h 14m", "4d 6h").
+    /// Never falls back to a date format — the menu bar can't afford the width.
+    var compactResetString: String? {
+        guard let date = resetsAtDate else { return nil }
+        let remaining = Int(date.timeIntervalSinceNow)
+        guard remaining > 0 else { return "now" }
+
+        let days = remaining / 86_400
+        let hours = (remaining % 86_400) / 3600
+        let minutes = (remaining % 3600) / 60
+
+        if days > 0 { return "\(days)d \(hours)h" }
+        if hours > 0 { return "\(hours)h \(minutes)m" }
+        return "\(max(minutes, 1))m"
+    }
 }
 
 struct ExtraUsage: Codable {
