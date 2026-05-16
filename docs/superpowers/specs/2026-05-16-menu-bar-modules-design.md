@@ -67,10 +67,13 @@ No green/orange/red threshold ladder — the user wants minimalism with a single
 
 - Bar `%` and `dailyCost` update whenever `AppState.refreshTimer` fires — no
   new timers, no new fetches.
-- `sessionReset` and `weeklyReset` countdowns recompute every 60 seconds via a
-  `Timer.publish(every: 60, …)` subscribed in `CCSwitcherApp`. The reset
-  *timestamp* (`resetsAt`) comes from the same cached `UsageAPIResponse`; only
-  the displayed "time remaining" is locally derived.
+- `sessionReset` and `weeklyReset` countdowns recompute every 60 seconds. The
+  app holds a `@State private var menuBarTick = Date()` in `CCSwitcherApp` and a
+  `Timer.publish(every: 60, on: .main, in: .common).autoconnect()` publisher
+  that updates it. `MenuBarModuleView` receives `menuBarTick` as a parameter so
+  reset modules re-render on each tick. The reset *timestamp* (`resetsAt`)
+  comes from the same cached `UsageAPIResponse`; only the displayed "time
+  remaining" is locally derived from `menuBarTick`.
 
 ### Settings UI
 
@@ -180,7 +183,7 @@ SettingsView (replace Toggle at line 56)
 | `CCSwitcher/Views/SettingsView.swift` | Replace toggle with section | ~10 |
 | `CCSwitcher/AppState.swift` | Publish `todayCost: Double?`, populate on refresh | ~20 |
 | `CCSwitcher/Services/L10n.swift` | New keys (module labels, section title) | ~15 |
-| `CCSwitcher/Models/UsageData.swift` | Extend `resetTimeString` for `Xd Yh` format on >24h | ~10 |
+| `CCSwitcher/Models/UsageData.swift` | Add `compactResetString` (sibling of `resetTimeString`, always `Xd Yh` / `Xh Ym` / `Xm` — no date fallback) | ~10 |
 | `project.yml` | None (no new targets, just new source files in existing groups) | 0 |
 
 Run `xcodegen generate` after adding the new files (per CCSwitcher project rules).
@@ -195,10 +198,11 @@ Run `xcodegen generate` after adding the new files (per CCSwitcher project rules
 - **Very wide menu bar selection** — no truncation; macOS handles this by
   showing/hiding the app icon. Settings UI shows the preview so user can see
   before committing.
-- **>24h reset countdown** — current `resetTimeString` returns a date format
-  (`EEE h:mm a`). We extend it to also support `Xd Yh` for the menu bar variant
-  (date format is fine for the existing dropdown UI; the menu bar wants
-  compact).
+- **>24h reset countdown** — existing `resetTimeString` returns a date format
+  (`EEE h:mm a`) for >24h, which is fine for the dropdown but too wide for the
+  menu bar. We add a sibling `compactResetString` that always returns
+  `Xd Yh` / `Xh Ym` / `Xm` / `"now"`. The existing `resetTimeString` is
+  unchanged so the dropdown UI keeps its current behavior.
 - **`showFullEmail` change** — `.account` module re-renders automatically
   because `MenuBarModuleView` takes it as a parameter.
 
