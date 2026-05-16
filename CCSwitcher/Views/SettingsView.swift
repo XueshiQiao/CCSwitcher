@@ -18,6 +18,11 @@ struct SettingsView: View {
                     Label("General", systemImage: "gear")
                 }
 
+            menuBarTab
+                .tabItem {
+                    Label("Menu Bar", systemImage: "menubar.rectangle")
+                }
+
             ClaudeCLITabView()
                 .tabItem {
                     Label("Claude CLI", systemImage: "terminal")
@@ -51,13 +56,11 @@ struct SettingsView: View {
                 }
             }
 
-            Section("Menu bar") {
-                MenuBarModulesSettingsView()
-                    .environmentObject(appState)
+            Section("Account display") {
+                Toggle("Show full email address", isOn: $showFullEmail)
             }
 
             Section("Appearance") {
-                Toggle("Show full email address", isOn: $showFullEmail)
                 Picker("Language", selection: $appLanguage) {
                     Text("Automatic").tag("auto")
                     Divider()
@@ -77,6 +80,19 @@ struct SettingsView: View {
                     .onChange(of: launchAtLogin) { _, newValue in
                         toggleLaunchAtLogin(newValue)
                     }
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+
+    // MARK: - Menu Bar Tab
+
+    private var menuBarTab: some View {
+        Form {
+            Section {
+                MenuBarModulesSettingsView()
+                    .environmentObject(appState)
             }
         }
         .formStyle(.grouped)
