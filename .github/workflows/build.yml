@@ -174,6 +174,45 @@ jobs:
           mkdir -p "$RUNNER_TEMP/sparkle"
           tar -xf "$RUNNER_TEMP/sparkle.tar.xz" -C "$RUNNER_TEMP/sparkle"
 
+      - name: Prepare release notes
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          MD="$RUNNER_TEMP/release_notes.md"
+          HTML="$RUNNER_TEMP/release_notes.html"
+
+          # Single source of truth: the committed RELEASE_NOTES.md (written by
+          # the /release flow before tagging). Fall back to GitHub's generated
+          # notes, then git log, so a release is never note-less.
+          if [ -f RELEASE_NOTES.md ]; then
+            cp RELEASE_NOTES.md "$MD"
+          else
+            PREV_TAG=$(git tag -l 'v*' --sort=-v:refname | grep -v "${GITHUB_REF_NAME}" | head -1 || true)
+            NOTES=""
+            if [ -n "$PREV_TAG" ]; then
+              NOTES=$(gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
+                -f tag_name="${GITHUB_REF_NAME}" -f previous_tag_name="${PREV_TAG}" \
+                --jq '.body' 2>/dev/null || true)
+              if [ -z "$NOTES" ]; then
+                NOTES=$(git log "${PREV_TAG}..HEAD" --pretty=format:'- %s' --no-merges 2>/dev/null || true)
+              fi
+            fi
+            [ -z "$NOTES" ] && NOTES="Bug fixes and improvements."
+            printf '%s\n' "$NOTES" > "$MD"
+          fi
+
+          # Render to GitHub-flavored HTML for the Sparkle update dialog.
+          if ! gh api --method POST /markdown -f mode=gfm -f text="$(cat "$MD")" > "$HTML" 2> "$RUNNER_TEMP/md_err.log" || [ ! -s "$HTML" ]; then
+            echo "WARN: gh /markdown render failed; using escaped <pre> fallback. gh stderr:"
+            cat "$RUNNER_TEMP/md_err.log" 2>/dev/null || true
+            python3 -c 'import html,sys; print("<pre>"+html.escape(open(sys.argv[1]).read())+"</pre>")' "$MD" > "$HTML"
+          fi
+
+          echo "--- release_notes.html ---"
+          cat "$HTML"
+
       - name: Sign DMG with Sparkle EdDSA + generate appcast.xml
         if: ${{ env.HAS_SPARKLE_KEY == 'true' && startsWith(github.ref, 'refs/tags/v') }}
         env:
@@ -233,26 +272,37 @@ jobs:
           DOWNLOAD_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/CCSwitcher.dmg"
           PUB_DATE=$(date -u +"%a, %d %b %Y %H:%M:%S +0000")
 
-          cat > appcast.xml <<EOF
-          <?xml version="1.0" encoding="utf-8"?>
-          <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
-            <channel>
-              <title>CCSwitcher Updates</title>
-              <link>https://github.com/${GITHUB_REPOSITORY}/releases.atom</link>
-              <item>
-                <title>Version ${VERSION}</title>
-                <pubDate>${PUB_DATE}</pubDate>
-                <sparkle:version>${BUILD}</sparkle:version>
-                <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
-                <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-                <enclosure url="${DOWNLOAD_URL}" length="${FILE_LENGTH}" type="application/octet-stream" sparkle:edSignature="${ED_SIGNATURE}" />
-              </item>
-            </channel>
-          </rss>
-          EOF
+          # Read the rendered notes (Prepare release notes step). Build the
+          # appcast with an echo block instead of a heredoc so the HTML never
+          # gets shell-expanded inside the CDATA section.
+          # Neutralize any literal CDATA terminator in the rendered HTML so a
+          # release note containing `]]>` (e.g. a code snippet) can't break the
+          # appcast XML.
+          RELEASE_NOTES_HTML=$(sed 's/]]>/]]\&gt;/g' "$RUNNER_TEMP/release_notes.html")
+          {
+            echo '<?xml version="1.0" encoding="utf-8"?>'
+            echo '<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">'
+            echo '  <channel>'
+            echo '    <title>CCSwitcher Updates</title>'
+            echo "    <link>https://github.com/${GITHUB_REPOSITORY}/releases.atom</link>"
+            echo '    <item>'
+            echo "      <title>Version ${VERSION}</title>"
+            echo "      <description><![CDATA[${RELEASE_NOTES_HTML}]]></description>"
+            echo "      <pubDate>${PUB_DATE}</pubDate>"
+            echo "      <sparkle:version>${BUILD}</sparkle:version>"
+            echo "      <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>"
+            echo '      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>'
+            echo "      <enclosure url=\"${DOWNLOAD_URL}\" length=\"${FILE_LENGTH}\" type=\"application/octet-stream\" sparkle:edSignature=\"${ED_SIGNATURE}\" />"
+            echo '    </item>'
+            echo '  </channel>'
+            echo '</rss>'
+          } > appcast.xml
 
           echo "Generated appcast.xml:"
           cat appcast.xml
+
+          # Never publish a malformed Sparkle feed: fail the build instead.
+          xmllint --noout appcast.xml
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -289,6 +339,10 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/v')
         with:
+          body_path: ${{ runner.temp }}/release_notes.md
+          # appcast.xml is only produced when the Sparkle key is present; don't
+          # fail the release if it (or any listed file) is absent.
+          fail_on_unmatched_files: false
           files: |
             build/Release/CCSwitcher.dmg
             build/Release/latest.json
