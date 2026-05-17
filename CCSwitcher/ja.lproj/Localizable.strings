@@ -152,6 +152,6 @@
 "Weekly reset countdown" = "週間 リセット カウントダウン";
 "Menu Bar" = "メニューバー";
 "Account display" = "アカウント表示";
-"Session usage + pace line (5h)" = "セッション使用量 + ペースライン（5時間）";
-"Weekly usage + pace line (7d)" = "週間使用量 + ペースライン（7日）";
-"Pace line = how much of the window has elapsed; fill past it means you're using faster than the clock." = "ペースライン = その時間枠の経過割合。塗りつぶしがこの線を超える = 時間より速く消費しています。";
+"Session — usage vs time (5h)" = "セッション — 使用量 vs 時間（5時間）";
+"Weekly — usage vs time (7d)" = "週間 — 使用量 vs 時間（7日）";
+"The vertical line marks time elapsed in the window; fill past it means you're using faster than the clock." = "縦線 = 経過時間（その時間枠の進捗）。塗りつぶしがこれを超える = 時間より速く消費しています。";

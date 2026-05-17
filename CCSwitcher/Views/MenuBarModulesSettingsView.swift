@@ -54,7 +54,7 @@ struct MenuBarModulesSettingsView: View {
             }
 
             Label(
-                String(localized: "Pace line = how much of the window has elapsed; fill past it means you're using faster than the clock.", bundle: L10n.bundle),
+                String(localized: "The vertical line marks time elapsed in the window; fill past it means you're using faster than the clock.", bundle: L10n.bundle),
                 systemImage: "info.circle"
             )
             .font(.caption)

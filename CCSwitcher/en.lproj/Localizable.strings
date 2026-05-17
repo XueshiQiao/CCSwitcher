@@ -156,6 +156,6 @@
 "Weekly reset countdown" = "Weekly reset countdown";
 "Menu Bar" = "Menu Bar";
 "Account display" = "Account display";
-"Session usage + pace line (5h)" = "Session usage + pace line (5h)";
-"Weekly usage + pace line (7d)" = "Weekly usage + pace line (7d)";
-"Pace line = how much of the window has elapsed; fill past it means you're using faster than the clock." = "Pace line = how much of the window has elapsed; fill past it means you're using faster than the clock.";
+"Session — usage vs time (5h)" = "Session — usage vs time (5h)";
+"Weekly — usage vs time (7d)" = "Weekly — usage vs time (7d)";
+"The vertical line marks time elapsed in the window; fill past it means you're using faster than the clock." = "The vertical line marks time elapsed in the window; fill past it means you're using faster than the clock.";

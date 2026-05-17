@@ -152,6 +152,6 @@
 "Weekly reset countdown" = "Compte à rebours réinitialisation semaine";
 "Menu Bar" = "Barre de menus";
 "Account display" = "Affichage du compte";
-"Session usage + pace line (5h)" = "Utilisation de la session + ligne de rythme (5h)";
-"Weekly usage + pace line (7d)" = "Utilisation hebdomadaire + ligne de rythme (7j)";
-"Pace line = how much of the window has elapsed; fill past it means you're using faster than the clock." = "Ligne de rythme = part du créneau déjà écoulée ; remplissage au-delà = consommation plus rapide que l'horloge.";
+"Session — usage vs time (5h)" = "Session — usage vs temps (5 h)";
+"Weekly — usage vs time (7d)" = "Hebdomadaire — usage vs temps (7 j)";
+"The vertical line marks time elapsed in the window; fill past it means you're using faster than the clock." = "La ligne verticale indique le temps écoulé ; remplissage au-delà = consommation plus rapide que l'horloge.";

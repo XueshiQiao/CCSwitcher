@@ -35,9 +35,9 @@ enum MenuBarModule: String, Codable, CaseIterable, Identifiable {
     var localizedDisplayName: String {
         switch self {
         case .account:         return String(localized: "Account name", bundle: L10n.bundle)
-        case .sessionBar:      return String(localized: "Session usage + pace line (5h)", bundle: L10n.bundle)
+        case .sessionBar:      return String(localized: "Session — usage vs time (5h)", bundle: L10n.bundle)
         case .sessionBarPlain: return String(localized: "Session usage (5h)", bundle: L10n.bundle)
-        case .weeklyBar:       return String(localized: "Weekly usage + pace line (7d)", bundle: L10n.bundle)
+        case .weeklyBar:       return String(localized: "Weekly — usage vs time (7d)", bundle: L10n.bundle)
         case .weeklyBarPlain:  return String(localized: "Weekly usage (7d)", bundle: L10n.bundle)
         case .dailyCost:       return String(localized: "Daily cost", bundle: L10n.bundle)
         case .sessionReset:    return String(localized: "Session reset countdown", bundle: L10n.bundle)
