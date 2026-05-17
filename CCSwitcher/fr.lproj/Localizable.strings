@@ -154,3 +154,4 @@
 "Account display" = "Affichage du compte";
 "Session usage + pace line (5h)" = "Utilisation de la session + ligne de rythme (5h)";
 "Weekly usage + pace line (7d)" = "Utilisation hebdomadaire + ligne de rythme (7j)";
+"Pace line = how much of the window has elapsed; fill past it means you're using faster than the clock." = "Ligne de rythme = part du créneau déjà écoulée ; remplissage au-delà = consommation plus rapide que l'horloge.";

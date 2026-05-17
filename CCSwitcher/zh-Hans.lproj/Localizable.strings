@@ -154,3 +154,4 @@
 "Account display" = "账户显示";
 "Session usage + pace line (5h)" = "会话用量 + 节奏线（5小时）";
 "Weekly usage + pace line (7d)" = "每周用量 + 节奏线（7天）";
+"Pace line = how much of the window has elapsed; fill past it means you're using faster than the clock." = "节奏线 = 该时段已过去的比例；填充超过这条线 = 你用得比时间快。";

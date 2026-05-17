@@ -158,3 +158,4 @@
 "Account display" = "Account display";
 "Session usage + pace line (5h)" = "Session usage + pace line (5h)";
 "Weekly usage + pace line (7d)" = "Weekly usage + pace line (7d)";
+"Pace line = how much of the window has elapsed; fill past it means you're using faster than the clock." = "Pace line = how much of the window has elapsed; fill past it means you're using faster than the clock.";

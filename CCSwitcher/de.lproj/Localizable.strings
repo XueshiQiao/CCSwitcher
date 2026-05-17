@@ -154,3 +154,4 @@
 "Account display" = "Kontoanzeige";
 "Session usage + pace line (5h)" = "Sitzungsnutzung + Tempolinie (5h)";
 "Weekly usage + pace line (7d)" = "Wochennutzung + Tempolinie (7d)";
+"Pace line = how much of the window has elapsed; fill past it means you're using faster than the clock." = "Tempolinie = wie viel des Zeitfensters vergangen ist; Füllung darüber hinaus = schneller als die Uhr verbraucht.";

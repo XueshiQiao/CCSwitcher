@@ -53,6 +53,14 @@ struct MenuBarModulesSettingsView: View {
                 persist()
             }
 
+            Label(
+                String(localized: "Pace line = how much of the window has elapsed; fill past it means you're using faster than the clock.", bundle: L10n.bundle),
+                systemImage: "info.circle"
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .padding(.top, 2)
+
             Divider()
 
             HStack(spacing: 8) {
