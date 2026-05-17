@@ -23,7 +23,7 @@ final class MenuBarConfig: ObservableObject {
 
     private init() {
         // Migration must run BEFORE the first read so a fresh-after-upgrade
-        // launch sees the seeded `[.account]` instead of an empty list.
+        // launch sees the seeded default instead of an empty list.
         MenuBarModuleStore.migrateIfNeeded()
         let data = UserDefaults.standard.data(forKey: storageKey) ?? Data()
         self.modules = MenuBarModuleStore.decode(data)

@@ -64,14 +64,14 @@ enum MenuBarModuleStore {
         (try? JSONEncoder().encode(modules)) ?? Data()
     }
 
-    /// Seed the new storage from the legacy `showAccountName` toggle on first
-    /// launch after upgrade. Idempotent — only runs once, and never clobbers an
-    /// existing `menuBarModules` value (defends against the migration flag
-    /// being cleared while real config exists).
+    /// Seed the new storage on first launch (fresh install or not-yet-migrated
+    /// upgrade). Idempotent — runs once and never clobbers an existing
+    /// `menuBarModules` value (so users already on 1.8.x keep their config).
     ///
-    /// The legacy default was `true`, so users who never touched the toggle
-    /// (including fresh installs of this build) get `[.account]` — same
-    /// behavior as before the multi-module redesign.
+    /// Default for new/unconfigured users: account name + the plain session
+    /// and weekly usage bars. Upgraders who had explicitly turned the legacy
+    /// "show account name" toggle OFF wanted a minimal menu bar, so they get
+    /// nothing (their intent is preserved).
     static func migrateIfNeeded() {
         let defaults = UserDefaults.standard
         guard !defaults.bool(forKey: migrationKey) else { return }
@@ -83,7 +83,7 @@ enum MenuBarModuleStore {
         }
 
         let legacy = defaults.object(forKey: legacyShowAccountNameKey) as? Bool ?? true
-        let seed: [MenuBarModule] = legacy ? [.account] : []
+        let seed: [MenuBarModule] = legacy ? [.account, .sessionBarPlain, .weeklyBarPlain] : []
         defaults.set(encode(seed), forKey: storageKey)
         defaults.set(true, forKey: migrationKey)
     }
