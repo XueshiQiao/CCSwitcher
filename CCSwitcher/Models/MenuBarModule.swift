@@ -38,14 +38,6 @@ enum MenuBarModule: String, Codable, CaseIterable, Identifiable {
         case .weeklyReset:  return String(localized: "Weekly reset countdown", bundle: L10n.bundle)
         }
     }
-
-    /// True if this module renders a horizontal bar (utilization 0–1).
-    var isBar: Bool {
-        switch self {
-        case .sessionBar, .weeklyBar: return true
-        default: return false
-        }
-    }
 }
 
 /// Persistence helpers for the user's chosen module ordering.
