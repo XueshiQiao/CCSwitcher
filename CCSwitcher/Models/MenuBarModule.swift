@@ -8,7 +8,9 @@ import Foundation
 enum MenuBarModule: String, Codable, CaseIterable, Identifiable {
     case account
     case sessionBar
+    case sessionBarPlain
     case weeklyBar
+    case weeklyBarPlain
     case dailyCost
     case sessionReset
     case weeklyReset
@@ -18,24 +20,28 @@ enum MenuBarModule: String, Codable, CaseIterable, Identifiable {
     /// Short uppercase label shown on the top line of the module.
     var compactLabel: String {
         switch self {
-        case .account:      return "@"
-        case .sessionBar:   return "5H"
-        case .weeklyBar:    return "7D"
-        case .dailyCost:    return "TODAY"
-        case .sessionReset: return "5H↻"
-        case .weeklyReset:  return "7D↻"
+        case .account:         return "@"
+        case .sessionBar:      return "5H"
+        case .sessionBarPlain: return "5H"
+        case .weeklyBar:       return "7D"
+        case .weeklyBarPlain:  return "7D"
+        case .dailyCost:       return "TODAY"
+        case .sessionReset:    return "5H↻"
+        case .weeklyReset:     return "7D↻"
         }
     }
 
     /// Human-readable name shown in the Settings reorder list.
     var localizedDisplayName: String {
         switch self {
-        case .account:      return String(localized: "Account name", bundle: L10n.bundle)
-        case .sessionBar:   return String(localized: "Session usage (5h)", bundle: L10n.bundle)
-        case .weeklyBar:    return String(localized: "Weekly usage (7d)", bundle: L10n.bundle)
-        case .dailyCost:    return String(localized: "Daily cost", bundle: L10n.bundle)
-        case .sessionReset: return String(localized: "Session reset countdown", bundle: L10n.bundle)
-        case .weeklyReset:  return String(localized: "Weekly reset countdown", bundle: L10n.bundle)
+        case .account:         return String(localized: "Account name", bundle: L10n.bundle)
+        case .sessionBar:      return String(localized: "Session usage + pace line (5h)", bundle: L10n.bundle)
+        case .sessionBarPlain: return String(localized: "Session usage (5h)", bundle: L10n.bundle)
+        case .weeklyBar:       return String(localized: "Weekly usage + pace line (7d)", bundle: L10n.bundle)
+        case .weeklyBarPlain:  return String(localized: "Weekly usage (7d)", bundle: L10n.bundle)
+        case .dailyCost:       return String(localized: "Daily cost", bundle: L10n.bundle)
+        case .sessionReset:    return String(localized: "Session reset countdown", bundle: L10n.bundle)
+        case .weeklyReset:     return String(localized: "Weekly reset countdown", bundle: L10n.bundle)
         }
     }
 }

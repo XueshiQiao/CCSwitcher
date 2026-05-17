@@ -60,6 +60,12 @@ struct MenuBarModuleView: View {
         case .weeklyBar:
             UtilizationBar(utilization: weeklyUtilization, markerPercent: weeklyTimeElapsed)
 
+        case .sessionBarPlain:
+            UtilizationBar(utilization: sessionUtilization)
+
+        case .weeklyBarPlain:
+            UtilizationBar(utilization: weeklyUtilization)
+
         case .dailyCost:
             Text(dailyCostText)
                 .font(.system(size: 10, weight: .medium).monospacedDigit())
