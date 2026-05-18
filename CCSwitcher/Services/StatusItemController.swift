@@ -13,11 +13,16 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     private var popover: NSPopover?
     // Strongly retained: NSHostingController drives the SwiftUI update loop.
     private var stripController: NSHostingController<AnyView>?
+    private var popoverController: NSHostingController<AnyView>?
+    private var appState: AppState?
+    private var menuBarConfig: MenuBarConfig?
     private var installed = false
 
     func install(appState: AppState, config: MenuBarConfig, locale: Locale) {
         guard !installed else { return }
         installed = true
+        self.appState = appState
+        self.menuBarConfig = config
 
         let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         self.statusItem = statusItem
@@ -64,7 +69,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         let popover = NSPopover()
         popover.behavior = .transient
         popover.animates = false
-        let controller = NSHostingController(
+        let popoverController = NSHostingController(
             rootView: AnyView(
                 MainMenuView()
                     .environmentObject(appState)
@@ -72,13 +77,35 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             )
         )
         if #available(macOS 13.0, *) {
-            controller.sizingOptions = [.preferredContentSize]
+            popoverController.sizingOptions = [.preferredContentSize]
         } else {
-            controller.preferredContentSize = NSSize(width: 360, height: 520)
+            popoverController.preferredContentSize = NSSize(width: 360, height: 520)
         }
-        popover.contentViewController = controller
+        popover.contentViewController = popoverController
         popover.delegate = self
         self.popover = popover
+        self.popoverController = popoverController
+    }
+
+    /// Update the locale environment on all hosted SwiftUI views.
+    /// Called when the user changes the in-app language setting.
+    func updateLocale(_ locale: Locale) {
+        guard let appState, let config = menuBarConfig else { return }
+        stripController?.rootView = AnyView(
+            MenuBarStripView(
+                appState: appState,
+                config: config,
+                onWidth: { [weak statusItem] width in
+                    statusItem?.length = max(width, 1)
+                }
+            )
+            .environment(\.locale, locale)
+        )
+        popoverController?.rootView = AnyView(
+            MainMenuView()
+                .environmentObject(appState)
+                .environment(\.locale, locale)
+        )
     }
 
     @objc private func togglePopover(_ sender: NSStatusBarButton) {

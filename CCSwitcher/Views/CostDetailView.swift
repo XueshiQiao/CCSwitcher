@@ -86,7 +86,7 @@ struct CostDetailView: View {
         .padding(.horizontal, 16)
     }
 
-    private func periodCard(title: String, cost: Double) -> some View {
+    private func periodCard(title: LocalizedStringKey, cost: Double) -> some View {
         VStack(spacing: 4) {
             Text(title)
                 .font(.caption2)

@@ -52,6 +52,9 @@ struct CCSwitcherApp: App {
                         appState.startAutoRefresh(interval: refreshInterval)
                     }
                 }
+                .onChange(of: appLanguage) { _, _ in
+                    statusItemController.updateLocale(currentLocale)
+                }
         }
         .defaultSize(width: 20, height: 20)
         .windowStyle(.hiddenTitleBar)

@@ -240,7 +240,7 @@ struct UsageDashboardView: View {
                 .lineLimit(1)
 
             if account.isActive {
-                Badge(text: String(localized: "Active"), color: .green)
+                Badge(text: String(localized: "Active", bundle: L10n.bundle), color: .green)
             }
 
             Spacer()
