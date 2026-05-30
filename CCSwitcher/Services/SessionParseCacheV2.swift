@@ -112,6 +112,11 @@ actor SessionParseCacheV2 {
     func refreshFromFilesystem() async {
         ensureLoaded()
         await PricingService.shared.ensureLoaded()
+        // Pick up a newer pricing snapshot the background download may have
+        // written since launch — otherwise a long-lived session prices any
+        // model released mid-session at $0. Runs before stamping/pricing so
+        // this cycle's cost output already reflects the reloaded table.
+        await PricingService.shared.reloadIfFreshChanged()
         // Capture the current pricing source for the envelope stamp.
         let src = await PricingService.shared.currentSource()
         pricingMeta = stampFor(source: src)
@@ -177,9 +182,15 @@ actor SessionParseCacheV2 {
         }
         var bucket: [String: [String: Acc]] = [:]
         var sessionsByDate: [String: Set<String>] = [:]
-        // Cache per-model pricing lookups across the loop — avoids
-        // pinging the PricingService actor once per row.
-        var priceCache: [String: LiteLLMModelPricing?] = [:]
+        // Resolve every model's price in a single actor hop up front. Doing
+        // this atomically — rather than awaiting `pricing(for:)` per row —
+        // means a concurrent `reloadIfFreshChanged()` can't swap the pricing
+        // table mid-summary and leave one result mixing old and new prices.
+        var distinctModels: Set<String> = []
+        for (_, file) in sortedFiles {
+            for e in file.entries { distinctModels.insert(e.model) }
+        }
+        let priceCache = await PricingService.shared.prices(for: Array(distinctModels))
 
         for (path, file) in sortedFiles {
             for e in file.entries {
@@ -199,13 +210,9 @@ actor SessionParseCacheV2 {
                     sessionsByDate[e.date, default: []].insert(path)
                 }
 
-                let price: LiteLLMModelPricing?
-                if let cached = priceCache[e.model] {
-                    price = cached
-                } else {
-                    price = await PricingService.shared.pricing(for: e.model)
-                    priceCache[e.model] = price
-                }
+                // priceCache holds every model seen above; `?? nil` flattens
+                // the optional-of-optional for a model with no pricing entry.
+                let price = priceCache[e.model] ?? nil
                 let rowCost = price?.cost(
                     input: e.input, output: e.output,
                     cacheCreate: e.cw, cacheRead: e.cr,

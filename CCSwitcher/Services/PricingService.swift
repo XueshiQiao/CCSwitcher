@@ -110,6 +110,10 @@ actor PricingService {
     private var pricing: [String: LiteLLMModelPricing] = [:]
     private var source: PricingSource = .bundle(commit: "unknown")
     private var loaded = false
+    /// mtime of the fresh file currently held in memory, or nil when the
+    /// in-memory table came from the bundle. Used by `reloadIfFreshChanged()`
+    /// to detect when a background download has produced a newer snapshot.
+    private var loadedFreshMtime: Date?
 
     private static let freshURL: URL = {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
@@ -135,6 +139,7 @@ actor PricingService {
         if let fresh = loadFresh() {
             pricing = fresh.models
             source = .fresh(fetchedAt: fresh.fetchedAt)
+            loadedFreshMtime = fresh.fetchedAt
             log.info("loaded \(pricing.count) models from fresh (\(fresh.fetchedAt))")
             return
         }
@@ -148,6 +153,37 @@ actor PricingService {
         }
 
         log.error("no pricing source available — cost calc will return 0")
+    }
+
+    /// Hot-reload the in-memory pricing table if the background download has
+    /// written a newer fresh snapshot since we last loaded. Without this, a
+    /// long-running session (the menu bar app can run for weeks) stays pinned
+    /// to the snapshot present at launch — so a model released mid-session
+    /// (e.g. a new Opus) has no pricing entry and every one of its rows is
+    /// valued at $0. Called from the periodic refresh cycle, so a fresh
+    /// download takes effect within one cycle (~5 min) with no app restart.
+    func reloadIfFreshChanged() {
+        guard loaded else { ensureLoaded(); return }
+
+        // A valid (within-TTL) fresh file must exist to consider reloading.
+        let fm = FileManager.default
+        guard let attrs = try? fm.attributesOfItem(atPath: Self.freshURL.path),
+              let mtime = attrs[.modificationDate] as? Date,
+              Date().timeIntervalSince(mtime) < Self.freshTTLSeconds
+        else { return }
+
+        // Already serving this exact fresh snapshot? Nothing to do. (When the
+        // current table is from the bundle, loadedFreshMtime is nil, so a
+        // newly-appeared fresh file always triggers a load.)
+        if let loadedAt = loadedFreshMtime, loadedAt == mtime {
+            return
+        }
+
+        guard let fresh = loadFresh() else { return }
+        pricing = fresh.models
+        source = .fresh(fetchedAt: fresh.fetchedAt)
+        loadedFreshMtime = fresh.fetchedAt
+        log.info("reloadIfFreshChanged: picked up newer fresh snapshot (\(fresh.fetchedAt)), \(pricing.count) models")
     }
 
     /// Resolve pricing for a model id. Tries exact match first, then common
@@ -169,6 +205,16 @@ actor PricingService {
             }
         }
         return best?.1
+    }
+
+    /// Resolve prices for many models in a single actor hop. Batch callers
+    /// should use this instead of awaiting `pricing(for:)` per row: it snapshots
+    /// the table atomically, so a concurrent `reloadIfFreshChanged()` can't swap
+    /// pricing partway through and mix old and new values into one result.
+    func prices(for models: [String]) -> [String: LiteLLMModelPricing?] {
+        var out: [String: LiteLLMModelPricing?] = [:]
+        for m in models { out[m] = pricing(for: m) }
+        return out
     }
 
     /// Snapshot of which source the cache is currently serving from.
