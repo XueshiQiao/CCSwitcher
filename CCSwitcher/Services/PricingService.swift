@@ -114,6 +114,8 @@ actor PricingService {
     /// in-memory table came from the bundle. Used by `reloadIfFreshChanged()`
     /// to detect when a background download has produced a newer snapshot.
     private var loadedFreshMtime: Date?
+    /// Wall-clock of the last network revalidation attempt, for throttling.
+    private var lastNetworkCheck: Date?
 
     private static let freshURL: URL = {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
@@ -122,13 +124,32 @@ actor PricingService {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent("litellm-pricing-fresh.json")
     }()
-    private static let freshTTLSeconds: TimeInterval = 24 * 60 * 60
+    /// Sidecar next to the fresh JSON holding the last ETag and the time we last
+    /// confirmed (via 200 or 304) that the cached file is current. Kept separate
+    /// from the JSON so a 304 re-stamp doesn't change the JSON's mtime — that
+    /// mtime is the "content actually changed" signal `reloadIfFreshChanged()`
+    /// relies on.
+    private static let metaURL: URL = freshURL
+        .deletingLastPathComponent()
+        .appendingPathComponent("litellm-pricing-fresh.meta.json")
+    /// How long a downloaded snapshot stays trusted over the bundle without a
+    /// successful revalidation. While the app runs we revalidate every refresh
+    /// cycle via a cheap conditional GET, so this only bites after a long
+    /// offline stretch — at which point we fall back to the bundled snapshot.
+    private static let freshValiditySeconds: TimeInterval = 30 * 24 * 60 * 60
+    /// Floor between network revalidations; guards against manual-refresh
+    /// storms. The CDN caches for 5 min, so sub-minute rechecks see nothing new.
+    private static let minCheckInterval: TimeInterval = 60
+    /// A usable LiteLLM payload yields dozens of Claude pricing rows (~44 at
+    /// time of writing). Anything below this floor means the bytes parsed as
+    /// JSON but aren't the pricing table — reject rather than trust them.
+    private static let minClaudeModels = 10
     private static let liteLLMURL = URL(string:
         "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
     )!
 
     /// Loads pricing if not already loaded. Preference order:
-    ///   1. fresh file on disk, if mtime within TTL
+    ///   1. fresh file on disk, if last revalidated within the validity window
     ///   2. bundled snapshot
     /// Bundle is the fallback path and is guaranteed present (committed to the repo).
     func ensureLoaded() {
@@ -165,11 +186,11 @@ actor PricingService {
     func reloadIfFreshChanged() {
         guard loaded else { ensureLoaded(); return }
 
-        // A valid (within-TTL) fresh file must exist to consider reloading.
+        // The JSON file's mtime is the "content actually changed" signal: it
+        // only advances on a real 200 download, never on a 304 re-stamp.
         let fm = FileManager.default
         guard let attrs = try? fm.attributesOfItem(atPath: Self.freshURL.path),
-              let mtime = attrs[.modificationDate] as? Date,
-              Date().timeIntervalSince(mtime) < Self.freshTTLSeconds
+              let mtime = attrs[.modificationDate] as? Date
         else { return }
 
         // Already serving this exact fresh snapshot? Nothing to do. (When the
@@ -179,6 +200,7 @@ actor PricingService {
             return
         }
 
+        // loadFresh() enforces the validity window; a stale file won't load.
         guard let fresh = loadFresh() else { return }
         pricing = fresh.models
         source = .fresh(fetchedAt: fresh.fetchedAt)
@@ -221,32 +243,65 @@ actor PricingService {
     /// Used by SessionParseCacheV2 to stamp the cache envelope.
     func currentSource() -> PricingSource { source }
 
-    /// Trigger a background refresh from LiteLLM. Idempotent; no-op if the
-    /// fresh file is younger than TTL. Returns immediately; the refresh is
-    /// fire-and-forget. The next app launch will pick up the new file.
+    /// Trigger a background revalidation of the LiteLLM pricing JSON. Returns
+    /// immediately; the work is fire-and-forget. A freshly-downloaded snapshot
+    /// is hot-loaded by `reloadIfFreshChanged()` on the same refresh cycle — no
+    /// app restart needed.
     nonisolated func refreshInBackground() {
         Task.detached(priority: .background) {
-            await self.refreshIfStale()
+            await self.conditionalRefresh()
         }
     }
 
-    private func refreshIfStale() async {
-        let fm = FileManager.default
-        if let attrs = try? fm.attributesOfItem(atPath: Self.freshURL.path),
-           let mtime = attrs[.modificationDate] as? Date,
-           Date().timeIntervalSince(mtime) < Self.freshTTLSeconds {
-            log.debug("refreshInBackground: fresh file still within TTL, skipping")
+    /// Conditional GET against LiteLLM. Sends `If-None-Match` with the last
+    /// ETag, so an unchanged file comes back as a 0-byte 304 (no re-download).
+    /// Called every refresh cycle; a sub-minute throttle guards against
+    /// manual-refresh storms.
+    ///   304 → re-stamp `verifiedAt` (keeps the cache trusted) and stop.
+    ///   200 → validate, overwrite the JSON, record the new ETag. The JSON
+    ///         mtime changes, which is what triggers the hot-reload.
+    private func conditionalRefresh() async {
+        if let last = lastNetworkCheck, Date().timeIntervalSince(last) < Self.minCheckInterval {
             return
+        }
+        lastNetworkCheck = Date()
+
+        var request = URLRequest(url: Self.liteLLMURL)
+        // Drive revalidation with our own ETag rather than URLSession's cache.
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        if let etag = loadMeta()?.etag, !etag.isEmpty {
+            request.setValue(etag, forHTTPHeaderField: "If-None-Match")
         }
 
         do {
-            let (data, _) = try await URLSession.shared.data(from: Self.liteLLMURL)
-            // Validate parseable before writing.
-            _ = try JSONSerialization.jsonObject(with: data)
-            try data.write(to: Self.freshURL, options: .atomic)
-            log.info("refreshInBackground: wrote \(data.count) bytes to \(Self.freshURL.lastPathComponent)")
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                log.warning("conditionalRefresh: non-HTTP response")
+                return
+            }
+            let now = Date().timeIntervalSince1970
+            switch http.statusCode {
+            case 304:
+                // Unchanged. Re-stamp so the on-disk cache stays trusted over
+                // the bundle without re-downloading; keep the existing ETag.
+                saveMeta(etag: loadMeta()?.etag, verifiedAt: now)
+                log.debug("conditionalRefresh: 304 not-modified, re-stamped verifiedAt")
+            case 200:
+                // Require a usable pricing table, not just valid JSON, before
+                // replacing the cache — a wrong-schema 200 must not zero prices.
+                guard let models = Self.claudeModels(from: data), models.count >= Self.minClaudeModels else {
+                    log.warning("conditionalRefresh: 200 body not a usable pricing table (claude rows=\(Self.claudeModels(from: data)?.count ?? -1)), keeping previous cache")
+                    return
+                }
+                try data.write(to: Self.freshURL, options: .atomic)
+                let etag = http.value(forHTTPHeaderField: "ETag")
+                saveMeta(etag: etag, verifiedAt: now)
+                log.info("conditionalRefresh: 200 updated, wrote \(data.count) bytes, \(models.count) claude rows, etag=\(etag ?? "nil")")
+            default:
+                log.warning("conditionalRefresh: unexpected status \(http.statusCode)")
+            }
         } catch {
-            log.warning("refreshInBackground: fetch failed — \(error.localizedDescription)")
+            log.warning("conditionalRefresh: fetch failed — \(error.localizedDescription)")
         }
     }
 
@@ -262,6 +317,25 @@ actor PricingService {
     private struct LoadedFresh {
         let models: [String: LiteLLMModelPricing]
         let fetchedAt: Date
+    }
+
+    /// Sidecar persisted next to the fresh JSON. `verifiedAt` is updated on
+    /// every successful revalidation (200 or 304); `etag` is the validator we
+    /// send back as `If-None-Match`.
+    private struct FreshMeta: Codable {
+        let etag: String?
+        let verifiedAt: Double   // unix seconds
+    }
+
+    private func loadMeta() -> FreshMeta? {
+        guard let data = try? Data(contentsOf: Self.metaURL),
+              let m = try? JSONDecoder().decode(FreshMeta.self, from: data) else { return nil }
+        return m
+    }
+
+    private func saveMeta(etag: String?, verifiedAt: Double) {
+        guard let data = try? JSONEncoder().encode(FreshMeta(etag: etag, verifiedAt: verifiedAt)) else { return }
+        try? data.write(to: Self.metaURL, options: .atomic)
     }
 
     private func loadBundled() -> LoadedBundle? {
@@ -280,21 +354,35 @@ actor PricingService {
         let path = Self.freshURL.path
         guard FileManager.default.fileExists(atPath: path),
               let attrs = try? FileManager.default.attributesOfItem(atPath: path),
-              let mtime = attrs[.modificationDate] as? Date,
-              Date().timeIntervalSince(mtime) < Self.freshTTLSeconds,
-              let data = try? Data(contentsOf: Self.freshURL),
-              let raw = try? JSONDecoder().decode([String: LiteLLMEntry].self, from: data)
+              let mtime = attrs[.modificationDate] as? Date
         else {
             return nil
         }
-        // Fresh file is the raw LiteLLM payload (not our envelope). Filter to
-        // Claude rows the same way fetch_litellm.sh does at build time.
+        // Trust window keys off the sidecar's verifiedAt (re-stamped on every
+        // 200/304 revalidation), so a file unchanged-but-revalidated for weeks
+        // stays valid. Pre-sidecar installs fall back to the file's mtime.
+        let verifiedAt = loadMeta().map { Date(timeIntervalSince1970: $0.verifiedAt) } ?? mtime
+        guard Date().timeIntervalSince(verifiedAt) < Self.freshValiditySeconds,
+              let data = try? Data(contentsOf: Self.freshURL),
+              let models = Self.claudeModels(from: data),
+              models.count >= Self.minClaudeModels
+        else {
+            return nil
+        }
+        return LoadedFresh(models: models, fetchedAt: mtime)
+    }
+
+    /// Decode a raw LiteLLM payload (the on-disk/network shape, not our
+    /// envelope) into Claude pricing rows — the same filter `fetch_litellm.sh`
+    /// applies at build time. Returns nil when the bytes aren't the expected
+    /// object-of-entries schema, so callers can reject a wrong-shape 200 body.
+    private static func claudeModels(from data: Data) -> [String: LiteLLMModelPricing]? {
+        guard let raw = try? JSONDecoder().decode([String: LiteLLMEntry].self, from: data) else { return nil }
         let claude = raw.filter { name, _ in
             name.hasPrefix("claude-")
                 || name.hasPrefix("anthropic/claude-")
                 || name.hasPrefix("anthropic.claude-")
         }
-        let models = claude.compactMapValues { $0.toPricing() }
-        return LoadedFresh(models: models, fetchedAt: mtime)
+        return claude.compactMapValues { $0.toPricing() }
     }
 }
