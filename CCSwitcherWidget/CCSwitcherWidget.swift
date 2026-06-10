@@ -33,7 +33,7 @@ struct CCSwitcherEntry: TimelineEntry {
             conversationTurns: 18,
             activeCodingTime: "1h 30m",
             linesWritten: 326,
-            modelUsage: ["Opus": 12, "Sonnet": 5, "Haiku": 1],
+            modelUsage: ["Fable": 18, "Opus": 12, "Sonnet": 5, "Haiku": 1],
             lastUpdated: .now
         )
     )
@@ -410,6 +410,7 @@ private struct LargeWidgetView: View {
                         .padding(.horizontal, 8)
 
                     HStack(spacing: 0) {
+                        modelStat(name: "Fable", count: data.modelUsage["Fable"] ?? 0, color: .purple)
                         modelStat(name: "Opus", count: data.modelUsage["Opus"] ?? 0, color: brandColor)
                         modelStat(name: "Sonnet", count: data.modelUsage["Sonnet"] ?? 0, color: .blue)
                         modelStat(name: "Haiku", count: data.modelUsage["Haiku"] ?? 0, color: .green)

@@ -135,6 +135,8 @@ struct UsageDashboardView: View {
 
             // Model usage row — same style as stats above
             HStack(spacing: 0) {
+                modelStat(name: "Fable", count: stats.modelUsage["Fable"] ?? 0,
+                          tooltip: "Claude Fable 5 — most powerful model, the new flagship tier")
                 modelStat(name: "Opus", count: stats.modelUsage["Opus"] ?? 0,
                           tooltip: "Claude Opus 4 — most capable model, best for complex tasks")
                 modelStat(name: "Sonnet", count: stats.modelUsage["Sonnet"] ?? 0,
@@ -186,6 +188,7 @@ struct UsageDashboardView: View {
 
     private func modelColor(_ name: String) -> Color {
         switch name {
+        case "Fable": return .purple
         case "Opus": return .brand
         case "Sonnet": return .blue
         case "Haiku": return .green

@@ -15,8 +15,9 @@ final class CostParser: Sendable {
 
     // MARK: - Helpers
 
-    /// "claude-opus-4-6" → "Opus"
+    /// "claude-opus-4-6" → "Opus", "claude-fable-5" → "Fable"
     static func shortModelName(_ model: String) -> String {
+        if model.contains("fable") { return "Fable" }
         if model.contains("opus") { return "Opus" }
         if model.contains("sonnet") { return "Sonnet" }
         if model.contains("haiku") { return "Haiku" }
