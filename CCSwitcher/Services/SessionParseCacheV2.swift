@@ -23,7 +23,7 @@ private let log = FileLog("CacheV2")
 
 /// One assistant row after per-file `(message.id, requestId)` dedup.
 /// Multiple of these may share a `hash`, but only across files; at query
-/// time they get deduped globally first-wins (matches ccusage 18.0.11).
+/// time they get deduped globally max-output-wins (matches ccusage 20.x).
 struct CachedEntryV2: Codable, Sendable {
     /// "messageId:requestId", or nil if either id was missing.
     /// nil-hash entries are NEVER deduped — every occurrence is kept.
@@ -34,7 +34,8 @@ struct CachedEntryV2: Codable, Sendable {
     let speed: String?      // nil / "standard" / "fast"
     let input: Int
     let output: Int
-    let cw: Int             // cache_creation_input_tokens
+    let cw: Int             // cache_creation_input_tokens (total)
+    let cw1h: Int           // cache_creation.ephemeral_1h_input_tokens (1-hour TTL portion)
     let cr: Int             // cache_read_input_tokens
     let costUSDRow: Double? // value of `costUSD` if present in the JSONL row
     let tools: [String: Int]
@@ -50,7 +51,7 @@ struct CachedEntryV2: Codable, Sendable {
 /// per-file aggregation is correct and cheap.
 struct CachedFileV2: Codable, Sendable {
     let mtimeUnix: Double               // bit-equal-comparable with FS mtime
-    let earliestTimestampUnix: Double   // for cross-file sort order at query time
+    let earliestTimestampUnix: Double   // for cross-file sort order; .greatestFiniteMagnitude = "no timestamp, sorts last" (must stay finite — see save())
     let project: String                 // dir name under ~/.claude/projects/
     let sessionId: String?              // from the file's first row, if present
     let isSidechain: Bool               // true if path contains /subagents/
@@ -85,7 +86,10 @@ private struct CacheEnvelopeV2: Codable {
 actor SessionParseCacheV2 {
     static let shared = SessionParseCacheV2()
 
-    private static let currentVersion = 2
+    // v3: cost entries gained `cw1h` (1-hour cache split) and dedup switched to
+    // max-output-wins; bump forces a full re-parse so old caches don't serve
+    // entries missing the new field or deduped under the old first-wins rule.
+    private static let currentVersion = 3
     private let claudeProjectsDir: String
     private let cacheURL: URL
 
@@ -149,9 +153,9 @@ actor SessionParseCacheV2 {
         save()
     }
 
-    /// Per-day, per-model cost summary. Applies global first-wins dedup
-    /// across all cached files in earliest-timestamp ascending order to
-    /// match ccusage 18.0.11's behavior.
+    /// Per-day, per-model cost summary. Applies global max-output-wins dedup
+    /// across all cached files (keeping the largest-output copy of each
+    /// duplicated message) to match ccusage 20.x's behavior.
     ///
     /// Each kept row is priced individually so the 200k-tier threshold
     /// and the fast multiplier apply per-request — not at the aggregated
@@ -160,11 +164,11 @@ actor SessionParseCacheV2 {
     func costSummary() async -> CostSummary {
         await PricingService.shared.ensureLoaded()
 
-        // Sort files by earliest timestamp. Resume duplicates write the
-        // same (msg.id, requestId) to multiple files; the earlier file
-        // wins the dedup race. Secondary sort by path string for
-        // deterministic ordering when timestamps tie (or are .infinity
-        // for files with no parseable timestamps).
+        // Sort files by earliest timestamp. Secondary sort by path string for
+        // deterministic ordering when timestamps tie (or are
+        // .greatestFiniteMagnitude for files with no parseable timestamps,
+        // which sort last). Dedup is max-output-wins below, so this order no
+        // longer affects which duplicate copy wins — it only stabilizes output.
         let sortedFiles: [(path: String, file: CachedFileV2)] = files
             .map { ($0.key, $0.value) }
             .sorted {
@@ -174,7 +178,6 @@ actor SessionParseCacheV2 {
                 return $0.0 < $1.0
             }
 
-        var seen: Set<String> = []
         // (date, model) → running totals; cost is summed per-row.
         struct Acc {
             var input = 0, output = 0, cw = 0, cr = 0
@@ -192,43 +195,56 @@ actor SessionParseCacheV2 {
         }
         let priceCache = await PricingService.shared.prices(for: Array(distinctModels))
 
+        // Global max-output-wins dedup across files. A message written more than
+        // once (partial stream snapshot + final copy) shares a hash; input/cache
+        // are identical across copies, only output_tokens grows, so keep the
+        // largest-output copy. nil-hash entries are never deduped. Selecting the
+        // winner is order-independent (max), so file order doesn't matter here.
+        struct Winner { let e: CachedEntryV2; let sessionKey: String }
+        var bestByHash: [String: Winner] = [:]
+        var nilHashWinners: [Winner] = []
         for (path, file) in sortedFiles {
+            let sessionKey = file.sessionId ?? path
             for e in file.entries {
-                if let h = e.hash {
-                    if seen.contains(h) { continue }
-                    seen.insert(h)
-                }
-                // ccusage strips `<synthetic>` from modelBreakdowns at
-                // aggregation time. These rows are zero-token / zero-cost
-                // anyway (compaction events, internal errors), so skipping
-                // them changes no numbers — only removes a meaningless
-                // entry from the UI's model column.
-                if e.model == "<synthetic>" { continue }
-                if let sid = file.sessionId {
-                    sessionsByDate[e.date, default: []].insert(sid)
+                let w = Winner(e: e, sessionKey: sessionKey)
+                guard let h = e.hash else { nilHashWinners.append(w); continue }
+                if let cur = bestByHash[h] {
+                    if e.output > cur.e.output { bestByHash[h] = w }
                 } else {
-                    sessionsByDate[e.date, default: []].insert(path)
+                    bestByHash[h] = w
                 }
-
-                // priceCache holds every model seen above; `?? nil` flattens
-                // the optional-of-optional for a model with no pricing entry.
-                let price = priceCache[e.model] ?? nil
-                let rowCost = price?.cost(
-                    input: e.input, output: e.output,
-                    cacheCreate: e.cw, cacheRead: e.cr,
-                    isFast: e.speed == "fast"
-                ) ?? 0
-
-                var byModel = bucket[e.date] ?? [:]
-                var acc = byModel[e.model] ?? Acc()
-                acc.input += e.input
-                acc.output += e.output
-                acc.cw += e.cw
-                acc.cr += e.cr
-                acc.cost += rowCost
-                byModel[e.model] = acc
-                bucket[e.date] = byModel
             }
+        }
+
+        var winners: [Winner] = Array(bestByHash.values)
+        winners.append(contentsOf: nilHashWinners)
+        for w in winners {
+            let e = w.e
+            // ccusage strips `<synthetic>` from modelBreakdowns at aggregation
+            // time. These rows are zero-token / zero-cost anyway (compaction
+            // events, internal errors), so skipping them changes no numbers —
+            // only removes a meaningless entry from the UI's model column.
+            if e.model == "<synthetic>" { continue }
+            sessionsByDate[e.date, default: []].insert(w.sessionKey)
+
+            // priceCache holds every model seen above; `?? nil` flattens
+            // the optional-of-optional for a model with no pricing entry.
+            let price = priceCache[e.model] ?? nil
+            let rowCost = price?.cost(
+                input: e.input, output: e.output,
+                cacheCreate: e.cw, cacheCreate1h: e.cw1h, cacheRead: e.cr,
+                isFast: e.speed == "fast"
+            ) ?? 0
+
+            var byModel = bucket[e.date] ?? [:]
+            var acc = byModel[e.model] ?? Acc()
+            acc.input += e.input
+            acc.output += e.output
+            acc.cw += e.cw
+            acc.cr += e.cr
+            acc.cost += rowCost
+            byModel[e.model] = acc
+            bucket[e.date] = byModel
         }
 
         var dailyCosts: [DailyCost] = []
@@ -446,7 +462,7 @@ private func parseFile(at path: String, relativePath: String, mtime: Double) -> 
     var earliest: Date?
 
     // Per-file cost dedup state.
-    var perFileSeen: Set<String> = []
+    var perFileBest: [String: Int] = [:]   // hash -> index of current max-output winner in costEntries
     var costEntries: [CachedEntryV2] = []
 
     // Per-date activity bookkeeping.
@@ -457,7 +473,8 @@ private func parseFile(at path: String, relativePath: String, mtime: Double) -> 
     var perDayTimestamps: [String: [Date]] = [:]
     var perDayActivityRequestSeen: Set<String> = []
 
-    // Strict schema regexes — mirror ccusage 18.0.11's published parser.
+    // Strict schema regexes — originally lifted from ccusage 18.0.11's JS parser;
+    // the row-acceptance schema is unchanged in 20.x (token columns still reconcile).
     // Bare patterns; ranges checked with `.regularExpression`.
     let timestampPattern = #"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$"#
     let versionPattern   = #"^\d+\.\d+\.\d+"#
@@ -504,7 +521,7 @@ private func parseFile(at path: String, relativePath: String, mtime: Double) -> 
             guard let message = obj["message"] as? [String: Any] else { return }
 
             // === Cost entry path (ccusage parity) ===
-            // Match published ccusage 18.0.11: any row with numeric input/output_tokens
+            // Match ccusage: any row with numeric input/output_tokens
             // gets its own entry. Schema is loose; rows with `<synthetic>` model
             // contribute zero-token entries, which is intentional — they're filtered
             // out from cost breakdowns at presentation time.
@@ -512,6 +529,8 @@ private func parseFile(at path: String, relativePath: String, mtime: Double) -> 
                let input = usage["input_tokens"] as? Int,
                let output = usage["output_tokens"] as? Int {
                 let cw = (usage["cache_creation_input_tokens"] as? Int) ?? 0
+                // 1-hour-TTL portion of the cache write (billed higher than 5m).
+                let cw1h = ((usage["cache_creation"] as? [String: Any])?["ephemeral_1h_input_tokens"] as? Int) ?? 0
                 let cr = (usage["cache_read_input_tokens"] as? Int) ?? 0
                 // `speed`: ccusage rejects values other than nil/"standard"/"fast".
                 let rawSpeed = usage["speed"]
@@ -543,37 +562,44 @@ private func parseFile(at path: String, relativePath: String, mtime: Double) -> 
                     return nil
                 }()
 
-                // Per-file first-wins dedup. Global dedup happens later.
-                var keep = true
-                if let h = hash {
-                    if perFileSeen.contains(h) { keep = false }
-                    else { perFileSeen.insert(h) }
-                }
-                if keep {
-                    // Tool counts + linesWritten for THIS row, attached at entry
-                    // level so we can slice cost-by-tool later if needed.
-                    var rowTools: [String: Int] = [:]
-                    var rowLines = 0
-                    if let arr = message["content"] as? [[String: Any]] {
-                        for block in arr where (block["type"] as? String) == "tool_use" {
-                            guard let toolName = block["name"] as? String else { continue }
-                            rowTools[toolName, default: 0] += 1
-                            if let input = block["input"] as? [String: Any] {
-                                rowLines += estimateLines(tool: toolName, input: input)
-                            }
+                // Tool counts + linesWritten for THIS row, attached at entry
+                // level so we can slice cost-by-tool later if needed.
+                var rowTools: [String: Int] = [:]
+                var rowLines = 0
+                if let arr = message["content"] as? [[String: Any]] {
+                    for block in arr where (block["type"] as? String) == "tool_use" {
+                        guard let toolName = block["name"] as? String else { continue }
+                        rowTools[toolName, default: 0] += 1
+                        if let input = block["input"] as? [String: Any] {
+                            rowLines += estimateLines(tool: toolName, input: input)
                         }
                     }
-                    costEntries.append(CachedEntryV2(
-                        hash: hash,
-                        date: dateStr,
-                        hour: hour,
-                        model: model,
-                        speed: speed,
-                        input: input, output: output, cw: cw, cr: cr,
-                        costUSDRow: costUSD,
-                        tools: rowTools,
-                        linesWritten: rowLines
-                    ))
+                }
+                let entry = CachedEntryV2(
+                    hash: hash,
+                    date: dateStr,
+                    hour: hour,
+                    model: model,
+                    speed: speed,
+                    input: input, output: output, cw: cw, cw1h: cw1h, cr: cr,
+                    costUSDRow: costUSD,
+                    tools: rowTools,
+                    linesWritten: rowLines
+                )
+                // Per-file max-output-wins dedup. A message written more than once
+                // (partial stream snapshot + final copy) shares a hash; input/cache
+                // are identical across copies, only output_tokens grows, so keep the
+                // largest-output copy. Global dedup happens later in costSummary.
+                // nil-hash rows are never deduped — every occurrence is kept.
+                if let h = hash {
+                    if let idx = perFileBest[h] {
+                        if output > costEntries[idx].output { costEntries[idx] = entry }
+                    } else {
+                        perFileBest[h] = costEntries.count
+                        costEntries.append(entry)
+                    }
+                } else {
+                    costEntries.append(entry)
                 }
             }
 
@@ -626,7 +652,11 @@ private func parseFile(at path: String, relativePath: String, mtime: Double) -> 
 
     return CachedFileV2(
         mtimeUnix: mtime,
-        earliestTimestampUnix: earliest?.timeIntervalSince1970 ?? .infinity,
+        // Must stay FINITE: JSONEncoder rejects non-finite floats by default, so a
+        // single timestamp-less file with .infinity here made save() throw and the
+        // whole cache silently never persisted (forcing a full re-parse every
+        // cycle). .greatestFiniteMagnitude still sorts after every real timestamp.
+        earliestTimestampUnix: earliest?.timeIntervalSince1970 ?? .greatestFiniteMagnitude,
         project: project,
         sessionId: sessionId,
         isSidechain: isSidechain,

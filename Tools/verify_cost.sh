@@ -59,20 +59,40 @@ if ! npx -y ccusage@latest daily --since "$SINCE" --json \
     exit 2
 fi
 CC_DAYS=$(jq '.daily | length' "$TMP/ccusage.json")
-CC_VERSION=$(npx -y ccusage@latest --version 2>/dev/null | tail -1 || echo "?")
+# The native-binary ccusage prints "ccusage 20.0.9"; older JS builds printed a
+# bare "18.0.11". Take the last whitespace token so we always store just the
+# number (the UI already prepends the word "ccusage").
+CC_VERSION=$(npx -y ccusage@latest --version 2>/dev/null | tail -1 | awk '{print $NF}' || echo "?")
 echo "  → ccusage $CC_VERSION, $CC_DAYS days written to $TMP/ccusage.json"
 
 bold "[3/3] Diffing..."
 python3 - "$TMP/ours.json" "$TMP/ccusage.json" "$TOL" <<'PY'
-import json, sys
+import json, sys, datetime
 ours_path, theirs_path, tol = sys.argv[1], sys.argv[2], float(sys.argv[3])
 
+# The current local day is still being written to ~/.claude/projects while this
+# runs, so our reparser and a separately-invoked ccusage scan it at different
+# instants and disagree by whatever was appended in between. That's a live-file
+# race, not an algorithm difference — exclude today from the pass/fail gate (it
+# still appears in the summary table below, flagged).
+TODAY = datetime.date.today().isoformat()
+
 ours = {(r['date'], r['model']): r for r in json.load(open(ours_path))['rows']
-        if r['model'] != '<synthetic>'}  # ccusage strips <synthetic>; do the same here
+        # ccusage strips <synthetic>; Claude-only mirrors the theirs-side filter
+        # so a stray non-Claude id (shouldn't occur from ~/.claude/projects) can't
+        # show up as a one-sided "EXTRA in ours" mismatch.
+        if r['model'] != '<synthetic>' and 'claude' in r['model']}
 theirs = {}
 for day in json.load(open(theirs_path))['daily']:
+    # ccusage renamed the daily bucket key 'date' -> 'period' in 19.x/20.x.
+    day_key = day.get('period') or day.get('date')
     for m in day['modelBreakdowns']:
-        theirs[(day['date'], m['modelName'])] = {
+        # Claude-only: ccusage 20.x became a multi-provider tracker (Codex/Kilo/
+        # Kimi/OpenCode/...). CCSwitcher is a Claude account tool and only counts
+        # Claude usage, so non-Claude models are out of scope for this diff.
+        if 'claude' not in m['modelName']:
+            continue
+        theirs[(day_key, m['modelName'])] = {
             'input_tokens': m['inputTokens'],
             'output_tokens': m['outputTokens'],
             'cache_creation_tokens': m['cacheCreationTokens'],
@@ -80,8 +100,10 @@ for day in json.load(open(theirs_path))['daily']:
             'cost_usd': m['cost'],
         }
 
-ours_keys = set(ours)
-theirs_keys = set(theirs)
+# Exclude the in-progress current day from the comparison keys (still shown in
+# the daily-totals table further down, which reads the unfiltered dicts).
+ours_keys = {k for k in ours if k[0] != TODAY}
+theirs_keys = {k for k in theirs if k[0] != TODAY}
 mismatches = []
 
 # Missing-key checks (asymmetric: a key only on one side is itself a mismatch)

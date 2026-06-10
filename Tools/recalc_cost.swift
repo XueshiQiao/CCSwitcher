@@ -3,13 +3,15 @@
 // JSONL session logs into per-day × per-model × per-token-type totals,
 // for the sole purpose of cross-checking against `ccusage daily`.
 //
-// Behavior is deliberately mirrored from ccusage 18.0.11 (the published
+// Behavior is deliberately mirrored from ccusage 20.0.9 (the published
 // bundle, NOT git HEAD — the two differ):
 //   - Recursive walk of ~/.claude/projects/ (includes subagents/)
 //   - Files visited in earliest-timestamp ascending order
 //   - Dedup key: "{message.id}:{requestId}", global across files, first-wins
 //   - Pricing: LiteLLM model_prices_and_context_window.json (live fetch)
 //   - 200k-token tier supported; "fast" speed multiplier supported
+//   - 1-hour cache-write tokens (cache_creation.ephemeral_1h_input_tokens)
+//     billed at cache_creation_input_token_cost_above_1hr (added in ccusage 19+)
 //   - Date bucket = local-time yyyy-MM-dd of `timestamp`
 //
 // Usage:
@@ -53,6 +55,7 @@ struct ModelPricing {
     let inputPerToken: Double
     let outputPerToken: Double
     let cacheCreatePerToken: Double
+    let cacheCreate1hPerToken: Double?   // cache_creation_input_token_cost_above_1hr (1-hour TTL write rate)
     let cacheReadPerToken: Double
     let inputAbove200k: Double?
     let outputAbove200k: Double?
@@ -98,6 +101,12 @@ func fetchPricing() -> [String: ModelPricing] {
         let input = (dict["input_cost_per_token"] as? Double) ?? 0
         let output = (dict["output_cost_per_token"] as? Double) ?? 0
         let cw = (dict["cache_creation_input_token_cost"] as? Double) ?? 0
+        // 1-hour cache writes bill at 2x base input (Anthropic's documented rule;
+        // the 5-minute default is 1.25x). LiteLLM exposes this as *_above_1hr for
+        // some models but omits it for others (e.g. claude-sonnet-4-6), while
+        // ccusage applies the 2x-input rule universally. Fall back to 2x input so
+        // a missing field doesn't silently drop the 1h premium.
+        let cw1h = (dict["cache_creation_input_token_cost_above_1hr"] as? Double) ?? (input > 0 ? input * 2 : nil)
         let cr = (dict["cache_read_input_token_cost"] as? Double) ?? 0
         // Skip rows that have no pricing at all (LiteLLM has metadata-only rows)
         if input == 0 && output == 0 && cw == 0 && cr == 0 { continue }
@@ -113,7 +122,7 @@ func fetchPricing() -> [String: ModelPricing] {
         }()
         out[name] = ModelPricing(
             inputPerToken: input, outputPerToken: output,
-            cacheCreatePerToken: cw, cacheReadPerToken: cr,
+            cacheCreatePerToken: cw, cacheCreate1hPerToken: cw1h, cacheReadPerToken: cr,
             inputAbove200k: inputHi, outputAbove200k: outputHi,
             cacheCreateAbove200k: cwHi, cacheReadAbove200k: crHi,
             fastMultiplier: fast
@@ -272,10 +281,15 @@ let cutoffDate: String = {
 }()
 FileHandle.standardError.write("[scan] keeping dates >= \(cutoffDate)\n".data(using: .utf8)!)
 
-// ccusage 18.0.11 dedup: GLOBAL first-wins on uniqueHash. Files are processed
-// in earliest-timestamp order, lines in file order. The first occurrence is
-// kept; later duplicates are skipped entirely.
-var processedHashes: Set<String> = []
+// ccusage 20.x dedup: GLOBAL on uniqueHash, keeping the copy with the LARGEST
+// output_tokens. A single assistant message is written more than once (a partial
+// streaming snapshot plus the final copy) sharing one msgid:requestId; input and
+// cache tokens are identical across copies, only output_tokens grows. ccusage
+// 18.0.11 kept the FIRST copy (often the partial, undercounting output); 20.x
+// keeps the final/complete one. We track the winning row per hash and replace it
+// when a larger-output copy arrives — order-independent, so it doesn't depend on
+// matching the binary's exact file-traversal order.
+var hashToIndex: [String: Int] = [:]
 // Final aggregated output. Built by appending each kept row to its (date, model) bucket.
 var keptRows: [(key: AggKey, bucket: Bucket)] = []
 
@@ -330,6 +344,10 @@ for path in allFiles {
         else { return }
         let cw = (usage["cache_creation_input_tokens"] as? Int) ?? 0
         let cr = (usage["cache_read_input_tokens"] as? Int) ?? 0
+        // Cache writes split by TTL: 1-hour writes bill higher than the 5-minute
+        // default. Claude Code uses 1h caching for ~90%+ of writes, so this split
+        // dominates cost. ccusage <19 ignored it (flat 5m rate); 20.x prices it.
+        let cw1h = ((usage["cache_creation"] as? [String: Any])?["ephemeral_1h_input_tokens"] as? Int) ?? 0
 
         // message.model / message.id: if present, must be non-empty string.
         if let m = message["model"], !(m is NSNull) {
@@ -358,9 +376,24 @@ for path in allFiles {
         // Cost calc with 200k tier + fast multiplier
         var cost: Double = 0
         if let p = resolvePricing(model: model, pricing: pricing) {
+            // Cache-creation cost: bill the 1-hour-TTL tokens at the higher 1h
+            // rate; the rest stay at the 5-minute rate, which carries the 200k
+            // tier when the model defines one. No first-party Claude Code model
+            // defines BOTH a 1h rate and a 200k tier, so this is exact for every
+            // model seen here; the combined 1h+200k rate a few Bedrock/legacy ids
+            // publish is not modeled (those never appear in ~/.claude/projects).
+            // `min` guards a malformed cw1h > cw.
+            let cacheCreateCost: Double
+            if let r1h = p.cacheCreate1hPerToken, cw1h > 0 {
+                let oneHour = min(cw1h, cw)
+                cacheCreateCost = tieredCost(tokens: cw - oneHour, baseRate: p.cacheCreatePerToken, hiRate: p.cacheCreateAbove200k)
+                                + tieredCost(tokens: oneHour, baseRate: r1h, hiRate: p.cacheCreateAbove200k)
+            } else {
+                cacheCreateCost = tieredCost(tokens: cw, baseRate: p.cacheCreatePerToken, hiRate: p.cacheCreateAbove200k)
+            }
             let base = tieredCost(tokens: input, baseRate: p.inputPerToken, hiRate: p.inputAbove200k)
                      + tieredCost(tokens: output, baseRate: p.outputPerToken, hiRate: p.outputAbove200k)
-                     + tieredCost(tokens: cw, baseRate: p.cacheCreatePerToken, hiRate: p.cacheCreateAbove200k)
+                     + cacheCreateCost
                      + tieredCost(tokens: cr, baseRate: p.cacheReadPerToken, hiRate: p.cacheReadAbove200k)
             let mult = isFast ? (p.fastMultiplier ?? 1.0) : 1.0
             cost = base * mult
@@ -372,20 +405,28 @@ for path in allFiles {
         let messageId = message["id"] as? String
         let requestId = obj["requestId"] as? String
 
-        // Global first-wins dedup, matching ccusage 18.0.11.
-        if let m = messageId, let r = requestId {
-            let hash = "\(m):\(r)"
-            if processedHashes.contains(hash) { return }
-            processedHashes.insert(hash)
-        }
-        // Rows with missing messageId or requestId have uniqueHash=null and are
-        // never deduped; every occurrence is kept (matches ccusage).
-
         let key = AggKey(date: date, model: modelKey)
         let bucket = Bucket(input: input, output: output, cacheCreate: cw, cacheRead: cr, cost: cost, requestCount: 1)
+
+        // Global max-output-wins dedup, matching ccusage 20.x. Duplicate copies of
+        // one message (same msgid:requestId) differ only in output_tokens (partial
+        // vs final write); keep the largest-output copy. Rows with missing
+        // messageId or requestId have uniqueHash=null and are never deduped; every
+        // occurrence is kept (matches ccusage).
+        if let m = messageId, let r = requestId {
+            let hash = "\(m):\(r)"
+            if let idx = hashToIndex[hash] {
+                if output > keptRows[idx].bucket.output {
+                    keptRows[idx] = (key, bucket)
+                }
+                return
+            }
+            hashToIndex[hash] = keptRows.count
+        }
+
         keptRows.append((key, bucket))
         rowsKept += 1
-        _ = hasSpeed  // unused under first-wins semantics
+        _ = hasSpeed
         _ = model
     }
 }

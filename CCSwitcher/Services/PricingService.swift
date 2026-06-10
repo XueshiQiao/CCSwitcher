@@ -17,6 +17,8 @@ struct LiteLLMModelPricing: Sendable {
     let inputPerToken: Double
     let outputPerToken: Double
     let cacheCreatePerToken: Double
+    /// 1-hour-TTL cache-write rate (2x base input). See `LiteLLMEntry.toPricing`.
+    let cacheCreate1hPerToken: Double?
     let cacheReadPerToken: Double
     let inputAbove200k: Double?
     let outputAbove200k: Double?
@@ -24,10 +26,25 @@ struct LiteLLMModelPricing: Sendable {
     let cacheReadAbove200k: Double?
     let fastMultiplier: Double?
 
-    func cost(input: Int, output: Int, cacheCreate: Int, cacheRead: Int, isFast: Bool) -> Double {
+    func cost(input: Int, output: Int, cacheCreate: Int, cacheCreate1h: Int, cacheRead: Int, isFast: Bool) -> Double {
+        // Cache-creation cost: 1-hour-TTL writes (cacheCreate1h) bill at the higher
+        // 1h rate; the remainder stays at the 5-minute rate, which carries the 200k
+        // long-context tier when the model defines one. No first-party Claude Code
+        // model defines BOTH a 1h rate and a 200k tier, so this split is exact for
+        // every model CCSwitcher ingests (bare ids from ~/.claude/projects). The
+        // combined 1h+200k rate a few Bedrock/legacy ids publish is not modeled —
+        // those ids never appear here. `min` guards a malformed cw1h > cw.
+        let cacheCreateCost: Double
+        if let r1h = cacheCreate1hPerToken, cacheCreate1h > 0 {
+            let oneHour = min(cacheCreate1h, cacheCreate)
+            cacheCreateCost = Self.tiered(tokens: cacheCreate - oneHour, rate: cacheCreatePerToken, hi: cacheCreateAbove200k)
+                            + Self.tiered(tokens: oneHour, rate: r1h, hi: cacheCreateAbove200k)
+        } else {
+            cacheCreateCost = Self.tiered(tokens: cacheCreate, rate: cacheCreatePerToken, hi: cacheCreateAbove200k)
+        }
         let base = Self.tiered(tokens: input, rate: inputPerToken, hi: inputAbove200k)
                  + Self.tiered(tokens: output, rate: outputPerToken, hi: outputAbove200k)
-                 + Self.tiered(tokens: cacheCreate, rate: cacheCreatePerToken, hi: cacheCreateAbove200k)
+                 + cacheCreateCost
                  + Self.tiered(tokens: cacheRead, rate: cacheReadPerToken, hi: cacheReadAbove200k)
         let mult = isFast ? (fastMultiplier ?? 1.0) : 1.0
         return base * mult
@@ -82,6 +99,7 @@ actor PricingService {
         let output_cost_per_token_above_200k_tokens: Double?
         let cache_creation_input_token_cost_above_200k_tokens: Double?
         let cache_read_input_token_cost_above_200k_tokens: Double?
+        let cache_creation_input_token_cost_above_1hr: Double?
         let provider_specific_entry: ProviderEntry?
 
         struct ProviderEntry: Decodable {
@@ -95,9 +113,14 @@ actor PricingService {
             let cr     = cache_read_input_token_cost ?? 0
             // LiteLLM contains metadata-only rows with no pricing — skip those.
             if input == 0 && output == 0 && cw == 0 && cr == 0 { return nil }
+            // 1-hour cache writes bill at 2x base input (the 5-minute default is
+            // 1.25x). LiteLLM publishes this as *_above_1hr for some models but
+            // omits it for others (e.g. claude-sonnet-4-6); ccusage applies the
+            // 2x-input rule universally, so fall back to it when absent.
+            let cw1h: Double? = cache_creation_input_token_cost_above_1hr ?? (input > 0 ? input * 2 : nil)
             return LiteLLMModelPricing(
                 inputPerToken: input, outputPerToken: output,
-                cacheCreatePerToken: cw, cacheReadPerToken: cr,
+                cacheCreatePerToken: cw, cacheCreate1hPerToken: cw1h, cacheReadPerToken: cr,
                 inputAbove200k: input_cost_per_token_above_200k_tokens,
                 outputAbove200k: output_cost_per_token_above_200k_tokens,
                 cacheCreateAbove200k: cache_creation_input_token_cost_above_200k_tokens,
