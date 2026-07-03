@@ -145,6 +145,11 @@
 "Menu bar modules" = "Menüleisten-Module";
 "Drag to reorder, toggle to enable. Disabled modules sit at the bottom." = "Zum Sortieren ziehen, zum Aktivieren umschalten. Deaktivierte Module stehen unten.";
 "Preview" = "Vorschau";
+"Limit bars" = "Limitbalken";
+"Session bar color" = "Farbe des Sitzungsbalkens";
+"Weekly bar color" = "Farbe des Wochenbalkens";
+"Low remaining color" = "Farbe bei geringem Rest";
+"Low remaining threshold" = "Schwelle für geringen Rest";
 "Account name" = "Kontoname";
 "Session usage (5h)" = "Sitzungsnutzung (5h)";
 "Weekly usage (7d)" = "Wochennutzung (7d)";

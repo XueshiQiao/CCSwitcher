@@ -44,6 +44,7 @@ struct MenuBarStripView: View {
                 MenuBarModuleView(
                     module: module,
                     appState: appState,
+                    config: config,
                     showFullEmail: showFullEmail,
                     tick: tick
                 )

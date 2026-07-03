@@ -73,6 +73,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             rootView: AnyView(
                 MainMenuView()
                     .environmentObject(appState)
+                    .environmentObject(config)
                     .environment(\.locale, locale)
             )
         )
@@ -104,6 +105,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         popoverController?.rootView = AnyView(
             MainMenuView()
                 .environmentObject(appState)
+                .environmentObject(config)
                 .environment(\.locale, locale)
         )
     }

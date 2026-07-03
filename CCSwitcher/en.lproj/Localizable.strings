@@ -149,6 +149,11 @@
 "Menu bar modules" = "Menu bar modules";
 "Drag to reorder, toggle to enable. Disabled modules sit at the bottom." = "Drag to reorder, toggle to enable. Disabled modules sit at the bottom.";
 "Preview" = "Preview";
+"Limit bars" = "Limit bars";
+"Session bar color" = "Session bar color";
+"Weekly bar color" = "Weekly bar color";
+"Low remaining color" = "Low remaining color";
+"Low remaining threshold" = "Low remaining threshold";
 "Account name" = "Account name";
 "Session usage (5h)" = "Session usage (5h)";
 "Weekly usage (7d)" = "Weekly usage (7d)";

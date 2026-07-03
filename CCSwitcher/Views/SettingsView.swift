@@ -95,6 +95,23 @@ struct SettingsView: View {
                 Toggle("Show head icon in menu bar", isOn: $menuBarConfig.showsHeadIcon)
             }
 
+            Section("Limit bars") {
+                ColorPicker("Session bar color", selection: sessionLimitBarColor, supportsOpacity: false)
+                ColorPicker("Weekly bar color", selection: weeklyLimitBarColor, supportsOpacity: false)
+                ColorPicker("Low remaining color", selection: lowRemainingLimitBarColor, supportsOpacity: false)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Low remaining threshold")
+                        Spacer()
+                        Text("\(Int(menuBarConfig.lowRemainingWarningThreshold))%")
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
+                    Slider(value: $menuBarConfig.lowRemainingWarningThreshold, in: 0...100, step: 5)
+                }
+            }
+
             Section {
                 MenuBarModulesSettingsView()
                     .environmentObject(appState)
@@ -171,5 +188,41 @@ struct SettingsView: View {
         } catch {
             launchAtLogin = !enable // revert on failure
         }
+    }
+
+    private var sessionLimitBarColor: Binding<Color> {
+        colorBinding(
+            keyPath: \.sessionLimitBarColorHex,
+            fallback: MenuBarConfig.defaultSessionLimitBarColorHex
+        )
+    }
+
+    private var weeklyLimitBarColor: Binding<Color> {
+        colorBinding(
+            keyPath: \.weeklyLimitBarColorHex,
+            fallback: MenuBarConfig.defaultWeeklyLimitBarColorHex
+        )
+    }
+
+    private var lowRemainingLimitBarColor: Binding<Color> {
+        colorBinding(
+            keyPath: \.lowRemainingLimitBarColorHex,
+            fallback: MenuBarConfig.defaultLowRemainingLimitBarColorHex
+        )
+    }
+
+    private func colorBinding(keyPath: ReferenceWritableKeyPath<MenuBarConfig, String>, fallback: String) -> Binding<Color> {
+        Binding(
+            get: {
+                Color(hexRGB: menuBarConfig[keyPath: keyPath])
+                    ?? Color(hexRGB: fallback)
+                    ?? .brand
+            },
+            set: { color in
+                if let hex = color.hexRGB {
+                    menuBarConfig[keyPath: keyPath] = hex
+                }
+            }
+        )
     }
 }

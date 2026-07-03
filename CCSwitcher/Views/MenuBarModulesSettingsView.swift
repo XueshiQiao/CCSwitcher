@@ -35,6 +35,7 @@ struct MenuBarModulesSettingsView: View {
                         MenuBarModuleView(
                             module: row.module,
                             appState: appState,
+                            config: config,
                             showFullEmail: showFullEmail,
                             tick: tick
                         )
@@ -87,6 +88,7 @@ struct MenuBarModulesSettingsView: View {
                 MenuBarModuleView(
                     module: row.module,
                     appState: appState,
+                    config: config,
                     showFullEmail: showFullEmail,
                     tick: tick
                 )

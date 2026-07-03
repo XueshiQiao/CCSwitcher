@@ -1,5 +1,6 @@
-import SwiftUI
 import AppKit
+import Foundation
+import SwiftUI
 
 extension Color {
     /// CCSwitcher brand color.
@@ -12,6 +13,32 @@ extension Color {
             let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             return NSColor(isDark ? dark : light)
         }))
+    }
+
+    init?(hexRGB: String) {
+        let trimmed = hexRGB.trimmingCharacters(in: .whitespacesAndNewlines)
+        let hex = trimmed.hasPrefix("#") ? String(trimmed.dropFirst()) : trimmed
+        guard hex.count == 6, let value = UInt64(hex, radix: 16) else { return nil }
+        self.init(
+            red: Double((value >> 16) & 0xFF) / 255.0,
+            green: Double((value >> 8) & 0xFF) / 255.0,
+            blue: Double(value & 0xFF) / 255.0
+        )
+    }
+
+    var hexRGB: String? {
+        guard let rgb = NSColor(self).usingColorSpace(.sRGB) else { return nil }
+
+        func channel(_ component: CGFloat) -> Int {
+            min(max(Int(round(component * 255)), 0), 255)
+        }
+
+        return String(
+            format: "#%02X%02X%02X",
+            channel(rgb.redComponent),
+            channel(rgb.greenComponent),
+            channel(rgb.blueComponent)
+        )
     }
 
     // MARK: - Card
