@@ -19,7 +19,12 @@ final class MenuBarConfig: ObservableObject {
         didSet { persist() }
     }
 
+    @Published var showsHeadIcon: Bool {
+        didSet { persistShowsHeadIcon() }
+    }
+
     private let storageKey = MenuBarModuleStore.storageKey
+    private let showsHeadIconKey = "menuBarShowsHeadIcon"
 
     private init() {
         // Migration must run BEFORE the first read so a fresh-after-upgrade
@@ -27,10 +32,19 @@ final class MenuBarConfig: ObservableObject {
         MenuBarModuleStore.migrateIfNeeded()
         let data = UserDefaults.standard.data(forKey: storageKey) ?? Data()
         self.modules = MenuBarModuleStore.decode(data)
+        if UserDefaults.standard.object(forKey: showsHeadIconKey) == nil {
+            self.showsHeadIcon = true
+        } else {
+            self.showsHeadIcon = UserDefaults.standard.bool(forKey: showsHeadIconKey)
+        }
     }
 
     private func persist() {
         UserDefaults.standard.set(MenuBarModuleStore.encode(modules), forKey: storageKey)
+    }
+
+    private func persistShowsHeadIcon() {
+        UserDefaults.standard.set(showsHeadIcon, forKey: showsHeadIconKey)
     }
 
     /// Replace the current list. Used by the Settings editor on reorder / toggle.

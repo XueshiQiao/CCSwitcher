@@ -35,8 +35,10 @@ struct MenuBarStripView: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: iconFilled ? "brain.head.profile.fill" : "brain.head.profile")
-                .font(.system(size: 14))
+            if config.showsHeadIcon {
+                Image(systemName: iconFilled ? "brain.head.profile.fill" : "brain.head.profile")
+                    .font(.system(size: 14))
+            }
 
             ForEach(config.modules) { module in
                 MenuBarModuleView(

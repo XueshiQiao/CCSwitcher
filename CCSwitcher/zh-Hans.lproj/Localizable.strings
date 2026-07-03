@@ -22,6 +22,7 @@
 "5 minutes" = "5 分钟";
 "10 minutes" = "10 分钟";
 "Show account name in menu bar" = "在菜单栏显示账户名称";
+"Show head icon in menu bar" = "在菜单栏显示头像图标";
 "Show full email address" = "显示完整邮箱地址";
 "Launch at login" = "登录时启动";
 

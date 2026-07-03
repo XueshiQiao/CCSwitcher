@@ -5,6 +5,7 @@ import ServiceManagement
 struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var updateChecker: UpdateChecker
+    @EnvironmentObject private var menuBarConfig: MenuBarConfig
     @AppStorage("refreshInterval") private var refreshInterval: Double = 300
     @AppStorage("showFullEmail") private var showFullEmail = false
     @AppStorage("showInDock") private var showInDock = false
@@ -90,6 +91,10 @@ struct SettingsView: View {
 
     private var menuBarTab: some View {
         Form {
+            Section("Appearance") {
+                Toggle("Show head icon in menu bar", isOn: $menuBarConfig.showsHeadIcon)
+            }
+
             Section {
                 MenuBarModulesSettingsView()
                     .environmentObject(appState)

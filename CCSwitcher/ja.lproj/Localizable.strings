@@ -22,6 +22,7 @@
 "5 minutes" = "5 分";
 "10 minutes" = "10 分";
 "Show account name in menu bar" = "メニューバーにアカウント名を表示";
+"Show head icon in menu bar" = "メニューバーにヘッドアイコンを表示";
 "Show full email address" = "メールアドレスを完全に表示";
 "Launch at login" = "ログイン時に起動";
 
