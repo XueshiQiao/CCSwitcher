@@ -9,6 +9,8 @@ struct SettingsView: View {
     @AppStorage("showFullEmail") private var showFullEmail = false
     @AppStorage("showInDock") private var showInDock = false
     @AppStorage("appLanguage") private var appLanguage = "auto"
+    @AppStorage("autoSwitchEnabled") private var autoSwitchEnabled = false
+    @AppStorage("autoSwitchThreshold") private var autoSwitchThreshold = 90.0
     @State private var launchAtLogin = false
 
     var body: some View {
@@ -53,6 +55,25 @@ struct SettingsView: View {
                 }
                 .onChange(of: refreshInterval) { _, newValue in
                     appState.startAutoRefresh(interval: newValue)
+                }
+            }
+
+            Section("Auto-switch") {
+                Toggle("Switch account before hitting the limit", isOn: $autoSwitchEnabled)
+                if autoSwitchEnabled {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("Switch at")
+                            Spacer()
+                            Text("\(Int(autoSwitchThreshold))%")
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                        }
+                        Slider(value: $autoSwitchThreshold, in: 50...99, step: 1)
+                    }
+                    Text("When the active account's 5-hour or weekly usage reaches this level, CCSwitcher switches to the account with the most quota left. Checked on every refresh; a 5-minute cooldown prevents rapid flip-flopping.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
 

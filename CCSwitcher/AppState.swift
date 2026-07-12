@@ -43,6 +43,29 @@ final class AppState: ObservableObject {
     private let accountsKey = "com.ccswitcher.accounts"
     private var refreshTimer: Timer?
 
+    // MARK: - Auto-switch
+
+    /// Whether proactive auto-switch is on (written by SettingsView via @AppStorage).
+    private var autoSwitchEnabled: Bool {
+        UserDefaults.standard.bool(forKey: "autoSwitchEnabled")
+    }
+
+    /// Utilization percentage at which we switch. Defaults to 90 when unset.
+    private var autoSwitchThreshold: Double {
+        let stored = UserDefaults.standard.double(forKey: "autoSwitchThreshold")
+        return stored == 0 ? 90 : stored
+    }
+
+    /// A candidate must sit at least this far below the threshold to be eligible,
+    /// so two accounts hovering at the line never ping-pong.
+    private let autoSwitchHysteresis: Double = 10
+
+    /// Minimum gap between two automatic switches, to avoid rapid flip-flopping.
+    private let autoSwitchCooldown: TimeInterval = 300
+
+    private var lastAutoSwitchAt: Date?
+    private var isEvaluatingAutoSwitch = false
+
     // MARK: - Initialization
 
     init() {
@@ -98,6 +121,10 @@ final class AppState: ObservableObject {
 
         updateWidgetData()
         isLoading = false
+
+        // Proactive auto-switch: after usage is refreshed, switch off the active
+        // account if it has reached the threshold. Guarded by cooldown + re-entrancy.
+        await evaluateAutoSwitch()
     }
 
     func startAutoRefresh(interval: TimeInterval = 300) {
@@ -319,6 +346,54 @@ final class AppState: ObservableObject {
             isLoading = false
             log.error("[switchTo] Switch failed: \(error.localizedDescription)")
         }
+    }
+
+    // MARK: - Auto-switch
+
+    /// Whether an account can be switched to right now: it must have a stored
+    /// backup token and not be flagged expired (an expired backup would fail the
+    /// switch verification, or silently swap in a dead session).
+    private func isSwitchable(_ account: Account) -> Bool {
+        guard keychain.getAccountBackup(forAccountId: account.id.uuidString) != nil else { return false }
+        if let error = accountUsageErrors[account.id], error.isExpired { return false }
+        return true
+    }
+
+    /// Evaluate whether the active account has reached the threshold and, if so,
+    /// switch to the same-provider account with the most quota left.
+    /// Called at the end of every `refresh()`. Safe to call repeatedly.
+    private func evaluateAutoSwitch() async {
+        guard autoSwitchEnabled, !isEvaluatingAutoSwitch else { return }
+        guard let active = activeAccount else { return }
+
+        // Cooldown: never auto-switch more than once per window.
+        if let last = lastAutoSwitchAt, Date().timeIntervalSince(last) < autoSwitchCooldown {
+            return
+        }
+
+        // Only consider same-provider accounts (a Claude switch never touches Codex/Gemini).
+        let candidates = accounts.filter { $0.provider == active.provider && $0.id != active.id }
+        guard let target = AutoSwitchEngine.chooseTarget(
+            active: active,
+            candidates: candidates,
+            usageByAccount: accountUsage,
+            isSwitchable: { [unowned self] in self.isSwitchable($0) },
+            threshold: autoSwitchThreshold,
+            hysteresisPct: autoSwitchHysteresis
+        ) else {
+            return
+        }
+
+        let activeUtil = AutoSwitchEngine.bindingUtilization(accountUsage[active.id]) ?? -1
+        log.info("[autoSwitch] \(active.email) reached \(String(format: "%.0f", activeUtil))% (threshold \(String(format: "%.0f", self.autoSwitchThreshold))%) -> switching to \(target.email)")
+
+        isEvaluatingAutoSwitch = true
+        lastAutoSwitchAt = Date()
+        // switchTo() calls refresh() -> evaluateAutoSwitch() again, but the
+        // re-entrancy flag + the freshly-set cooldown make that a no-op.
+        // The active account visibly changes in the menu bar as feedback.
+        await switchTo(target)
+        isEvaluatingAutoSwitch = false
     }
 
     /// Re-authenticate an account by running `claude auth login` and capturing fresh credentials.
