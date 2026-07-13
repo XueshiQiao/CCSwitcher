@@ -43,6 +43,24 @@ final class AppState: ObservableObject {
     private let accountsKey = "com.ccswitcher.accounts"
     private var refreshTimer: Timer?
 
+    // MARK: - Usage polling state
+
+    /// Re-entrancy guard: overlapping refreshes (timer + manual button + post-switch)
+    /// would each burst per-account usage requests and trip the endpoint's rate limit.
+    private var isRefreshing = false
+
+    /// Round-robin cursor over non-active accounts: each refresh cycle fetches usage
+    /// for the active account plus ONE other, instead of all of them. The usage
+    /// endpoint's rate limit is tight and shared with every running Claude Code
+    /// session's own polling, so fewer requests per cycle beats a full sweep.
+    private var usageFetchCursor = 0
+
+    /// Per-account "leave it alone until" timestamps. The usage endpoint enforces a
+    /// long-window per-account quota - observed Retry-After values run into tens of
+    /// minutes - so once an account is rate-limited, polling it again before the
+    /// server-given deadline just burns more quota. Stale samples are kept meanwhile.
+    private var usageRetryNotBefore: [UUID: Date] = [:]
+
     // MARK: - Initialization
 
     init() {
@@ -58,6 +76,12 @@ final class AppState: ObservableObject {
             log.info("[refresh] Skipping: login in progress")
             return
         }
+        guard !isRefreshing else {
+            log.info("[refresh] Skipping: refresh already in progress")
+            return
+        }
+        isRefreshing = true
+        defer { isRefreshing = false }
         isLoading = true
         errorMessage = nil
 
@@ -387,11 +411,56 @@ final class AppState: ObservableObject {
 
     // MARK: - Usage
 
+    /// Fetch usage with a single retry on 429 - but only when Retry-After is short.
+    /// Observed Retry-After values run into tens of minutes (long-window per-account
+    /// quota); retrying against those just burns more quota, so we rethrow instead
+    /// and let the caller park the account until the deadline.
+    private func fetchUsageWithRetry(accessToken: String) async throws -> UsageAPIResponse {
+        do {
+            return try await claudeService.getUsageLimits(accessToken: accessToken)
+        } catch ClaudeService.UsageError.rateLimited(let retryAfter) {
+            let delay = retryAfter ?? 15
+            guard delay <= 30 else {
+                throw ClaudeService.UsageError.rateLimited(retryAfter: retryAfter)
+            }
+            // Floor of 3s: "Retry-After: 0" is a momentary burst limiter, and an
+            // immediate (~1s) retry was observed to fail again.
+            log.warning("[fetchUsage] Rate-limited, retrying in \(String(format: "%.0f", max(delay, 3)))s...")
+            try? await Task.sleep(nanoseconds: UInt64(max(delay, 3) * 1_000_000_000))
+            return try await claudeService.getUsageLimits(accessToken: accessToken)
+        }
+    }
+
     private func fetchAllAccountUsage() async {
-        accountUsageErrors.removeAll()
+        // Pick this cycle's targets: the active account (always) + one non-active
+        // account in round-robin order. Stale samples for the others are kept.
+        // Accounts parked by a server-given Retry-After deadline are skipped.
+        let now = Date()
+        let eligible = accounts.filter { (usageRetryNotBefore[$0.id] ?? .distantPast) <= now }
+        let others = eligible.filter { !$0.isActive }
+        var targets = eligible.filter { $0.isActive }
+        if !others.isEmpty {
+            targets.append(others[usageFetchCursor % others.count])
+            usageFetchCursor += 1
+        }
+
+        // Only clear error state for the accounts we are about to sample;
+        // the others keep both their stale usage and their error flags.
+        for target in targets {
+            accountUsageErrors[target.id] = nil
+        }
+
         // For active account: use live keychain token (with delegated refresh on expiry)
-        // For other accounts: use backup token (no silent swap — just mark expired)
-        for account in accounts {
+        // For other accounts: use backup token (refreshed in place when expired)
+        var isFirstRequest = true
+        for account in targets {
+            // Stagger requests: a back-to-back burst (one request per account within
+            // ~100ms) reliably gets all but one of them 429'd by the usage endpoint.
+            if !isFirstRequest {
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+            }
+            isFirstRequest = false
+
             let tokenJSON: String?
             if account.isActive {
                 tokenJSON = keychain.readClaudeToken()
@@ -403,10 +472,21 @@ final class AppState: ObservableObject {
                 continue
             }
             do {
-                let usage = try await claudeService.getUsageLimits(accessToken: accessToken)
+                let usage = try await fetchUsageWithRetry(accessToken: accessToken)
                 accountUsage[account.id] = usage
                 accountUsageErrors[account.id] = nil
                 log.info("[fetchUsage] \(account.email): session=\(usage.fiveHour?.utilization ?? -1)%, weekly=\(usage.sevenDay?.utilization ?? -1)%")
+            } catch ClaudeService.UsageError.rateLimited(let retryAfter) {
+                // Rate-limited: park the account until the server-given deadline
+                // (floor 60s - "Retry-After: 0" burst rejections must still park;
+                // cap 1h; default 2min when no Retry-After) and keep the last
+                // known sample - stale percentages beat an error banner.
+                let parkFor = min(max(retryAfter ?? 120, 60), 3600)
+                usageRetryNotBefore[account.id] = Date().addingTimeInterval(parkFor)
+                log.warning("[fetchUsage] \(account.email) rate-limited; parked for \(String(format: "%.0f", parkFor))s, keeping last known usage")
+                if accountUsage[account.id] == nil {
+                    accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: true, message: String(localized: "API Rate Limited. Try again later.", bundle: L10n.bundle))
+                }
             } catch ClaudeService.UsageError.expired {
                 log.warning("[fetchUsage] Token expired for \(account.email)")
                 if account.isActive {
@@ -428,20 +508,33 @@ final class AppState: ObservableObject {
                         accountUsageErrors[account.id] = UsageErrorState(isExpired: true, isRateLimited: false, message: String(localized: "Token expired. Switch to refresh.", bundle: L10n.bundle))
                     }
                 } else {
-                    // Non-active account: do NOT silent-swap keychain — just mark as expired.
-                    // Token will be refreshed when the user explicitly switches to this account.
-                    log.info("[fetchUsage] Non-active account \(account.email) token expired, skipping silent swap to avoid race condition with Claude Code CLI.")
-                    accountUsage[account.id] = nil
-                    accountUsageErrors[account.id] = UsageErrorState(isExpired: true, isRateLimited: false, message: String(localized: "Token expired. Switch to this account to refresh.", bundle: L10n.bundle))
+                    // Non-active account: refresh the backup credential in place via
+                    // the OAuth token endpoint - no keychain swap, so no race with
+                    // running Claude Code sessions. Access tokens only live a few
+                    // hours, so without this every non-active account would sit in
+                    // a permanent "Token expired" state between switches.
+                    if let backup = keychain.getAccountBackup(forAccountId: account.id.uuidString),
+                       let refreshed = await claudeService.refreshOAuthCredentials(backup.token),
+                       keychain.saveAccountBackup(token: refreshed, oauthAccount: backup.oauthAccount, forAccountId: account.id.uuidString) {
+                        log.info("[fetchUsage] Silently refreshed backup for \(account.email); retrying usage")
+                        if let newToken = ClaudeService.extractAccessToken(from: refreshed),
+                           let usage = try? await claudeService.getUsageLimits(accessToken: newToken) {
+                            accountUsage[account.id] = usage
+                            accountUsageErrors[account.id] = nil
+                            log.info("[fetchUsage] \(account.email): session=\(usage.fiveHour?.utilization ?? -1)%, weekly=\(usage.sevenDay?.utilization ?? -1)%")
+                        }
+                    } else {
+                        // Refresh grant rejected: the refresh token itself is dead
+                        // (rotated elsewhere or revoked) - only re-authentication fixes that.
+                        log.warning("[fetchUsage] Could not silently refresh \(account.email); refresh token likely dead")
+                        accountUsage[account.id] = nil
+                        accountUsageErrors[account.id] = UsageErrorState(isExpired: true, isRateLimited: false, message: String(localized: "Session expired. Re-authenticate (↻) to fix.", bundle: L10n.bundle))
+                    }
                 }
             } catch {
                 log.error("[fetchUsage] Failed to get usage for \(account.email): \(error.localizedDescription)")
                 accountUsage[account.id] = nil
-                if let usageError = error as? ClaudeService.UsageError, case .network(let msg) = usageError, msg.contains("429") {
-                    accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: true, message: String(localized: "API Rate Limited. Try again later.", bundle: L10n.bundle))
-                } else {
-                    accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: false, message: String(localized: "Could not fetch usage: \(error.localizedDescription)", bundle: L10n.bundle))
-                }
+                accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: false, message: String(localized: "Could not fetch usage: \(error.localizedDescription)", bundle: L10n.bundle))
             }
         }
     }

@@ -224,6 +224,7 @@ final class ClaudeService: @unchecked Sendable {
         case expired
         case network(String)
         case decode(String)
+        case rateLimited(retryAfter: TimeInterval?)
     }
 
     /// Fetch usage for a specific access token
@@ -244,6 +245,12 @@ final class ClaudeService: @unchecked Sendable {
             if httpResponse?.statusCode == 401 || responseString.contains("token_expired") {
                 throw UsageError.expired
             }
+            if httpResponse?.statusCode == 429 {
+                let retryAfter = httpResponse?.value(forHTTPHeaderField: "Retry-After")
+                    .flatMap(TimeInterval.init)
+                log.warning("[getUsageLimits] 429, Retry-After: \(retryAfter.map { String(format: "%.0f", $0) } ?? "none")s")
+                throw UsageError.rateLimited(retryAfter: retryAfter)
+            }
             throw UsageError.network("HTTP \(httpResponse?.statusCode ?? 0)")
         }
         
@@ -254,6 +261,65 @@ final class ClaudeService: @unchecked Sendable {
         } catch {
             log.error("[getUsageLimits] Decode Error: \(error.localizedDescription)")
             throw UsageError.decode(error.localizedDescription)
+        }
+    }
+
+    // MARK: - OAuth refresh (direct token endpoint, no keychain swap)
+
+    /// Claude Code's public OAuth client id (PKCE public client - not a secret).
+    private static let oauthClientID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
+    private static let oauthTokenURL = "https://console.anthropic.com/v1/oauth/token"
+
+    /// Silently refresh a credential JSON using its refresh token, via a direct
+    /// POST to the OAuth token endpoint. Never touches the keychain - safe to run
+    /// for non-active accounts while Claude Code sessions are working, because
+    /// only CCSwitcher holds these backups (rotation cannot race anyone).
+    /// Returns the updated credential JSON, or nil when the input has no refresh
+    /// token or the endpoint rejects the grant (dead/rotated refresh token).
+    func refreshOAuthCredentials(_ credentialsJSON: String) async -> String? {
+        guard var root = (try? JSONSerialization.jsonObject(with: Data(credentialsJSON.utf8))) as? [String: Any],
+              var oauth = root["claudeAiOauth"] as? [String: Any],
+              let refreshToken = oauth["refreshToken"] as? String, !refreshToken.isEmpty,
+              let url = URL(string: Self.oauthTokenURL)
+        else { return nil }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "grant_type": "refresh_token",
+            "refresh_token": refreshToken,
+            "client_id": Self.oauthClientID,
+        ])
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            guard status == 200,
+                  let resp = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+                  let accessToken = resp["access_token"] as? String,
+                  let expiresIn = resp["expires_in"] as? Double
+            else {
+                let body = String(data: data, encoding: .utf8) ?? ""
+                log.warning("[refreshOAuth] Endpoint refused refresh (HTTP \(status)): \(body.prefix(200))")
+                return nil
+            }
+
+            oauth["accessToken"] = accessToken
+            oauth["expiresAt"] = Int64(Date().timeIntervalSince1970 * 1000) + Int64(expiresIn * 1000)
+            if let newRefresh = resp["refresh_token"] as? String, !newRefresh.isEmpty {
+                oauth["refreshToken"] = newRefresh
+            }
+            if let scope = resp["scope"] as? String, !scope.isEmpty {
+                oauth["scopes"] = scope.split(separator: " ").map(String.init)
+            }
+            root["claudeAiOauth"] = oauth
+            let out = try JSONSerialization.data(withJSONObject: root)
+            log.info("[refreshOAuth] Access token refreshed, valid for \(Int(expiresIn / 3600))h \(Int(expiresIn.truncatingRemainder(dividingBy: 3600) / 60))m")
+            return String(data: out, encoding: .utf8)
+        } catch {
+            log.warning("[refreshOAuth] Refresh failed: \(error.localizedDescription)")
+            return nil
         }
     }
 
