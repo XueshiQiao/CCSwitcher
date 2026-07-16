@@ -225,6 +225,9 @@ final class ClaudeService: @unchecked Sendable {
         case network(String)
         case decode(String)
         case rateLimited(retryAfter: TimeInterval?)
+        /// 403 permission_error - e.g. "OAuth authentication is currently not
+        /// allowed for this organization" (no active Pro/Max subscription).
+        case forbidden(String)
     }
 
     /// Fetch usage for a specific access token
@@ -250,6 +253,11 @@ final class ClaudeService: @unchecked Sendable {
                     .flatMap(TimeInterval.init)
                 log.warning("[getUsageLimits] 429, Retry-After: \(retryAfter.map { String(format: "%.0f", $0) } ?? "none")s")
                 throw UsageError.rateLimited(retryAfter: retryAfter)
+            }
+            if httpResponse?.statusCode == 403 {
+                // Typically: no active Pro/Max subscription on the account.
+                log.warning("[getUsageLimits] 403 permission error: \(responseString.prefix(200))")
+                throw UsageError.forbidden(responseString)
             }
             throw UsageError.network("HTTP \(httpResponse?.statusCode ?? 0)")
         }

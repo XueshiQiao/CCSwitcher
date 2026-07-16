@@ -476,6 +476,14 @@ final class AppState: ObservableObject {
                 accountUsage[account.id] = usage
                 accountUsageErrors[account.id] = nil
                 log.info("[fetchUsage] \(account.email): session=\(usage.fiveHour?.utilization ?? -1)%, weekly=\(usage.sevenDay?.utilization ?? -1)%")
+            } catch ClaudeService.UsageError.forbidden {
+                // No active Pro/Max subscription on this account (e.g. the plan
+                // lapsed) - usage is meaningless until it recovers. Observed as:
+                // {"error":{"type":"permission_error","message":"OAuth
+                // authentication is currently not allowed for this organization."}}
+                log.warning("[fetchUsage] \(account.email) forbidden (no active subscription?)")
+                accountUsage[account.id] = nil
+                accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: false, message: String(localized: "No active subscription on this account (OAuth not allowed).", bundle: L10n.bundle))
             } catch ClaudeService.UsageError.rateLimited(let retryAfter) {
                 // Rate-limited: park the account until the server-given deadline
                 // (floor 60s - "Retry-After: 0" burst rejections must still park;
