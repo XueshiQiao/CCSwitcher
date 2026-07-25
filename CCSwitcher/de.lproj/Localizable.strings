@@ -130,6 +130,8 @@
 "Could not capture credentials" = "Anmeldedaten konnten nicht erfasst werden";
 "No stored credentials for %@. Use re-authenticate to fix." = "Keine gespeicherten Anmeldedaten für %@. Verwenden Sie Erneut authentifizieren zur Behebung.";
 "Logged in as %@, but expected %@. Credentials not updated." = "Angemeldet als %1$@, aber %2$@ erwartet. Anmeldedaten nicht aktualisiert.";
+"Claude CLI is authenticating via %@ instead of a stored claude.ai login, so it reports no account. Unset ANTHROPIC_AUTH_TOKEN / CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_PROFILE and remove any apiKeyHelper, then try again." = "Die Claude CLI authentifiziert sich über %@ statt über eine gespeicherte claude.ai-Anmeldung und meldet daher kein Konto. Heben Sie ANTHROPIC_AUTH_TOKEN / CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_PROFILE auf, entfernen Sie einen etwaigen apiKeyHelper und versuchen Sie es erneut.";
+"Switched to %@, but the Claude CLI is authenticating via %@ instead of the stored login, so it will not use this account." = "Zu %1$@ gewechselt, aber die Claude CLI authentifiziert sich über %2$@ statt über die gespeicherte Anmeldung und verwendet dieses Konto daher nicht.";
 "Token expired. Switch to refresh." = "Token abgelaufen. Wechseln zum Aktualisieren.";
 "Token expired. Switch to this account to refresh." = "Token abgelaufen. Zu diesem Konto wechseln zum Aktualisieren.";
 "API Rate Limited. Try again later." = "API-Anfragelimit erreicht. Bitte später erneut versuchen.";

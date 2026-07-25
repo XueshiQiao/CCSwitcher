@@ -207,7 +207,7 @@ Step 3: OVERWRITE the LIVE slot with target token
 
 Step 4: VERIFY the switch worked
 
-    Run `claude auth status` → returns { email: "?", loggedIn: ? }
+    Run `claude auth status` → returns { authMethod, email?, loggedIn }
 
     ┌─────────────────────────────────────────────────────────────────────────┐
     │ if !loggedIn:                                                           │
@@ -216,12 +216,31 @@ Step 4: VERIFY the switch worked
     │ if email == B.email:                                                    │
     │   → SUCCESS. Claude CLI now operates as Account B.                     │
     │                                                                         │
-    │ if email != B.email (e.g. still A, or unknown):                        │
+    │ if email is present but != B.email:                                    │
     │   → Backup T-B was CORRUPTED (contained wrong account's token).        │
     │   → throw switchWrongAccount(expected: B, actual: email)               │
     │   → User sees: "Switch failed: expected B@... but got A@...            │
     │     Try removing and re-adding the account."                           │
+    │                                                                         │
+    │ if email is ABSENT (authMethod != "claude.ai"):                        │
+    │   → Says NOTHING about our swap — see the note below.                  │
+    │   → Fall back to a local check: LIVE keychain accessToken == T-B's,    │
+    │     and ~/.claude.json identity == B.email.                            │
+    │   → match    → SUCCESS, plus a warning naming the shadowing source.    │
+    │   → mismatch → throw switchVerificationFailed                          │
     └─────────────────────────────────────────────────────────────────────────┘
+
+    ⚠️  `claude auth status` only emits `email` / `orgId` / `orgName` /
+        `subscriptionType` when `authMethod == "claude.ai"`, i.e. when the
+        stored claude.ai login is the credential source the CLI actually
+        resolves to. Any higher-precedence source shadows it and the whole
+        identity block is omitted while `loggedIn` stays `true`:
+        `ANTHROPIC_AUTH_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`, an `apiKeyHelper`,
+        an OAuth token file, an Anthropic profile in `~/.config/anthropic`,
+        or a third-party provider (Bedrock/Vertex/…). Treating that absence
+        as "wrong account" produced the bogus
+        "Switch failed: expected <email> but got unknown" of issue #18, even
+        though both halves of the swap had been written correctly.
 
 Step 5: POST-SWITCH diagnostics
 
