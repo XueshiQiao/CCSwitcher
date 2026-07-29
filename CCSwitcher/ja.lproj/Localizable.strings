@@ -158,3 +158,15 @@
 "Weekly — usage vs time (7d)" = "週間 — 使用量 vs 時間（7日）";
 "The vertical line marks time elapsed in the window; fill past it means you're using faster than the clock." = "縦線 = 経過時間（その時間枠の進捗）。塗りつぶしがこれを超える = 時間より速く消費しています。";
 "Claude Fable 5 — most powerful model, the new flagship tier" = "Claude Fable 5 — 最も強力なモデル、新しいフラッグシップ層";
+
+/* Auto-switch & rate-limit resilience */
+"Waiting for usage data..." = "使用データを待っています...";
+"No active subscription on this account (OAuth not allowed)." = "このアカウントに有効なサブスクリプションがありません（OAuth は許可されていません）。";
+"Session expired. Re-authenticate (↻) to fix." = "セッションの期限が切れました。再認証（↻）で修復してください。";
+"Auto-switch" = "自動切り替え";
+"Switch account before hitting the limit" = "上限に達する前にアカウントを切り替える";
+"Switch at" = "切り替えしきい値";
+"When the active account's 5-hour or weekly usage reaches this level, CCSwitcher switches to the account with the most quota left. Checked on every refresh; a 5-minute cooldown prevents rapid flip-flopping." = "アクティブなアカウントの 5 時間または週間使用量がこのレベルに達すると、CCSwitcher は残りクォータが最も多いアカウントに切り替えます。更新のたびにチェックされ、5 分間のクールダウンで頻繁な切り替えを防ぎます。";
+"Updated %@ ago" = "%@前に更新";
+"Could not save the refreshed sign-in; will retry automatically." = "更新されたログイン情報を保存できませんでした。自動的に再試行します。";
+"Credential storage is temporarily unavailable. Try again shortly." = "認証情報ストレージは一時的に利用できません。しばらくしてからもう一度お試しください。";

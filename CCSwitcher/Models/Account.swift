@@ -45,10 +45,18 @@ struct Account: Identifiable, Codable, Hashable {
     }
 
     var obfuscatedEmail: String {
-        return email.obfuscatedEmail()
+        // This field IS an address — mask structurally, no detection step, so
+        // non-ASCII/quoted/punycode/literal forms can never slip through.
+        return email.maskedAsEmailAddress()
     }
 
     var obfuscatedDisplayName: String {
+        // displayName is orgName ?? email: when it IS the email, mask it
+        // structurally like the email field; otherwise treat it as free text
+        // and only mask what the conservative detector recognizes.
+        if displayName == email {
+            return email.maskedAsEmailAddress()
+        }
         return displayName.obfuscatedEmail()
     }
 

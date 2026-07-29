@@ -158,3 +158,15 @@
 "Weekly — usage vs time (7d)" = "每周 — 用量 vs 时间（7天）";
 "The vertical line marks time elapsed in the window; fill past it means you're using faster than the clock." = "竖线 = 时间进度（该时段已过去多少）；填充超过它 = 你用得比时间快。";
 "Claude Fable 5 — most powerful model, the new flagship tier" = "Claude Fable 5 — 最强大的模型，全新旗舰层级";
+
+/* Auto-switch & rate-limit resilience */
+"Waiting for usage data..." = "正在等待用量数据...";
+"No active subscription on this account (OAuth not allowed)." = "该账户没有有效订阅（不允许 OAuth）。";
+"Session expired. Re-authenticate (↻) to fix." = "会话已过期。请重新认证（↻）来修复。";
+"Auto-switch" = "自动切换";
+"Switch account before hitting the limit" = "在达到限额前切换账户";
+"Switch at" = "切换阈值";
+"When the active account's 5-hour or weekly usage reaches this level, CCSwitcher switches to the account with the most quota left. Checked on every refresh; a 5-minute cooldown prevents rapid flip-flopping." = "当活跃账户的 5 小时或每周用量达到此水平时，CCSwitcher 会切换到剩余配额最多的账户。每次刷新时检查；5 分钟冷却时间可防止频繁来回切换。";
+"Updated %@ ago" = "%@前更新";
+"Could not save the refreshed sign-in; will retry automatically." = "无法保存刷新后的登录凭据；将自动重试。";
+"Credential storage is temporarily unavailable. Try again shortly." = "凭据存储暂时不可用。请稍后重试。";

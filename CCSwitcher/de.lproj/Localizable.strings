@@ -158,3 +158,15 @@
 "Weekly — usage vs time (7d)" = "Woche — Nutzung vs. Zeit (7 Tage)";
 "The vertical line marks time elapsed in the window; fill past it means you're using faster than the clock." = "Die vertikale Linie zeigt die verstrichene Zeit; Füllung darüber hinaus = schneller als die Uhr verbraucht.";
 "Claude Fable 5 — most powerful model, the new flagship tier" = "Claude Fable 5 — leistungsstärkstes Modell, die neue Flaggschiff-Klasse";
+
+/* Auto-switch & rate-limit resilience */
+"Waiting for usage data..." = "Warte auf Nutzungsdaten...";
+"No active subscription on this account (OAuth not allowed)." = "Kein aktives Abonnement für dieses Konto (OAuth nicht erlaubt).";
+"Session expired. Re-authenticate (↻) to fix." = "Sitzung abgelaufen. Zur Behebung erneut authentifizieren (↻).";
+"Auto-switch" = "Automatischer Wechsel";
+"Switch account before hitting the limit" = "Konto vor Erreichen des Limits wechseln";
+"Switch at" = "Wechseln bei";
+"When the active account's 5-hour or weekly usage reaches this level, CCSwitcher switches to the account with the most quota left. Checked on every refresh; a 5-minute cooldown prevents rapid flip-flopping." = "Erreicht die 5-Stunden- oder Wochennutzung des aktiven Kontos dieses Niveau, wechselt CCSwitcher zum Konto mit dem meisten verbleibenden Kontingent. Wird bei jeder Aktualisierung geprüft; eine 5-Minuten-Abklingzeit verhindert schnelles Hin- und Herwechseln.";
+"Updated %@ ago" = "Aktualisiert vor %@";
+"Could not save the refreshed sign-in; will retry automatically." = "Aktualisierte Anmeldedaten konnten nicht gespeichert werden; es wird automatisch erneut versucht.";
+"Credential storage is temporarily unavailable. Try again shortly." = "Anmeldedaten-Speicher ist vorübergehend nicht verfügbar. Versuchen Sie es gleich erneut.";

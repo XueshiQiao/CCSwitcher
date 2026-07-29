@@ -278,18 +278,33 @@ final class ClaudeService: @unchecked Sendable {
     private static let oauthClientID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
     private static let oauthTokenURL = "https://console.anthropic.com/v1/oauth/token"
 
+    /// Outcome of an OAuth refresh attempt. The `rejected`/`transient`
+    /// distinction is load-bearing for the caller: `rejected` means the refresh
+    /// token is dead and only re-authentication helps, while `transient` says
+    /// nothing about the token at all — showing "re-authenticate" for a network
+    /// blip would send the user through a pointless login.
+    enum OAuthRefreshResult {
+        case success(String)
+        /// The endpoint (or the stored credential itself) says this grant can
+        /// never work: no refresh token stored, or a 4xx rejection.
+        case rejected
+        /// Network trouble or a server-side error; the token's validity is unknown.
+        case transient
+    }
+
     /// Silently refresh a credential JSON using its refresh token, via a direct
     /// POST to the OAuth token endpoint. Never touches the keychain - safe to run
     /// for non-active accounts while Claude Code sessions are working, because
     /// only CCSwitcher holds these backups (rotation cannot race anyone).
-    /// Returns the updated credential JSON, or nil when the input has no refresh
-    /// token or the endpoint rejects the grant (dead/rotated refresh token).
-    func refreshOAuthCredentials(_ credentialsJSON: String) async -> String? {
+    func refreshOAuthCredentials(_ credentialsJSON: String) async -> OAuthRefreshResult {
         guard var root = (try? JSONSerialization.jsonObject(with: Data(credentialsJSON.utf8))) as? [String: Any],
               var oauth = root["claudeAiOauth"] as? [String: Any],
               let refreshToken = oauth["refreshToken"] as? String, !refreshToken.isEmpty,
               let url = URL(string: Self.oauthTokenURL)
-        else { return nil }
+        else {
+            log.warning("[refreshOAuth] Stored credential has no refresh token")
+            return .rejected
+        }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -308,9 +323,26 @@ final class ClaudeService: @unchecked Sendable {
                   let accessToken = resp["access_token"] as? String,
                   let expiresIn = resp["expires_in"] as? Double
             else {
-                let body = String(data: data, encoding: .utf8) ?? ""
-                log.warning("[refreshOAuth] Endpoint refused refresh (HTTP \(status)): \(body.prefix(200))")
-                return nil
+                // NEVER log the response body. This guard also fires when the
+                // status IS 200 but a field failed to parse (schema change) —
+                // in that case the body is a *successful* token response whose
+                // first bytes are a live access token, headed for a log file
+                // that outlives rotation and gets attached to bug reports.
+                // Log the status plus an allowlisted OAuth error code only.
+                let oauthError = ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any])?["error"] as? String
+                let knownCodes = ["invalid_grant", "invalid_request", "invalid_client", "unauthorized_client", "unsupported_grant_type", "invalid_scope"]
+                let loggedCode = oauthError.map { knownCodes.contains($0) ? $0 : "unrecognized" } ?? "none"
+                log.warning("[refreshOAuth] Refresh not applied (HTTP \(status), error=\(loggedCode), \(data.count) bytes)")
+
+                // A 200 that failed OUR parse is a schema change, not a dead
+                // grant. Otherwise only a grant-terminal OAuth error means the
+                // refresh token is dead (RFC 6749 §5.2: `invalid_grant` covers
+                // expired/revoked/invalid refresh tokens). Everything else —
+                // 5xx, 429, 408, an `invalid_request` from a request-shape
+                // mismatch — says nothing about the token, and demanding
+                // re-authentication for it would be a pointless login.
+                if status == 200 { return .transient }
+                return oauthError == "invalid_grant" ? .rejected : .transient
             }
 
             oauth["accessToken"] = accessToken
@@ -318,16 +350,21 @@ final class ClaudeService: @unchecked Sendable {
             if let newRefresh = resp["refresh_token"] as? String, !newRefresh.isEmpty {
                 oauth["refreshToken"] = newRefresh
             }
-            if let scope = resp["scope"] as? String, !scope.isEmpty {
-                oauth["scopes"] = scope.split(separator: " ").map(String.init)
-            }
+            // `scopes` is deliberately NOT rewritten from the refresh response.
+            // The CLI (verified against claude 2.1.220) decides whether it
+            // recognises a stored login by checking that `scopes` contains
+            // "user:inference"; a refresh response carrying a narrower scope
+            // string would make this credential invisible to `claude auth
+            // status`, and the account would read as not-logged-in with no
+            // visible cause. The login-time value is the one to keep.
             root["claudeAiOauth"] = oauth
             let out = try JSONSerialization.data(withJSONObject: root)
             log.info("[refreshOAuth] Access token refreshed, valid for \(Int(expiresIn / 3600))h \(Int(expiresIn.truncatingRemainder(dividingBy: 3600) / 60))m")
-            return String(data: out, encoding: .utf8)
+            guard let json = String(data: out, encoding: .utf8) else { return .transient }
+            return .success(json)
         } catch {
             log.warning("[refreshOAuth] Refresh failed: \(error.localizedDescription)")
-            return nil
+            return .transient
         }
     }
 
@@ -351,8 +388,11 @@ final class ClaudeService: @unchecked Sendable {
         let shadowedBy: String?
     }
 
+    /// `targetBackup` is resolved by the caller (which can distinguish a
+    /// missing backup from a briefly unreadable store) and handed down so no
+    /// second, ambiguity-collapsing lookup happens here.
     @discardableResult
-    func switchAccount(from currentAccount: Account, to targetAccount: Account) async throws -> SwitchOutcome {
+    func switchAccount(from currentAccount: Account, to targetAccount: Account, targetBackup: AccountBackup) async throws -> SwitchOutcome {
         let keychain = KeychainService.shared
 
         log.info("[switchAccount] Switching from \(currentAccount.id) to \(targetAccount.id)")
@@ -372,14 +412,8 @@ final class ClaudeService: @unchecked Sendable {
             log.warning("[switchAccount] Step 1: Could not read current token or oauthAccount")
         }
 
-        // 2. Retrieve target account's backup
-        log.info("[switchAccount] Step 2: Reading backup for target account...")
-        guard let targetBackup = keychain.getAccountBackup(forAccountId: targetAccount.id.uuidString) else {
-            log.error("[switchAccount] Step 2: No backup found for target account!")
-            throw ClaudeServiceError.noTokenForAccount(targetAccount.id.uuidString)
-        }
-        let targetEmail = (targetBackup.oauthAccount["emailAddress"]?.value as? String) ?? "?"
-        log.info("[switchAccount] Step 2: Target backup found (email=\(targetEmail))")
+        // 2. Target backup was resolved and validated by the caller.
+        log.info("[switchAccount] Step 2: Using caller-resolved backup for target account")
 
         // 3. Write target token to keychain + target oauthAccount to ~/.claude.json
         log.info("[switchAccount] Step 3: Writing target credentials...")

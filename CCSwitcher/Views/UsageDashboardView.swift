@@ -204,6 +204,7 @@ struct UsageDashboardView: View {
             if let usage = usage {
                 usageBars(usage)
                 extraUsageRow(usage.extraUsage)
+                sampleAgeLabel(account)
             } else if let errorState = appState.accountUsageErrors[account.id] {
                 HStack {
                     Image(systemName: errorState.isRateLimited ? "timer" : (errorState.isExpired ? "exclamationmark.triangle" : "xmark.circle"))
@@ -232,6 +233,24 @@ struct UsageDashboardView: View {
         }
         .cardStyle(fill: account.isActive ? .cardFill : .cardFill)
         .sectionPadding()
+    }
+
+    /// Accounts are polled round-robin (active + one other per cycle), so a
+    /// card's numbers can be several cycles old — say so instead of letting a
+    /// stale percentage render exactly like a live one. Hidden while the sample
+    /// is fresh (< 90s); the relative text then counts up by itself.
+    @ViewBuilder
+    private func sampleAgeLabel(_ account: Account) -> some View {
+        if let sampledAt = appState.accountUsageSampledAt[account.id],
+           Date().timeIntervalSince(sampledAt) >= 90 {
+            HStack(spacing: 3) {
+                Image(systemName: "clock")
+                    .font(.caption2)
+                Text("Updated \(Text(sampledAt, style: .relative)) ago")
+                    .font(.caption2)
+            }
+            .foregroundStyle(.textSecondary)
+        }
     }
 
     @ViewBuilder
