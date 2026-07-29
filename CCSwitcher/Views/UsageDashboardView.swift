@@ -216,10 +216,13 @@ struct UsageDashboardView: View {
                 }
                 .padding(.top, 4)
             } else {
+                // No sample yet (accounts are polled round-robin) - this is a
+                // waiting state, not an error. The old hardcoded "Token expired"
+                // text here made healthy accounts look broken.
                 HStack {
-                    Image(systemName: "exclamationmark.triangle")
-                        .foregroundStyle(.yellow)
-                    Text("Token expired. Switch to this account in Claude Code to refresh.")
+                    Image(systemName: "hourglass")
+                        .foregroundStyle(.secondary)
+                    Text("Waiting for usage data...")
                         .font(.caption)
                         .foregroundStyle(.textSecondary)
                     Spacer()
