@@ -270,7 +270,15 @@ final class ClaudeService: @unchecked Sendable {
 
     // MARK: - Account Switching
 
-    func switchAccount(from currentAccount: Account, to targetAccount: Account) async throws {
+    /// Result of a completed switch.
+    struct SwitchOutcome {
+        /// Set when the swap succeeded but `claude auth status` could not confirm
+        /// it, because this credential source shadows the stored claude.ai login.
+        let shadowedBy: String?
+    }
+
+    @discardableResult
+    func switchAccount(from currentAccount: Account, to targetAccount: Account) async throws -> SwitchOutcome {
         let keychain = KeychainService.shared
 
         log.info("[switchAccount] Switching from \(currentAccount.id) to \(targetAccount.id)")
@@ -318,11 +326,52 @@ final class ClaudeService: @unchecked Sendable {
             log.error("[switchAccount] Step 4: Not logged in after switch!")
             throw ClaudeServiceError.switchVerificationFailed
         }
-        if status.email != targetAccount.email {
-            log.error("[switchAccount] Step 4: Logged in as \(status.email ?? "nil") instead of \(targetAccount.email)")
-            throw ClaudeServiceError.switchWrongAccount(expected: targetAccount.email, actual: status.email ?? "unknown")
+
+        if let email = status.email {
+            guard email == targetAccount.email else {
+                log.error("[switchAccount] Step 4: Logged in as \(email) instead of \(targetAccount.email)")
+                throw ClaudeServiceError.switchWrongAccount(expected: targetAccount.email, actual: email)
+            }
+            log.info("[switchAccount] Step 4: Switch verified — logged in as \(email)")
+            return SwitchOutcome(shadowedBy: nil)
         }
-        log.info("[switchAccount] Step 4: Switch verified — logged in as \(status.email ?? "")")
+
+        // No `email` in the status output. The CLI is logged in, but resolves to a
+        // credential source that outranks the stored claude.ai login (env token,
+        // apiKeyHelper, OAuth token file, Anthropic profile, third-party provider),
+        // so it omits the identity block entirely. That says nothing about whether
+        // our swap worked, so verify against the credentials we just wrote instead
+        // of reporting the target account as "wrong" (issue #18).
+        let shadowedBy = status.shadowingAuthMethod ?? "unknown"
+        log.warning("[switchAccount] Step 4: CLI reports authMethod=\(shadowedBy) and omits the account identity; verifying against the credential store instead")
+        guard credentialsOnDiskMatch(backup: targetBackup, email: targetAccount.email) else {
+            throw ClaudeServiceError.switchVerificationFailed
+        }
+        log.info("[switchAccount] Step 4: Switch verified against the credential store (CLI identity hidden by \(shadowedBy))")
+        return SwitchOutcome(shadowedBy: shadowedBy)
+    }
+
+    /// Ground-truth check that does not depend on `claude auth status`: both
+    /// halves of a switch — the keychain token and the `~/.claude.json` identity —
+    /// must hold the target account.
+    private func credentialsOnDiskMatch(backup: AccountBackup, email: String) -> Bool {
+        let keychain = KeychainService.shared
+
+        guard let liveToken = keychain.readClaudeToken(),
+              let liveAccessToken = Self.extractAccessToken(from: liveToken),
+              let expectedAccessToken = Self.extractAccessToken(from: backup.token),
+              liveAccessToken == expectedAccessToken else {
+            log.error("[switchAccount] Keychain token does not match the target account's backup")
+            return false
+        }
+
+        guard let liveOAuth = keychain.readOAuthAccount(),
+              (liveOAuth["emailAddress"]?.value as? String) == email else {
+            log.error("[switchAccount] ~/.claude.json identity does not match \(email)")
+            return false
+        }
+
+        return true
     }
 
     /// Capture the current Claude auth token + oauthAccount and associate with an account

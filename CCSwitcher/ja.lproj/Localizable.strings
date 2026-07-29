@@ -130,6 +130,8 @@
 "Could not capture credentials" = "認証情報を取得できませんでした";
 "No stored credentials for %@. Use re-authenticate to fix." = "%@ の保存済み認証情報がありません。再認証で修復してください。";
 "Logged in as %@, but expected %@. Credentials not updated." = "%1$@ としてログインしましたが、%2$@ が期待されていました。認証情報は更新されません。";
+"Claude CLI is authenticating via %@ instead of a stored claude.ai login, so it reports no account. Unset ANTHROPIC_AUTH_TOKEN / CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_PROFILE and remove any apiKeyHelper, then try again." = "Claude CLI は保存された claude.ai ログインではなく %@ で認証しているため、アカウントを報告しません。ANTHROPIC_AUTH_TOKEN / CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_PROFILE を解除し、apiKeyHelper があれば削除してから、もう一度お試しください。";
+"Switched to %@, but the Claude CLI is authenticating via %@ instead of the stored login, so it will not use this account." = "%1$@ に切り替えましたが、Claude CLI は保存されたログインではなく %2$@ で認証しているため、このアカウントは使用されません。";
 "Token expired. Switch to refresh." = "トークンが期限切れです。切り替えて更新してください。";
 "Token expired. Switch to this account to refresh." = "トークンが期限切れです。このアカウントに切り替えて更新してください。";
 "API Rate Limited. Try again later." = "API レート制限中。後でもう一度お試しください。";

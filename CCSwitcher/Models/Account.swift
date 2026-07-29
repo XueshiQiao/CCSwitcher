@@ -98,6 +98,17 @@ struct Account: Identifiable, Codable, Hashable {
 
 // MARK: - Auth Status (from `claude auth status`)
 
+/// Decoded `claude auth status` output.
+///
+/// The CLI only emits `email`, `orgId`, `orgName` and `subscriptionType` when
+/// `authMethod == "claude.ai"` — that is, when the stored claude.ai login is the
+/// credential source it actually resolves to. Any higher-precedence source
+/// shadows the stored login and the whole identity block is omitted while
+/// `loggedIn` stays `true`: an `ANTHROPIC_AUTH_TOKEN` / `CLAUDE_CODE_OAUTH_TOKEN`
+/// environment variable, an `apiKeyHelper`, an OAuth token file, an Anthropic
+/// profile in `~/.config/anthropic`, or a third-party provider (Bedrock, Vertex,
+/// …). Callers must therefore treat a missing `email` as "identity unavailable",
+/// never as "a different account is active".
 struct AuthStatus: Codable {
     let loggedIn: Bool
     let authMethod: String?
@@ -106,4 +117,16 @@ struct AuthStatus: Codable {
     let orgId: String?
     let orgName: String?
     let subscriptionType: String?
+
+    /// True when the CLI reports the identity of the stored claude.ai login,
+    /// i.e. when `email` is meaningful.
+    var reportsClaudeAiIdentity: Bool {
+        authMethod == "claude.ai"
+    }
+
+    /// The credential source shadowing the stored claude.ai login, or `nil` when
+    /// nothing shadows it. Only meaningful while `loggedIn` is `true`.
+    var shadowingAuthMethod: String? {
+        reportsClaudeAiIdentity ? nil : (authMethod ?? "unknown")
+    }
 }

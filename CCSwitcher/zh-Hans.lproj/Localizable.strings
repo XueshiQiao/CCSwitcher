@@ -130,6 +130,8 @@
 "Could not capture credentials" = "无法获取凭据";
 "No stored credentials for %@. Use re-authenticate to fix." = "没有 %@ 的存储凭据。请使用重新认证来修复。";
 "Logged in as %@, but expected %@. Credentials not updated." = "登录账户为 %1$@，但预期为 %2$@。凭据未更新。";
+"Claude CLI is authenticating via %@ instead of a stored claude.ai login, so it reports no account. Unset ANTHROPIC_AUTH_TOKEN / CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_PROFILE and remove any apiKeyHelper, then try again." = "Claude CLI 正在通过 %@ 进行认证，而不是使用已保存的 claude.ai 登录，因此不会报告账号。请取消 ANTHROPIC_AUTH_TOKEN / CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_PROFILE，并移除所有 apiKeyHelper，然后重试。";
+"Switched to %@, but the Claude CLI is authenticating via %@ instead of the stored login, so it will not use this account." = "已切换到 %1$@，但 Claude CLI 正在通过 %2$@ 认证，而不是使用已保存的登录，因此不会使用此账号。";
 "Token expired. Switch to refresh." = "令牌已过期。切换以刷新。";
 "Token expired. Switch to this account to refresh." = "令牌已过期。切换到此账户以刷新。";
 "API Rate Limited. Try again later." = "API 请求频率受限。请稍后重试。";

@@ -127,9 +127,14 @@ final class AppState: ObservableObject {
 
         do {
             let status = try await claudeService.getAuthStatus()
-            guard status.loggedIn, let email = status.email else {
+            guard status.loggedIn else {
                 errorMessage = String(localized: "Not logged in to Claude. Run 'claude auth login' first.", bundle: L10n.bundle)
                 log.error("[addAccount] Aborted: not logged in")
+                return
+            }
+            guard let email = status.email else {
+                errorMessage = shadowedIdentityMessage(status)
+                log.error("[addAccount] Aborted: CLI reports authMethod=\(status.authMethod ?? "nil") without an account identity")
                 return
             }
             log.info("[addAccount] Current auth: logged in, sub=\(status.subscriptionType ?? "nil")")
@@ -203,9 +208,15 @@ final class AppState: ObservableObject {
             // 3. Read the new identity from ~/.claude.json
             log.info("[loginNewAccount] Step 3: Reading post-login state...")
             let status = try await claudeService.getAuthStatus()
-            guard status.loggedIn, let email = status.email else {
+            guard status.loggedIn else {
                 errorMessage = String(localized: "Login did not complete", bundle: L10n.bundle)
                 log.error("[loginNewAccount] Step 3: Not logged in after login!")
+                isLoggingIn = false
+                return
+            }
+            guard let email = status.email else {
+                errorMessage = shadowedIdentityMessage(status)
+                log.error("[loginNewAccount] Step 3: CLI reports authMethod=\(status.authMethod ?? "nil") without an account identity")
                 isLoggingIn = false
                 return
             }
@@ -301,7 +312,7 @@ final class AppState: ObservableObject {
 
         isLoading = true
         do {
-            try await claudeService.switchAccount(from: currentActive, to: account)
+            let outcome = try await claudeService.switchAccount(from: currentActive, to: account)
 
             for i in accounts.indices {
                 accounts[i].isActive = (accounts[i].id == account.id)
@@ -313,6 +324,10 @@ final class AppState: ObservableObject {
             saveAccounts()
 
             await refresh()
+            // `refresh()` clears errorMessage, so surface the warning afterwards.
+            if let shadowedBy = outcome.shadowedBy {
+                errorMessage = String(localized: "Switched to \(account.email), but the Claude CLI is authenticating via \(shadowedBy) instead of the stored login, so it will not use this account.", bundle: L10n.bundle)
+            }
             log.info("[switchTo] ===== Switch completed =====")
         } catch {
             errorMessage = error.localizedDescription
@@ -345,8 +360,14 @@ final class AppState: ObservableObject {
 
             // 3. Verify the login result matches the target account
             let status = try await claudeService.getAuthStatus()
-            guard status.loggedIn, let email = status.email else {
+            guard status.loggedIn else {
                 errorMessage = String(localized: "Login did not complete", bundle: L10n.bundle)
+                isLoggingIn = false
+                return
+            }
+            guard let email = status.email else {
+                errorMessage = shadowedIdentityMessage(status)
+                log.error("[reauth] CLI reports authMethod=\(status.authMethod ?? "nil") without an account identity")
                 isLoggingIn = false
                 return
             }
@@ -447,6 +468,15 @@ final class AppState: ObservableObject {
     }
 
     // MARK: - Diagnostics
+
+    /// Message for the case where the CLI *is* authenticated but reports no
+    /// account, because a credential source outranking the stored claude.ai login
+    /// is in play. Without this the user only saw "Not logged in" / "Login did not
+    /// complete" and re-authorized in a loop that could never help (issue #18).
+    private func shadowedIdentityMessage(_ status: AuthStatus) -> String {
+        let method = status.shadowingAuthMethod ?? "unknown"
+        return String(localized: "Claude CLI is authenticating via \(method) instead of a stored claude.ai login, so it reports no account. Unset ANTHROPIC_AUTH_TOKEN / CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_PROFILE and remove any apiKeyHelper, then try again.", bundle: L10n.bundle)
+    }
 
     /// Passive health check — verifies backup existence and identity consistency.
     private func diagnoseTokenHealth() {
