@@ -147,6 +147,8 @@
 "Menu bar modules" = "メニューバー モジュール";
 "Drag to reorder, toggle to enable. Disabled modules sit at the bottom." = "ドラッグで並び替え、トグルで有効化。無効モジュールは下に表示されます。";
 "Preview" = "プレビュー";
+"Customize limit bar colors" = "制限バーの色をカスタマイズ";
+"Warns when this much quota or less is left. At 30%, bars turn at 70% used." = "残量がこの割合以下になると警告色に変わります。30% なら使用率 70% で変色します。";
 "Limit bars" = "制限バー";
 "Session bar color" = "セッションバーの色";
 "Weekly bar color" = "週間バーの色";

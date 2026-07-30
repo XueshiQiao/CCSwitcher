@@ -117,19 +117,28 @@ struct SettingsView: View {
             }
 
             Section("Limit bars") {
-                ColorPicker("Session bar color", selection: sessionLimitBarColor, supportsOpacity: false)
-                ColorPicker("Weekly bar color", selection: weeklyLimitBarColor, supportsOpacity: false)
-                ColorPicker("Low remaining color", selection: lowRemainingLimitBarColor, supportsOpacity: false)
+                Toggle("Customize limit bar colors", isOn: $menuBarConfig.customizesLimitBarColors)
 
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text("Low remaining threshold")
-                        Spacer()
-                        Text("\(Int(menuBarConfig.lowRemainingWarningThreshold))%")
+                // Collapsed while off, so the stock layout keeps the module list
+                // and its preview visible without scrolling.
+                if menuBarConfig.customizesLimitBarColors {
+                    ColorPicker("Session bar color", selection: sessionLimitBarColor, supportsOpacity: false)
+                    ColorPicker("Weekly bar color", selection: weeklyLimitBarColor, supportsOpacity: false)
+                    ColorPicker("Low remaining color", selection: lowRemainingLimitBarColor, supportsOpacity: false)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("Low remaining threshold")
+                            Spacer()
+                            Text("\(Int(menuBarConfig.lowRemainingWarningThreshold))%")
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        }
+                        Slider(value: $menuBarConfig.lowRemainingWarningThreshold, in: 0...100, step: 5)
+                        Text("Warns when this much quota or less is left. At 30%, bars turn at 70% used.")
+                            .font(.caption)
                             .foregroundStyle(.secondary)
-                            .monospacedDigit()
                     }
-                    Slider(value: $menuBarConfig.lowRemainingWarningThreshold, in: 0...100, step: 5)
                 }
             }
 

@@ -147,6 +147,8 @@
 "Menu bar modules" = "Menüleisten-Module";
 "Drag to reorder, toggle to enable. Disabled modules sit at the bottom." = "Zum Sortieren ziehen, zum Aktivieren umschalten. Deaktivierte Module stehen unten.";
 "Preview" = "Vorschau";
+"Customize limit bar colors" = "Farben der Limitbalken anpassen";
+"Warns when this much quota or less is left. At 30%, bars turn at 70% used." = "Warnt, wenn nur noch dieser Anteil übrig ist. Bei 30% färben sich die Balken ab 70% Nutzung.";
 "Limit bars" = "Limitbalken";
 "Session bar color" = "Farbe des Sitzungsbalkens";
 "Weekly bar color" = "Farbe des Wochenbalkens";

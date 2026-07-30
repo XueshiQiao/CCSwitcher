@@ -147,6 +147,8 @@
 "Menu bar modules" = "Modules de la barre de menus";
 "Drag to reorder, toggle to enable. Disabled modules sit at the bottom." = "Glissez pour réorganiser, basculez pour activer. Les modules désactivés sont en bas.";
 "Preview" = "Aperçu";
+"Customize limit bar colors" = "Personnaliser les couleurs des barres";
+"Warns when this much quota or less is left. At 30%, bars turn at 70% used." = "Avertit lorsqu'il ne reste que ce pourcentage. À 30%, les barres changent à 70% d'utilisation.";
 "Limit bars" = "Barres de limite";
 "Session bar color" = "Couleur de la barre session";
 "Weekly bar color" = "Couleur de la barre hebdo";

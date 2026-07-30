@@ -147,6 +147,8 @@
 "Menu bar modules" = "菜单栏模块";
 "Drag to reorder, toggle to enable. Disabled modules sit at the bottom." = "拖动排序，勾选启用。未启用的模块排在下方。";
 "Preview" = "预览";
+"Customize limit bar colors" = "自定义额度条颜色";
+"Warns when this much quota or less is left. At 30%, bars turn at 70% used." = "剩余额度低于这个比例时变为警告色。设为 30% 表示用量达到 70% 时变色。";
 "Limit bars" = "额度条";
 "Session bar color" = "会话条颜色";
 "Weekly bar color" = "每周条颜色";

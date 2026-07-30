@@ -321,7 +321,7 @@ struct UsageDashboardView: View {
     // MARK: - Usage Row
 
     private func usageRow(label: LocalizedStringKey, resetText: String?, utilization: Double, kind: LimitBarKind) -> some View {
-        let fillColor = menuBarConfig.limitBarColor(for: kind, utilization: utilization)
+        let fillColor = menuBarConfig.limitBarColor(for: kind, utilization: utilization, context: .dashboard)
 
         return VStack(spacing: 5) {
             HStack {

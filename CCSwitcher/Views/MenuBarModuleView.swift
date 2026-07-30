@@ -59,26 +59,26 @@ struct MenuBarModuleView: View {
             UtilizationBar(
                 utilization: sessionUtilization,
                 markerPercent: sessionTimeElapsed,
-                fillColor: config.limitBarColor(for: .session, utilization: sessionUtilization)
+                fillColor: config.limitBarColor(for: .session, utilization: sessionUtilization, context: .menuBar)
             )
 
         case .weeklyBar:
             UtilizationBar(
                 utilization: weeklyUtilization,
                 markerPercent: weeklyTimeElapsed,
-                fillColor: config.limitBarColor(for: .weekly, utilization: weeklyUtilization)
+                fillColor: config.limitBarColor(for: .weekly, utilization: weeklyUtilization, context: .menuBar)
             )
 
         case .sessionBarPlain:
             UtilizationBar(
                 utilization: sessionUtilization,
-                fillColor: config.limitBarColor(for: .session, utilization: sessionUtilization)
+                fillColor: config.limitBarColor(for: .session, utilization: sessionUtilization, context: .menuBar)
             )
 
         case .weeklyBarPlain:
             UtilizationBar(
                 utilization: weeklyUtilization,
-                fillColor: config.limitBarColor(for: .weekly, utilization: weeklyUtilization)
+                fillColor: config.limitBarColor(for: .weekly, utilization: weeklyUtilization, context: .menuBar)
             )
 
         case .dailyCost:
@@ -160,7 +160,10 @@ struct MenuBarModuleView: View {
 }
 
 /// Hollow rounded capsule with an inner filled pill whose width reflects
-/// `utilization` (a 0–100 percentage, normalized to 0–1).
+/// `utilization` (a 0–100 percentage, normalized to 0–1). `fillColor` comes from
+/// `MenuBarConfig.limitBarColor(for:utilization:context:)`, which by default
+/// keeps the fill monochrome so it adapts to the light/dark menu bar and turns
+/// red only above 90% (staying red on overage, clamped at 100%).
 ///
 /// `markerPercent` (0–100, optional) draws a thin vertical "pace" tick at the
 /// fraction of the rate-limit window already elapsed. Compare the fill to the

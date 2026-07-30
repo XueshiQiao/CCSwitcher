@@ -151,6 +151,8 @@
 "Menu bar modules" = "Menu bar modules";
 "Drag to reorder, toggle to enable. Disabled modules sit at the bottom." = "Drag to reorder, toggle to enable. Disabled modules sit at the bottom.";
 "Preview" = "Preview";
+"Customize limit bar colors" = "Customize limit bar colors";
+"Warns when this much quota or less is left. At 30%, bars turn at 70% used." = "Warns when this much quota or less is left. At 30%, bars turn at 70% used.";
 "Limit bars" = "Limit bars";
 "Session bar color" = "Session bar color";
 "Weekly bar color" = "Weekly bar color";
