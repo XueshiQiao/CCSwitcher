@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 /// Owns the menu-bar `NSStatusItem` and its click-through `NSPopover`.
@@ -16,6 +17,9 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     private var popoverController: NSHostingController<AnyView>?
     private var appState: AppState?
     private var menuBarConfig: MenuBarConfig?
+    private var currentLocale: Locale = .autoupdatingCurrent
+    private var stripRefreshCancellables = Set<AnyCancellable>()
+    private var isStripRefreshScheduled = false
     private var installed = false
 
     func install(appState: AppState, config: MenuBarConfig, locale: Locale) {
@@ -23,6 +27,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         installed = true
         self.appState = appState
         self.menuBarConfig = config
+        self.currentLocale = locale
 
         let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         self.statusItem = statusItem
@@ -30,20 +35,12 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         // The strip reports its true intrinsic width back to us; we mirror it
         // onto the status item so the leading icon / trailing module never clip
         // when content widens (real data, longer countdowns, account name).
-        let strip = MenuBarStripView(
-            appState: appState,
-            config: config,
-            onWidth: { [weak statusItem] width in
-                statusItem?.length = max(width, 1)
-            }
-        )
-        .environment(\.locale, locale)
-
-        let stripController = NSHostingController(rootView: AnyView(strip))
+        let stripController = NSHostingController(rootView: makeStripView(appState: appState, config: config, locale: locale))
         if #available(macOS 13.0, *) {
             stripController.sizingOptions = [.intrinsicContentSize]
         }
         self.stripController = stripController
+        observeStripRefreshes(appState: appState, config: config)
 
         let stripView = stripController.view
         stripView.translatesAutoresizingMaskIntoConstraints = false
@@ -73,6 +70,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             rootView: AnyView(
                 MainMenuView()
                     .environmentObject(appState)
+                    .environmentObject(config)
                     .environment(\.locale, locale)
             )
         )
@@ -90,20 +88,13 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     /// Update the locale environment on all hosted SwiftUI views.
     /// Called when the user changes the in-app language setting.
     func updateLocale(_ locale: Locale) {
+        currentLocale = locale
         guard let appState, let config = menuBarConfig else { return }
-        stripController?.rootView = AnyView(
-            MenuBarStripView(
-                appState: appState,
-                config: config,
-                onWidth: { [weak statusItem] width in
-                    statusItem?.length = max(width, 1)
-                }
-            )
-            .environment(\.locale, locale)
-        )
+        stripController?.rootView = makeStripView(appState: appState, config: config, locale: locale)
         popoverController?.rootView = AnyView(
             MainMenuView()
                 .environmentObject(appState)
+                .environmentObject(config)
                 .environment(\.locale, locale)
         )
     }
@@ -115,6 +106,57 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         } else {
             popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()
+        }
+    }
+
+    private func makeStripView(appState: AppState, config: MenuBarConfig, locale: Locale) -> AnyView {
+        let statusItem = self.statusItem
+        return AnyView(
+            MenuBarStripView(
+                appState: appState,
+                config: config,
+                onWidth: { [weak statusItem] width in
+                    statusItem?.length = max(width, 1)
+                }
+            )
+            .environment(\.locale, locale)
+        )
+    }
+
+    private func observeStripRefreshes(appState: AppState, config: MenuBarConfig) {
+        stripRefreshCancellables.removeAll()
+
+        appState.objectWillChange
+            .sink { [weak self] _ in
+                Task { @MainActor in
+                    self?.scheduleStripRefresh()
+                }
+            }
+            .store(in: &stripRefreshCancellables)
+
+        config.objectWillChange
+            .sink { [weak self] _ in
+                Task { @MainActor in
+                    self?.scheduleStripRefresh()
+                }
+            }
+            .store(in: &stripRefreshCancellables)
+    }
+
+    private func scheduleStripRefresh() {
+        guard !isStripRefreshScheduled else { return }
+        isStripRefreshScheduled = true
+
+        Task { @MainActor [weak self] in
+            await Task.yield()
+            guard let self else { return }
+            isStripRefreshScheduled = false
+            guard let appState, let config = menuBarConfig else { return }
+            stripController?.rootView = makeStripView(
+                appState: appState,
+                config: config,
+                locale: currentLocale
+            )
         }
     }
 }

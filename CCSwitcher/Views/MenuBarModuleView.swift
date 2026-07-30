@@ -6,6 +6,7 @@ import SwiftUI
 struct MenuBarModuleView: View {
     let module: MenuBarModule
     let appState: AppState
+    let config: MenuBarConfig
     let showFullEmail: Bool
     /// Tick value that recomputes reset countdowns once a minute.
     /// Passed in (and ignored by non-countdown modules) so the parent timer
@@ -55,16 +56,30 @@ struct MenuBarModuleView: View {
                 .fixedSize()
 
         case .sessionBar:
-            UtilizationBar(utilization: sessionUtilization, markerPercent: sessionTimeElapsed)
+            UtilizationBar(
+                utilization: sessionUtilization,
+                markerPercent: sessionTimeElapsed,
+                fillColor: config.limitBarColor(for: .session, utilization: sessionUtilization)
+            )
 
         case .weeklyBar:
-            UtilizationBar(utilization: weeklyUtilization, markerPercent: weeklyTimeElapsed)
+            UtilizationBar(
+                utilization: weeklyUtilization,
+                markerPercent: weeklyTimeElapsed,
+                fillColor: config.limitBarColor(for: .weekly, utilization: weeklyUtilization)
+            )
 
         case .sessionBarPlain:
-            UtilizationBar(utilization: sessionUtilization)
+            UtilizationBar(
+                utilization: sessionUtilization,
+                fillColor: config.limitBarColor(for: .session, utilization: sessionUtilization)
+            )
 
         case .weeklyBarPlain:
-            UtilizationBar(utilization: weeklyUtilization)
+            UtilizationBar(
+                utilization: weeklyUtilization,
+                fillColor: config.limitBarColor(for: .weekly, utilization: weeklyUtilization)
+            )
 
         case .dailyCost:
             Text(dailyCostText)
@@ -145,9 +160,7 @@ struct MenuBarModuleView: View {
 }
 
 /// Hollow rounded capsule with an inner filled pill whose width reflects
-/// `utilization` (a 0–100 percentage, normalized to 0–1). Fill is monochrome
-/// (adapts to the light/dark menu bar), turning red above 90% (and staying red
-/// on overage, clamped at 100%).
+/// `utilization` (a 0–100 percentage, normalized to 0–1).
 ///
 /// `markerPercent` (0–100, optional) draws a thin vertical "pace" tick at the
 /// fraction of the rate-limit window already elapsed. Compare the fill to the
@@ -157,6 +170,7 @@ private struct UtilizationBar: View {
     let utilization: Double?
     /// 0–100 time-elapsed percentage for the pace tick, or nil to hide it.
     var markerPercent: Double? = nil
+    let fillColor: Color
 
     private let trackWidth: CGFloat = 26
     private let trackHeight: CGFloat = 8
@@ -164,11 +178,6 @@ private struct UtilizationBar: View {
     private let innerInset: CGFloat = 1.5
 
     private var clamped: Double { min(max((utilization ?? 0) / 100.0, 0), 1) }
-
-    private var fillColor: Color {
-        guard let u = utilization, u > 90 else { return .primary }
-        return .red
-    }
 
     /// X offset (within the inset interior) of the pace tick, if shown.
     /// Suppressed when there's no usage data so a dashed "no data" bar can't

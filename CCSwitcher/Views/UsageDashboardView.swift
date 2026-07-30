@@ -23,6 +23,7 @@ private struct StatWithTooltip<Content: View>: View {
 /// Shows real usage limits from Claude API, one card per account.
 struct UsageDashboardView: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var menuBarConfig: MenuBarConfig
     @AppStorage("showFullEmail") private var showFullEmail = false
 
     var body: some View {
@@ -279,10 +280,20 @@ struct UsageDashboardView: View {
     @ViewBuilder
     private func usageBars(_ usage: UsageAPIResponse) -> some View {
         if let session = usage.fiveHour {
-            usageRow(label: "Session", resetText: session.resetTimeString, utilization: session.utilization ?? 0)
+            usageRow(
+                label: "Session",
+                resetText: session.resetTimeString,
+                utilization: session.utilization ?? 0,
+                kind: .session
+            )
         }
         if let weekly = usage.sevenDay {
-            usageRow(label: "Weekly", resetText: weekly.resetTimeString, utilization: weekly.utilization ?? 0)
+            usageRow(
+                label: "Weekly",
+                resetText: weekly.resetTimeString,
+                utilization: weekly.utilization ?? 0,
+                kind: .weekly
+            )
         }
     }
 
@@ -309,8 +320,10 @@ struct UsageDashboardView: View {
 
     // MARK: - Usage Row
 
-    private func usageRow(label: LocalizedStringKey, resetText: String?, utilization: Double) -> some View {
-        VStack(spacing: 5) {
+    private func usageRow(label: LocalizedStringKey, resetText: String?, utilization: Double, kind: LimitBarKind) -> some View {
+        let fillColor = menuBarConfig.limitBarColor(for: kind, utilization: utilization)
+
+        return VStack(spacing: 5) {
             HStack {
                 Text(label)
                     .font(.caption)
@@ -331,7 +344,7 @@ struct UsageDashboardView: View {
                             .frame(height: 7)
 
                         RoundedRectangle(cornerRadius: 3)
-                            .fill(colorForUtilization(utilization))
+                            .fill(fillColor)
                             .frame(width: max(0, geo.size.width * min(utilization / 100.0, 1.0)), height: 7)
                     }
                 }
@@ -339,15 +352,9 @@ struct UsageDashboardView: View {
 
                 Text("\(Int(utilization))%")
                     .font(.caption.weight(.medium).monospacedDigit())
-                    .foregroundStyle(colorForUtilization(utilization))
+                    .foregroundStyle(fillColor)
                     .frame(width: 34, alignment: .trailing)
             }
         }
-    }
-
-    private func colorForUtilization(_ pct: Double) -> Color {
-        if pct >= 90 { return .red }
-        if pct >= 60 { return .orange }
-        return .green
     }
 }

@@ -35,6 +35,7 @@ struct MenuBarModulesSettingsView: View {
                         MenuBarModuleView(
                             module: row.module,
                             appState: appState,
+                            config: config,
                             showFullEmail: showFullEmail,
                             tick: tick
                         )
@@ -79,12 +80,15 @@ struct MenuBarModulesSettingsView: View {
 
     private var previewBar: some View {
         HStack(spacing: 10) {
-            Image(systemName: "brain.head.profile")
-                .font(.system(size: 13))
+            if config.showsHeadIcon {
+                Image(systemName: "brain.head.profile")
+                    .font(.system(size: 13))
+            }
             ForEach(rows.filter(\.isEnabled)) { row in
                 MenuBarModuleView(
                     module: row.module,
                     appState: appState,
+                    config: config,
                     showFullEmail: showFullEmail,
                     tick: tick
                 )
