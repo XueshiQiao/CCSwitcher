@@ -201,6 +201,18 @@ final class AppState: ObservableObject {
 
     // MARK: - Account Management
 
+    /// Locate an account by (email, orgId). The same email can belong to
+    /// multiple Teams/organizations, so matching by email alone would let a
+    /// second organization silently take over the first one's entry.
+    /// Accounts saved by older versions have no orgId (nil): fall back to
+    /// email-only matching for those; callers backfill orgId after matching.
+    private func matchAccountIndex(email: String, orgId: String?) -> Int? {
+        if let exact = accounts.firstIndex(where: { $0.email == email && $0.orgId == orgId }) {
+            return exact
+        }
+        return accounts.firstIndex(where: { $0.email == email && $0.orgId == nil })
+    }
+
     func addAccount() async {
         log.info("[addAccount] Starting add current account flow...")
         guard claudeAvailable else {
@@ -223,9 +235,11 @@ final class AppState: ObservableObject {
             }
             log.info("[addAccount] Current auth: logged in, sub=\(status.subscriptionType ?? "nil")")
 
-            if accounts.contains(where: { $0.email == email }) {
+            if let existing = matchAccountIndex(email: email, orgId: status.orgId) {
+                accounts[existing].orgId = status.orgId // Backfill for accounts saved by older versions
+                saveAccounts()
                 errorMessage = String(localized: "Account already exists", bundle: L10n.bundle)
-                log.warning("[addAccount] Aborted: duplicate account")
+                log.warning("[addAccount] Aborted: duplicate account (same email + org)")
                 return
             }
 
@@ -234,6 +248,7 @@ final class AppState: ObservableObject {
                 displayName: status.orgName ?? email,
                 provider: .claudeCode,
                 orgName: status.orgName,
+                orgId: status.orgId,
                 subscriptionType: status.subscriptionType,
                 isActive: accounts.isEmpty
             )
@@ -321,12 +336,13 @@ final class AppState: ObservableObject {
             // using. The capture CAN also fail (e.g. the backup store refuses
             // writes while unreadable); claiming "credentials refreshed" then
             // would leave a stale backup behind an explicit success message.
-            if let existing = accounts.firstIndex(where: { $0.email == email }) {
-                log.info("[loginNewAccount] Step 4: Account already exists, refreshing backup and marking it active")
+            if let existing = matchAccountIndex(email: email, orgId: status.orgId) {
+                log.info("[loginNewAccount] Step 4: Account already exists (email + org), refreshing backup and marking it active")
                 let captured = claudeService.captureCurrentCredentials(forAccountId: accounts[existing].id.uuidString)
                 for i in accounts.indices {
                     accounts[i].isActive = (i == existing)
                 }
+                accounts[existing].orgId = status.orgId // Backfill for accounts saved by older versions
                 accounts[existing].lastUsed = Date()
                 activeAccount = accounts[existing]
                 // A login is a deliberate account choice; grant it the same
@@ -349,6 +365,7 @@ final class AppState: ObservableObject {
                 displayName: status.orgName ?? email,
                 provider: .claudeCode,
                 orgName: status.orgName,
+                orgId: status.orgId,
                 subscriptionType: status.subscriptionType,
                 isActive: true
             )
@@ -679,6 +696,16 @@ final class AppState: ObservableObject {
                 return
             }
 
+            // The same email can belong to multiple organizations: make sure the
+            // login landed on THIS entry's organization, so another Team's
+            // credentials don't get stored under it.
+            if let expectedOrg = account.orgId, let gotOrg = status.orgId, expectedOrg != gotOrg {
+                errorMessage = String(localized: "Logged in to organization \(status.orgName ?? gotOrg), but expected \(account.orgName ?? expectedOrg). Credentials not updated.", bundle: L10n.bundle)
+                log.error("[reauth] Org mismatch: got \(gotOrg), expected \(expectedOrg)")
+                isLoggingIn = false
+                return
+            }
+
             // 4. Capture the fresh token
             let captured = claudeService.captureCurrentCredentials(forAccountId: account.id.uuidString)
             log.info("[reauth] Token capture result: \(captured)")
@@ -690,6 +717,7 @@ final class AppState: ObservableObject {
             // fail while the UI claimed everything was refreshed.
             if let index = accounts.firstIndex(where: { $0.id == account.id }) {
                 accounts[index].orgName = status.orgName
+                accounts[index].orgId = status.orgId // Backfill for accounts saved by older versions
                 accounts[index].subscriptionType = status.subscriptionType
 
                 // Mark this account as active (it's what the CLI is now using)
@@ -1065,11 +1093,12 @@ final class AppState: ObservableObject {
     private func updateActiveAccount(from status: AuthStatus) {
         guard status.loggedIn, let email = status.email else { return }
 
-        if let index = accounts.firstIndex(where: { $0.email == email }) {
+        if let index = matchAccountIndex(email: email, orgId: status.orgId) {
             for i in accounts.indices {
                 accounts[i].isActive = (i == index)
             }
             accounts[index].orgName = status.orgName
+            accounts[index].orgId = status.orgId // Backfill for accounts saved by older versions
             accounts[index].subscriptionType = status.subscriptionType
             activeAccount = accounts[index]
             saveAccounts()
@@ -1080,6 +1109,7 @@ final class AppState: ObservableObject {
                 displayName: status.orgName ?? email,
                 provider: .claudeCode,
                 orgName: status.orgName,
+                orgId: status.orgId,
                 subscriptionType: status.subscriptionType,
                 isActive: true
             )

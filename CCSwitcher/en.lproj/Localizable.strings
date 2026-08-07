@@ -131,6 +131,7 @@
 "Could not capture credentials" = "Could not capture credentials";
 "No stored credentials for %@. Use re-authenticate to fix." = "No stored credentials for %@. Use re-authenticate to fix.";
 "Logged in as %@, but expected %@. Credentials not updated." = "Logged in as %1$@, but expected %2$@. Credentials not updated.";
+"Logged in to organization %@, but expected %@. Credentials not updated." = "Logged in to organization %1$@, but expected %2$@. Credentials not updated.";
 "Claude CLI is authenticating via %@ instead of a stored claude.ai login, so it reports no account. Unset ANTHROPIC_AUTH_TOKEN / CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_PROFILE and remove any apiKeyHelper, then try again." = "Claude CLI is authenticating via %@ instead of a stored claude.ai login, so it reports no account. Unset ANTHROPIC_AUTH_TOKEN / CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_PROFILE and remove any apiKeyHelper, then try again.";
 "Switched to %@, but the Claude CLI is authenticating via %@ instead of the stored login, so it will not use this account." = "Switched to %1$@, but the Claude CLI is authenticating via %2$@ instead of the stored login, so it will not use this account.";
 "Token expired. Switch to refresh." = "Token expired. Switch to refresh.";
