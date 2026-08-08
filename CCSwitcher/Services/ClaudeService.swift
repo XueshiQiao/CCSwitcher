@@ -388,26 +388,31 @@ final class ClaudeService: @unchecked Sendable {
         let shadowedBy: String?
     }
 
-    /// `targetBackup` is resolved by the caller (which can distinguish a
-    /// missing backup from a briefly unreadable store) and handed down so no
-    /// second, ambiguity-collapsing lookup happens here.
+    /// `targetBackup` and `liveCredentialIsSource` are resolved by the caller
+    /// (which can distinguish a missing backup from a briefly unreadable store,
+    /// and holds the credential anchor) and handed down so no second,
+    /// ambiguity-collapsing lookup happens here.
     @discardableResult
-    func switchAccount(from currentAccount: Account, to targetAccount: Account, targetBackup: AccountBackup) async throws -> SwitchOutcome {
+    func switchAccount(from currentAccount: Account, to targetAccount: Account, targetBackup: AccountBackup, liveCredentialIsSource: Bool) async throws -> SwitchOutcome {
         let keychain = KeychainService.shared
 
         log.info("[switchAccount] Switching from \(currentAccount.id) to \(targetAccount.id)")
 
         // 1. Back up current account (token + oauthAccount)
+        //
+        // Gated on the anchor, not on the `oauthAccount` email: that email is
+        // exactly what goes wrong when a Claude Code session rewrites the
+        // identity block, and checking the source against it made the guard
+        // agree with the corruption instead of catching it — backing the
+        // previous account's token up as this one's, which no later switch
+        // undoes.
         log.info("[switchAccount] Step 1: Backing up current account...")
-        if let currentToken = keychain.readClaudeToken(),
-           let currentOAuth = keychain.readOAuthAccount() {
-            let email = (currentOAuth["emailAddress"]?.value as? String) ?? "?"
-            if email == currentAccount.email {
-                let saved = keychain.saveAccountBackup(token: currentToken, oauthAccount: currentOAuth, forAccountId: currentAccount.id.uuidString)
-                log.info("[switchAccount] Step 1: Backup saved: \(saved)")
-            } else {
-                log.warning("[switchAccount] Step 1: oauthAccount email (\(email)) != source (\(currentAccount.email)), skipping backup")
-            }
+        if !liveCredentialIsSource {
+            log.warning("[switchAccount] Step 1: Live credential is not confirmed to be \(currentAccount.email)'s; skipping backup rather than storing it under the wrong account")
+        } else if let currentToken = keychain.readClaudeToken(),
+                  let currentOAuth = keychain.readOAuthAccount() {
+            let saved = keychain.saveAccountBackup(token: currentToken, oauthAccount: currentOAuth, forAccountId: currentAccount.id.uuidString)
+            log.info("[switchAccount] Step 1: Backup saved: \(saved)")
         } else {
             log.warning("[switchAccount] Step 1: Could not read current token or oauthAccount")
         }
