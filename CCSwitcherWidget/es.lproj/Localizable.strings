@@ -1,0 +1,21 @@
+/* Widget Configuration */
+"Monitor your Claude Code account usage, costs, and activity." = "Supervisa el uso, los costos y la actividad de tus cuentas de Claude Code.";
+"CCSwitcher Rings" = "Anillos de CCSwitcher";
+"Session and weekly usage shown as circular progress rings." = "Uso de sesión y semanal mostrados como anillos de progreso.";
+
+/* Widget Views */
+"Open CCSwitcher" = "Abrir CCSwitcher";
+"to load data" = "para cargar los datos";
+"today" = "hoy";
+"No accounts" = "Sin cuentas";
+"Error" = "Error";
+"Session" = "Sesión";
+"Weekly" = "Semanal";
+"Extra usage" = "Uso adicional";
+"On" = "Activo";
+"Off" = "Inactivo";
+"ACTIVE" = "ACTIVA";
+"Turns" = "Mensajes";
+"Active" = "Activo";
+"Lines" = "Líneas";
+"Cost" = "Costo";
