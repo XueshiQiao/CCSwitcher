@@ -1,0 +1,184 @@
+/* Navigation - Tab Bar */
+"Usage" = "Uso";
+"Costs" = "Costos";
+"Accounts" = "Cuentas";
+
+/* Main Menu */
+"Double Usage Active" = "Uso doble activo";
+"No account connected" = "Ninguna cuenta conectada";
+"Refresh" = "Actualizar";
+"Settings" = "Ajustes";
+"Quit" = "Salir";
+
+/* Settings - General */
+"General" = "General";
+"About" = "Acerca de";
+"Appearance" = "Apariencia";
+"System" = "Sistema";
+"Auto-refresh interval" = "Intervalo de actualización automática";
+"15 seconds" = "15 segundos";
+"30 seconds" = "30 segundos";
+"1 minute" = "1 minuto";
+"5 minutes" = "5 minutos";
+"10 minutes" = "10 minutos";
+"Show account name in menu bar" = "Mostrar el nombre de la cuenta en la barra de menús";
+"Show head icon in menu bar" = "Mostrar el icono de perfil en la barra de menús";
+"Show full email address" = "Mostrar el correo completo";
+"Launch at login" = "Abrir al iniciar sesión";
+
+/* Language */
+"Language" = "Idioma";
+"Automatic" = "Automático";
+
+/* Settings - About */
+"Claude Code Account Switcher" = "Cambiador de cuentas de Claude Code";
+"Version %@" = "Versión %@";
+"Checking..." = "Comprobando...";
+"Check for Updates" = "Buscar actualizaciones";
+"Easily switch between Claude Code accounts and monitor usage." = "Cambia fácilmente entre cuentas de Claude Code y supervisa el uso.";
+
+/* Usage Dashboard */
+"Loading usage data..." = "Cargando datos de uso...";
+"Usage data unavailable" = "Datos de uso no disponibles";
+"Today's API-Equivalent Cost" = "Costo equivalente en API de hoy";
+"Today's Activity" = "Actividad de hoy";
+"Turns" = "Mensajes";
+"Active" = "Activo";
+"Lines" = "Líneas";
+"Messages you sent to Claude Code today" = "Mensajes que enviaste a Claude Code hoy";
+"Estimated total time Claude worked for you today. Parallel sessions stack. Idle gaps >10 min excluded. This is an approximation based on message timestamps, not exact." = "Tiempo total estimado que Claude trabajó para ti hoy. Las sesiones paralelas se suman. Se excluyen pausas de más de 10 min. Es una aproximación basada en las marcas de tiempo de los mensajes, no exacta.";
+"Estimated lines of code written by Claude via Edit/Write tools" = "Líneas de código estimadas escritas por Claude con las herramientas Edit/Write";
+"Claude Opus 4 — most capable model, best for complex tasks" = "Claude Opus 4 — el modelo más capaz, ideal para tareas complejas";
+"Claude Sonnet 4 — balanced speed and capability" = "Claude Sonnet 4 — equilibrio entre velocidad y capacidad";
+"Claude Haiku 4 — fastest model, best for simple tasks" = "Claude Haiku 4 — el modelo más rápido, ideal para tareas sencillas";
+"Estimated API-equivalent cost of your Claude Code usage, for reference only." = "Costo equivalente en API de tu uso de Claude Code, solo como referencia.";
+"Token expired. Switch to this account in Claude Code to refresh." = "Token caducado. Cambia a esta cuenta en Claude Code para renovarlo.";
+"Session" = "Sesión";
+"Weekly" = "Semanal";
+"Extra usage" = "Uso adicional";
+"On" = "Activo";
+"Off" = "Inactivo";
+"Resets in %@" = "Se reinicia en %@";
+
+/* Cost Detail */
+"Today" = "Hoy";
+"Last 7 Days" = "Últimos 7 días";
+"Last 30 Days" = "Últimos 30 días";
+"Daily History" = "Historial diario";
+"Total: %@" = "Total: %@";
+"No cost data available" = "No hay datos de costo disponibles";
+"How We Calculate" = "Cómo calculamos";
+"Cost is computed from Claude Code session logs (~/.claude/projects/), deduplicated by request ID." = "El costo se calcula a partir de los registros de sesión de Claude Code (~/.claude/projects/), deduplicados por ID de solicitud.";
+"Cache write = 5-min tier (1.25× base input). Cache read = 0.1× base input." = "Escritura de caché = nivel de 5 min (1.25× el input base). Lectura de caché = 0.1× el input base.";
+"Official Pricing — platform.claude.com" = "Precios oficiales — platform.claude.com";
+"Model" = "Modelo";
+"Input" = "Entrada";
+"Output" = "Salida";
+"Cache W" = "Caché W";
+"Cache R" = "Caché R";
+"%lld sessions" = "%lld sesiones";
+"%@ tokens" = "%@ tokens";
+
+/* Account Switcher */
+"No Accounts" = "Sin cuentas";
+"Add your current Claude Code account to get started." = "Añade tu cuenta actual de Claude Code para comenzar.";
+"Custom label" = "Etiqueta personalizada";
+"Edit label" = "Editar etiqueta";
+"Switch" = "Cambiar";
+"Login New Account" = "Iniciar sesión con cuenta nueva";
+"Add Current Account" = "Añadir cuenta actual";
+"Waiting for browser login..." = "Esperando el inicio de sesión en el navegador...";
+"Complete the login in your browser, then return here." = "Completa el inicio de sesión en tu navegador y vuelve aquí.";
+"This will capture the currently logged-in Claude Code account." = "Esto capturará la cuenta de Claude Code con la sesión iniciada.";
+"Cancel" = "Cancelar";
+"Add Account" = "Añadir cuenta";
+"Re-authenticate (fix stale token)" = "Reautenticar (corregir token caducado)";
+"Remove account" = "Eliminar cuenta";
+
+/* Usage Chart */
+"No Data" = "Sin datos";
+"Usage data will appear here" = "Los datos de uso aparecerán aquí";
+
+/* Update Checker */
+"A new version of CCSwitcher is available!" = "¡Hay una nueva versión de CCSwitcher disponible!";
+"Version %@ is available. You are currently running version %@.\n\nWould you like to download it now?" = "La versión %@ está disponible. Actualmente tienes la versión %@.\n\n¿Quieres descargarla ahora?";
+"Download & Install" = "Descargar e instalar";
+"View Release" = "Ver versión";
+"Later" = "Después";
+"Update Check Failed" = "Error al buscar actualizaciones";
+"Could not connect to GitHub. Please try again later." = "No se pudo conectar con GitHub. Inténtalo de nuevo más tarde.";
+"Rate Limit Exceeded" = "Límite de solicitudes superado";
+"GitHub API rate limit exceeded. Please try again later." = "Se superó el límite de solicitudes de la API de GitHub. Inténtalo de nuevo más tarde.";
+"Up to date" = "Actualizado";
+"No releases found on GitHub." = "No se encontraron versiones en GitHub.";
+"GitHub API returned status code %lld." = "La API de GitHub devolvió el código de estado %lld.";
+"You are running the latest version of CCSwitcher (%@)." = "Tienes la versión más reciente de CCSwitcher (%@).";
+"Downloading CCSwitcher.dmg..." = "Descargando CCSwitcher.dmg...";
+"Downloading Update" = "Descargando actualización";
+"Download Complete" = "Descarga completada";
+"The update has been downloaded and opened. Please drag the new CCSwitcher to your Applications folder to replace the old one.\n\nDo you want to quit the current app now?" = "La actualización se descargó y abrió. Arrastra el nuevo CCSwitcher a tu carpeta de Aplicaciones para reemplazar el anterior.\n\n¿Quieres salir de la app ahora?";
+"Quit CCSwitcher" = "Salir de CCSwitcher";
+"Download Failed" = "Error en la descarga";
+"OK" = "Aceptar";
+
+/* AppState Errors */
+"Claude CLI not found" = "No se encontró Claude CLI";
+"Not logged in to Claude. Run 'claude auth login' first." = "No has iniciado sesión en Claude. Ejecuta 'claude auth login' primero.";
+"Account already exists" = "La cuenta ya existe";
+"Could not capture auth token from keychain" = "No se pudo capturar el token de autenticación del llavero";
+"Login did not complete" = "El inicio de sesión no se completó";
+"Account already exists - credentials refreshed" = "La cuenta ya existe: credenciales renovadas";
+"Could not capture credentials" = "No se pudieron capturar las credenciales";
+"No stored credentials for %@. Use re-authenticate to fix." = "No hay credenciales guardadas para %@. Usa reautenticar para corregirlo.";
+"Logged in as %@, but expected %@. Credentials not updated." = "Sesión iniciada como %1$@, pero se esperaba %2$@. Las credenciales no se actualizaron.";
+"Claude CLI is authenticating via %@ instead of a stored claude.ai login, so it reports no account. Unset ANTHROPIC_AUTH_TOKEN / CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_PROFILE and remove any apiKeyHelper, then try again." = "Claude CLI se está autenticando mediante %@ en lugar de un inicio de sesión guardado de claude.ai, por lo que no reporta ninguna cuenta. Quita las variables ANTHROPIC_AUTH_TOKEN / CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_PROFILE y elimina cualquier apiKeyHelper, y vuelve a intentarlo.";
+"Switched to %@, but the Claude CLI is authenticating via %@ instead of the stored login, so it will not use this account." = "Se cambió a %1$@, pero Claude CLI se está autenticando mediante %2$@ en lugar del inicio de sesión guardado, por lo que no usará esta cuenta.";
+"Token expired. Switch to refresh." = "Token caducado. Cambia para renovarlo.";
+"Token expired. Switch to this account to refresh." = "Token caducado. Cambia a esta cuenta para renovarlo.";
+"API Rate Limited. Try again later." = "Límite de la API superado. Inténtalo más tarde.";
+"Could not fetch usage: %@" = "No se pudo obtener el uso: %@";
+
+/* Promo */
+"%@ - %@ (Weekdays) & Weekends" = "%@ - %@ (entre semana) y fines de semana";
+"Double limits: 2 PM - 8 AM ET & Weekends" = "Límites dobles: 2 PM - 8 AM ET y fines de semana";
+
+/* About */
+"More apps at xueshi.dev" = "Más apps en xueshi.dev";
+"© 2026 Xueshi Qiao" = "© 2026 Xueshi Qiao";
+
+/* Menu Bar */
+"Menu bar" = "Barra de menús";
+"Menu bar modules" = "Módulos de la barra de menús";
+"Drag to reorder, toggle to enable. Disabled modules sit at the bottom." = "Arrastra para reordenar, activa o desactiva. Los módulos desactivados quedan al final.";
+"Preview" = "Vista previa";
+"Customize limit bar colors" = "Personalizar los colores de las barras de límite";
+"Warns when this much quota or less is left. At 30%, bars turn at 70% used." = "Advierte cuando queda esta cantidad de cuota o menos. Al 30%, las barras se marcan al 70% de uso.";
+"Limit bars" = "Barras de límite";
+"Session bar color" = "Color de la barra de sesión";
+"Weekly bar color" = "Color de la barra semanal";
+"Low remaining color" = "Color de cuota baja";
+"Low remaining threshold" = "Umbral de cuota baja";
+"Account name" = "Nombre de la cuenta";
+"Session usage (5h)" = "Uso de sesión (5 h)";
+"Weekly usage (7d)" = "Uso semanal (7 d)";
+"Daily cost" = "Costo diario";
+"Session reset countdown" = "Cuenta regresiva de sesión";
+"Weekly reset countdown" = "Cuenta regresiva semanal";
+"Menu Bar" = "Barra de menús";
+"Account display" = "Visualización de cuenta";
+"Session — usage vs time (5h)" = "Sesión: uso vs. tiempo (5 h)";
+"Weekly — usage vs time (7d)" = "Semanal: uso vs. tiempo (7 d)";
+"The vertical line marks time elapsed in the window; fill past it means you're using faster than the clock." = "La línea vertical marca el tiempo transcurrido en la ventana; si el relleno la supera, estás usando más rápido que el reloj.";
+"Claude Fable 5 — most powerful model, the new flagship tier" = "Claude Fable 5 — el modelo más potente, el nuevo nivel insignia";
+
+/* Auto-switch & rate-limit resilience */
+"Waiting for usage data..." = "Esperando datos de uso...";
+"No active subscription on this account (OAuth not allowed)." = "Esta cuenta no tiene una suscripción activa (OAuth no permitido).";
+"Session expired. Re-authenticate (↻) to fix." = "Sesión caducada. Reautentica (↻) para corregirlo.";
+"Auto-switch" = "Cambio automático";
+"Switch account before hitting the limit" = "Cambiar de cuenta antes de llegar al límite";
+"Switch at" = "Cambiar al";
+"When the active account's 5-hour or weekly usage reaches this level, CCSwitcher switches to the account with the most quota left. Checked on every refresh; a 5-minute cooldown prevents rapid flip-flopping." = "Cuando el uso de 5 horas o semanal de la cuenta activa alcanza este nivel, CCSwitcher cambia a la cuenta con más cuota disponible. Se comprueba en cada actualización; un enfriamiento de 5 minutos evita cambios bruscos.";
+"Updated %@ ago" = "Actualizado hace %@";
+"Could not save the refreshed sign-in; will retry automatically." = "No se pudo guardar el inicio de sesión renovado; se reintentará automáticamente.";
+"Credential storage is temporarily unavailable. Try again shortly." = "El almacenamiento de credenciales no está disponible temporalmente. Inténtalo de nuevo en unos momentos.";

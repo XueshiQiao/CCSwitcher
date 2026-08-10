@@ -12,6 +12,7 @@ options:
     - ja
     - de
     - fr
+    - es
 
 packages:
   Sparkle:

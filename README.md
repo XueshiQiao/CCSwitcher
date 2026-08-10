@@ -4,6 +4,7 @@
   <a href="README.ja.md"><img src="https://img.shields.io/badge/日本語-gray" alt="日本語"></a>
   <a href="README.de.md"><img src="https://img.shields.io/badge/Deutsch-gray" alt="Deutsch"></a>
   <a href="README.fr.md"><img src="https://img.shields.io/badge/Français-gray" alt="Français"></a>
+  <a href="README.es.md"><img src="https://img.shields.io/badge/Español-gray" alt="Español"></a>
 </p>
 
 <p align="center">
@@ -28,7 +29,7 @@ CCSwitcher is a lightweight, pure menu bar macOS application designed to help de
 - **Desktop Widgets**: Native macOS desktop widgets in small, medium, and large sizes showing account usage, costs, and activity stats. Includes a circular ring variant for at-a-glance usage monitoring.
 - **In-App Auto-Update**: Powered by [Sparkle 2.x](https://sparkle-project.org/). New versions install silently and atomically — no DMG dragging, no Finder dialogs.
 - **Dark Mode**: Full light and dark mode support with adaptive colors that follow your system appearance.
-- **Internationalization**: Available in English, 简体中文 (Chinese), 日本語 (Japanese), Deutsch (German), and Français (French).
+- **Internationalization**: Available in English, 简体中文 (Chinese), 日本語 (Japanese), Deutsch (German), Français (French), and Español (Spanish).
 - **Privacy-Focused UI**: Automatically obfuscates email addresses and account names in screenshots or screen recordings to protect your identity.
 - **Zero-Interaction Token Refresh**: Intelligently handles Claude's OAuth token expiration by delegating the refresh process to the official CLI in the background.
 - **Seamless Login Flow**: Add new accounts without ever opening a terminal. The app silently invokes the CLI and handles the browser OAuth loop for you.
