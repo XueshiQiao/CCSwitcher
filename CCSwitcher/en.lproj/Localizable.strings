@@ -182,3 +182,11 @@
 "Updated %@ ago" = "Updated %@ ago";
 "Could not save the refreshed sign-in; will retry automatically." = "Could not save the refreshed sign-in; will retry automatically.";
 "Credential storage is temporarily unavailable. Try again shortly." = "Credential storage is temporarily unavailable. Try again shortly.";
+
+/* Weekly Consumption Total */
+"Weekly Consumption — All Accounts" = "Weekly Consumption — All Accounts";
+"Total" = "Total";
+"Average" = "Average";
+"Sum of every account's 7-day utilization. Each account has its own weekly quota, so the total can exceed 100%." = "Sum of every account's 7-day utilization. Each account has its own weekly quota, so the total can exceed 100%.";
+"Average 7-day utilization across the accounts that reported data." = "Average 7-day utilization across the accounts that reported data.";
+"%lld/%lld accounts" = "%lld/%lld accounts";

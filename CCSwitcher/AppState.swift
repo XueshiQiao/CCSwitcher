@@ -38,6 +38,47 @@ final class AppState: ObservableObject {
     
     @Published var accountUsageErrors: [UUID: UsageErrorState] = [:]
 
+    // MARK: - Weekly Consumption Summary (all accounts)
+
+    /// Aggregates the 7-day utilization reported by every account into a single
+    /// weekly-consumption snapshot: the sum of all accounts' weekly usage
+    /// percentages, the average utilization, and how many accounts reported data.
+    struct WeeklyConsumptionSummary {
+        /// Sum of every account's `seven_day.utilization` (%). Can exceed 100
+        /// when several accounts have consumed part of their own weekly quota.
+        let totalUtilization: Double
+        /// Simple average of the accounts that reported weekly data.
+        let averageUtilization: Double
+        /// Number of accounts with a usable seven-day sample right now.
+        let sampledAccountCount: Int
+        /// Total number of configured accounts.
+        let accountCount: Int
+        /// True when at least one account has reported weekly data.
+        var hasData: Bool { sampledAccountCount > 0 }
+
+        static let empty = WeeklyConsumptionSummary(
+            totalUtilization: 0, averageUtilization: 0,
+            sampledAccountCount: 0, accountCount: 0
+        )
+    }
+
+    /// Computed from the latest per-account usage samples (`accountUsage`).
+    /// The seven-day window is the natural "weekly consumption" metric each
+    /// account already exposes; summing it answers "how much have all my
+    /// accounts consumed this week?" at a glance.
+    var weeklyConsumptionSummary: WeeklyConsumptionSummary {
+        let samples = accountUsage.values.compactMap { $0.sevenDay?.utilization }
+        guard !samples.isEmpty else {
+            return .empty
+        }
+        let total = samples.reduce(0, +)
+        return WeeklyConsumptionSummary(
+            totalUtilization: total,
+            averageUtilization: total / Double(samples.count),
+            sampledAccountCount: samples.count,
+            accountCount: accounts.count
+        )
+    }
     // MARK: - Services
 
     private let claudeService = ClaudeService.shared
