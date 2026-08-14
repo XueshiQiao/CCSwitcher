@@ -34,6 +34,11 @@ struct Account: Identifiable, Codable, Hashable {
     var displayName: String
     var provider: AIProviderType
     var orgName: String?
+    /// Organization ID. One email can belong to multiple Teams/organizations,
+    /// so account identity must be the (email, orgId) composite key.
+    /// Accounts saved by older versions decode this as nil; matching falls
+    /// back to email-only for those and backfills the value afterwards.
+    var orgId: String?
     var subscriptionType: String?
     var isActive: Bool
     var lastUsed: Date?
@@ -87,6 +92,7 @@ struct Account: Identifiable, Codable, Hashable {
         displayName: String,
         provider: AIProviderType = .claudeCode,
         orgName: String? = nil,
+        orgId: String? = nil,
         subscriptionType: String? = nil,
         isActive: Bool = false,
         lastUsed: Date? = nil,
@@ -97,6 +103,7 @@ struct Account: Identifiable, Codable, Hashable {
         self.displayName = displayName
         self.provider = provider
         self.orgName = orgName
+        self.orgId = orgId
         self.subscriptionType = subscriptionType
         self.isActive = isActive
         self.lastUsed = lastUsed

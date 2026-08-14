@@ -57,7 +57,7 @@ struct UsageDashboardView: View {
                     // Today's activity stats
                     todayActivityCard
 
-                    ForEach(appState.accounts) { account in
+                    ForEach(accountsActiveFirst) { account in
                         accountUsageCard(account: account, usage: appState.accountUsage[account.id])
                     }
                 }
@@ -199,6 +199,22 @@ struct UsageDashboardView: View {
 
     // MARK: - Per-Account Card
 
+    /// Active account first: the card you're actually spending from should be
+    /// the top one, not something you have to hunt for. Sorting is made stable
+    /// by falling back to the stored order, so the list never reshuffles on a
+    /// refresh. Only the Usage tab reorders — the Accounts tab keeps the stored
+    /// order so managing accounts doesn't move rows under the cursor.
+    private var accountsActiveFirst: [Account] {
+        appState.accounts.enumerated()
+            .sorted { lhs, rhs in
+                if lhs.element.isActive != rhs.element.isActive {
+                    return lhs.element.isActive
+                }
+                return lhs.offset < rhs.offset
+            }
+            .map(\.element)
+    }
+
     private func accountUsageCard(account: Account, usage: UsageAPIResponse?) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             accountHeader(account)
@@ -232,7 +248,10 @@ struct UsageDashboardView: View {
                 .padding(.top, 4)
             }
         }
-        .cardStyle(fill: account.isActive ? .cardFill : .cardFill)
+        // The active card is marked by position (first), the "Active" badge and
+        // a slightly heavier fill — deliberately no accent border, which read as
+        // an out-of-place box against the flat cards around it.
+        .cardStyle(fill: account.isActive ? .cardFillStrong : .cardFill)
         .sectionPadding()
     }
 
@@ -256,17 +275,37 @@ struct UsageDashboardView: View {
 
     @ViewBuilder
     private func accountHeader(_ account: Account) -> some View {
+        // One email can belong to several organizations/Teams, so the email
+        // alone makes those cards indistinguishable. Lead with the org name
+        // (or custom label) and keep the email as a subtitle, matching the
+        // popover header and the Accounts tab. The subtitle is dropped when the
+        // name already IS the email (no org, no label) so single-org cards keep
+        // their original one-line height instead of repeating themselves.
+        let name = account.effectiveDisplayName(obfuscated: !showFullEmail)
+        let email = account.displayEmail(obfuscated: !showFullEmail)
+
         HStack(spacing: 8) {
             Image(systemName: account.provider.iconName)
                 .font(.subheadline)
                 .foregroundStyle(account.isActive ? .brand : .secondary)
 
-            Text(account.displayEmail(obfuscated: !showFullEmail))
-                .font(.subheadline.weight(.medium))
-                .lineLimit(1)
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 6) {
+                    Text(name)
+                        .font(.subheadline.weight(account.isActive ? .semibold : .medium))
+                        .lineLimit(1)
 
-            if account.isActive {
-                Badge(text: String(localized: "Active", bundle: L10n.bundle), color: .green)
+                    if account.isActive {
+                        Badge(text: String(localized: "Active", bundle: L10n.bundle), color: .green)
+                    }
+                }
+
+                if name != email {
+                    Text(email)
+                        .font(.caption2)
+                        .foregroundStyle(.textSecondary)
+                        .lineLimit(1)
+                }
             }
 
             Spacer()
