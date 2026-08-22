@@ -1,0 +1,102 @@
+#!/bin/zsh
+
+set -u
+
+readonly preferences_domain="me.xueshi.ccswitcher"
+accounts_file=""
+
+cleanup() {
+  if [[ -n "$accounts_file" && -f "$accounts_file" ]]; then
+    /bin/unlink "$accounts_file"
+  fi
+}
+trap cleanup EXIT INT TERM
+
+usage() {
+  print -u2 "Usage: ccswitch <email>"
+  print -u2 "       ccswitch current"
+  print -u2 "       ccswitch list"
+}
+
+current_email() {
+  claude auth status --json 2>/dev/null \
+    | plutil -extract email raw -o - - 2>/dev/null
+}
+
+identity_file_email() {
+  plutil -extract oauthAccount.emailAddress raw -o - "$HOME/.claude.json" 2>/dev/null
+}
+
+load_accounts() {
+  [[ -n "$accounts_file" ]] && return 0
+
+  accounts_file=$(mktemp "${TMPDIR:-/tmp}/ccswitch-accounts.XXXXXX") || return 1
+  /usr/bin/defaults export "$preferences_domain" - 2>/dev/null \
+    | xmllint --xpath "string(//key[text()='com.ccswitcher.accounts']/following-sibling::data[1])" - 2>/dev/null \
+    | tr -d '[:space:]' \
+    | base64 -D \
+    | plutil -convert xml1 -o "$accounts_file" - 2>/dev/null
+}
+
+list_accounts() {
+  load_accounts || return 1
+
+  local index=0 email active marker
+  while email=$(plutil -extract "$index.email" raw -o - "$accounts_file" 2>/dev/null); do
+    active=$(plutil -extract "$index.isActive" raw -o - "$accounts_file" 2>/dev/null)
+    [[ "$active" == "true" ]] && marker="*" || marker=" "
+    print -r -- "$marker $email"
+    (( index += 1 ))
+  done
+}
+
+account_exists() {
+  list_accounts | sed 's/^[* ]*//' | grep -Fqx "$1"
+}
+
+case "${1:-}" in
+  current)
+    current_email
+    exit $?
+    ;;
+  list)
+    list_accounts
+    exit $?
+    ;;
+  ""|-h|--help)
+    usage
+    exit 2
+    ;;
+esac
+
+target="$1"
+if ! account_exists "$target"; then
+  print -u2 "Account is not saved in CCSwitcher: $target"
+  exit 3
+fi
+
+if [[ "$(current_email)" == "$target" && "$(identity_file_email)" == "$target" ]]; then
+  print "Already active and verified: $target"
+  exit 0
+fi
+
+encoded="${target//\%/%25}"
+encoded="${encoded//+/%2B}"
+encoded="${encoded//@/%40}"
+if ! open -g "ccswitcher://switch?email=${encoded}"; then
+  print -u2 "Could not open CCSwitcher. Confirm the app is installed."
+  exit 4
+fi
+
+for attempt in {1..45}; do
+  if [[ "$(current_email)" == "$target" && "$(identity_file_email)" == "$target" ]]; then
+    print "Switched and verified: $target"
+    exit 0
+  fi
+  sleep 1
+done
+
+print -u2 "Switch was not verified within 45 seconds."
+print -u2 "claude auth: $(current_email)"
+print -u2 "~/.claude.json: $(identity_file_email)"
+exit 5
