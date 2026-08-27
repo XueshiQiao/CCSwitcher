@@ -1010,6 +1010,7 @@ final class AppState: ObservableObject {
         let widgetAccounts = accounts.map { account in
             let usage = accountUsage[account.id]
             let error = accountUsageErrors[account.id]
+            let modelWeekly = usage?.modelScopedWeekly
             return WidgetAccountData(
                 email: account.displayEmail(obfuscated: !UserDefaults.standard.bool(forKey: "showFullEmail")),
                 displayName: account.effectiveDisplayName(obfuscated: !UserDefaults.standard.bool(forKey: "showFullEmail")),
@@ -1019,6 +1020,9 @@ final class AppState: ObservableObject {
                 sessionResetTime: usage?.fiveHour?.resetTimeString,
                 weeklyUtilization: usage?.sevenDay?.utilization,
                 weeklyResetTime: usage?.sevenDay?.resetTimeString,
+                modelWeeklyLabel: modelWeekly?.modelName,
+                modelWeeklyUtilization: modelWeekly?.window.utilization,
+                modelWeeklyResetTime: modelWeekly?.window.resetTimeString,
                 extraUsageEnabled: usage?.extraUsage?.isEnabled,
                 hasError: error != nil,
                 errorMessage: error?.message

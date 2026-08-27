@@ -11,6 +11,7 @@ struct UsageAPIResponse: Codable {
     let sevenDayCowork: UsageWindow?
     let iguanaNecktie: UsageWindow?
     let extraUsage: ExtraUsage?
+    let limits: [RateLimitEntry]?
 
     enum CodingKeys: String, CodingKey {
         case fiveHour = "five_hour"
@@ -21,7 +22,79 @@ struct UsageAPIResponse: Codable {
         case sevenDayCowork = "seven_day_cowork"
         case iguanaNecktie = "iguana_necktie"
         case extraUsage = "extra_usage"
+        case limits
     }
+
+    /// The weekly limit that only applies to one model — "Fable only", and
+    /// whatever replaces it later.
+    ///
+    /// Read out of the self-describing `limits` array, not the fixed
+    /// `seven_day_opus` / `seven_day_sonnet` keys: those now come back `null`
+    /// even on accounts that *do* have a live model-scoped weekly limit, so
+    /// they only survive here as a fallback for older server responses.
+    var modelScopedWeekly: ModelScopedWeekly? {
+        let scoped = (limits ?? []).filter {
+            $0.kind == "weekly_scoped" && !($0.scope?.model?.displayName ?? "").isEmpty
+        }
+        // The server may return more than one scoped window. Surface the one
+        // closest to its cap — that's the one that bites first.
+        if let entry = scoped.max(by: { ($0.percent ?? 0) < ($1.percent ?? 0) }),
+           let name = entry.scope?.model?.displayName {
+            return ModelScopedWeekly(
+                modelName: name,
+                window: UsageWindow(utilization: entry.percent, resetsAt: entry.resetsAt)
+            )
+        }
+        if let opus = sevenDayOpus, opus.utilization != nil {
+            return ModelScopedWeekly(modelName: "Opus", window: opus)
+        }
+        return nil
+    }
+}
+
+/// One entry of the server's `limits` array — the self-describing rate-limit
+/// list that superseded the fixed `seven_day_*` keys.
+struct RateLimitEntry: Codable {
+    /// `"session"`, `"weekly_all"` or `"weekly_scoped"`.
+    let kind: String?
+    /// `"session"` or `"weekly"`.
+    let group: String?
+    let percent: Double?
+    let severity: String?
+    let resetsAt: String?
+    /// Present only on `weekly_scoped` entries.
+    let scope: RateLimitScope?
+    let isActive: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case kind, group, percent, severity, scope
+        case resetsAt = "resets_at"
+        case isActive = "is_active"
+    }
+}
+
+/// What a scoped limit is scoped *to*. Only `model` is decoded; the sibling
+/// `surface` key has no stable shape yet and nothing reads it.
+struct RateLimitScope: Codable {
+    let model: RateLimitScopeModel?
+}
+
+struct RateLimitScopeModel: Codable {
+    /// Frequently `null` — the server identifies the tier by display name.
+    let id: String?
+    let displayName: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case displayName = "display_name"
+    }
+}
+
+/// A model-scoped weekly limit, paired with the server's own display name for
+/// the model so the UI never hardcodes a tier.
+struct ModelScopedWeekly {
+    let modelName: String
+    let window: UsageWindow
 }
 
 struct UsageWindow: Codable {

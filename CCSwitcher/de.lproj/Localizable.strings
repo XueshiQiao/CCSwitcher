@@ -152,18 +152,22 @@
 "Limit bars" = "Limitbalken";
 "Session bar color" = "Farbe des Sitzungsbalkens";
 "Weekly bar color" = "Farbe des Wochenbalkens";
+"Model weekly bar color" = "Farbe des Modell-Wochenbalkens";
 "Low remaining color" = "Farbe bei geringem Rest";
 "Low remaining threshold" = "Schwelle für geringen Rest";
 "Account name" = "Kontoname";
 "Session usage (5h)" = "Sitzungsnutzung (5h)";
 "Weekly usage (7d)" = "Wochennutzung (7d)";
+"Model weekly usage (7d)" = "Modell-Wochennutzung (7d)";
 "Daily cost" = "Tageskosten";
 "Session reset countdown" = "Sitzungs-Reset Countdown";
 "Weekly reset countdown" = "Wochen-Reset Countdown";
+"Model weekly reset countdown" = "Modell-Wochen-Reset Countdown";
 "Menu Bar" = "Menüleiste";
 "Account display" = "Kontoanzeige";
 "Session — usage vs time (5h)" = "Sitzung — Nutzung vs. Zeit (5 Std.)";
 "Weekly — usage vs time (7d)" = "Woche — Nutzung vs. Zeit (7 Tage)";
+"Model weekly — usage vs time (7d)" = "Modell-Woche — Nutzung vs. Zeit (7 Tage)";
 "The vertical line marks time elapsed in the window; fill past it means you're using faster than the clock." = "Die vertikale Linie zeigt die verstrichene Zeit; Füllung darüber hinaus = schneller als die Uhr verbraucht.";
 "Claude Fable 5 — most powerful model, the new flagship tier" = "Claude Fable 5 — leistungsstärkstes Modell, die neue Flaggschiff-Klasse";
 

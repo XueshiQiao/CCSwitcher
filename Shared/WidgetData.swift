@@ -13,6 +13,12 @@ struct WidgetAccountData: Codable {
     let sessionResetTime: String?
     let weeklyUtilization: Double?
     let weeklyResetTime: String?
+    /// Display name of the model the scoped weekly limit applies to (e.g.
+    /// "Fable"), or nil when the account has no model-scoped weekly limit.
+    /// Optional — a payload written by an older build simply decodes to nil.
+    let modelWeeklyLabel: String?
+    let modelWeeklyUtilization: Double?
+    let modelWeeklyResetTime: String?
     let extraUsageEnabled: Bool?
     let hasError: Bool
     let errorMessage: String?
