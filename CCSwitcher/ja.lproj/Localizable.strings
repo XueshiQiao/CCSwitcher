@@ -152,18 +152,22 @@
 "Limit bars" = "制限バー";
 "Session bar color" = "セッションバーの色";
 "Weekly bar color" = "週間バーの色";
+"Model weekly bar color" = "モデル別週間バーの色";
 "Low remaining color" = "残量低下時の色";
 "Low remaining threshold" = "残量低下しきい値";
 "Account name" = "アカウント名";
 "Session usage (5h)" = "セッション使用量（5時間）";
 "Weekly usage (7d)" = "週間使用量（7日）";
+"Model weekly usage (7d)" = "モデル別週間使用量（7日）";
 "Daily cost" = "本日の料金";
 "Session reset countdown" = "セッション リセット カウントダウン";
 "Weekly reset countdown" = "週間 リセット カウントダウン";
+"Model weekly reset countdown" = "モデル別週間 リセット カウントダウン";
 "Menu Bar" = "メニューバー";
 "Account display" = "アカウント表示";
 "Session — usage vs time (5h)" = "セッション — 使用量 vs 時間（5時間）";
 "Weekly — usage vs time (7d)" = "週間 — 使用量 vs 時間（7日）";
+"Model weekly — usage vs time (7d)" = "モデル別週間 — 使用量 vs 時間（7日）";
 "The vertical line marks time elapsed in the window; fill past it means you're using faster than the clock." = "縦線 = 経過時間（その時間枠の進捗）。塗りつぶしがこれを超える = 時間より速く消費しています。";
 "Claude Fable 5 — most powerful model, the new flagship tier" = "Claude Fable 5 — 最も強力なモデル、新しいフラッグシップ層";
 
