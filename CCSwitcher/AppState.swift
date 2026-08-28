@@ -1038,9 +1038,15 @@ final class AppState: ObservableObject {
             modelUsage: activityStats.modelUsage,
             lastUpdated: Date()
         )
-        data.save()
-        WidgetCenter.shared.reloadAllTimelines()
-        log.debug("[updateWidgetData] Widget data saved and timelines reloaded")
+        // The payload is built on the main actor (it reads @Published state),
+        // but the write itself must not be: the first write into the App Group
+        // container after launch can block in `open()` for tens of seconds,
+        // which used to freeze the menu bar for exactly that long.
+        Task.detached(priority: .utility) {
+            await data.saveInBackground()
+            WidgetCenter.shared.reloadAllTimelines()
+            log.debug("[updateWidgetData] Widget data saved and timelines reloaded")
+        }
     }
 
     // MARK: - Persistence
