@@ -1009,7 +1009,14 @@ final class AppState: ObservableObject {
         for account in accounts {
             if let backup = keychain.getAccountBackup(forAccountId: account.id.uuidString) {
                 let backupEmail = (backup.oauthAccount["emailAddress"]?.value as? String) ?? "?"
-                log.info("[diagnose] Backup [\(account.email)]: OK (email=\(backupEmail))")
+                // The email lives in `oauthAccount`, and an emptied backup keeps
+                // that block intact, so checking it alone reports a backup that
+                // cannot log anyone in as healthy.
+                if backup.hasUsableCredentials {
+                    log.info("[diagnose] Backup [\(account.email)]: OK (email=\(backupEmail))")
+                } else {
+                    log.warning("[diagnose] Backup [\(account.email)]: EMPTY — metadata is intact but the token carries no OAuth secret; switch will fail until re-authenticated")
+                }
             } else {
                 log.warning("[diagnose] Backup [\(account.email)]: MISSING — switch will fail")
             }
