@@ -397,10 +397,26 @@ final class ClaudeService: @unchecked Sendable {
 
         log.info("[switchAccount] Switching from \(currentAccount.id) to \(targetAccount.id)")
 
+        // A backup with both OAuth secrets blanked cannot authenticate, and
+        // Step 4 is far too late to find that out: by then the target's dead
+        // credentials are already live and the source account is gone with
+        // them. Refuse before anything is written.
+        guard targetBackup.hasUsableCredentials else {
+            log.error("[switchAccount] ABORT: stored backup for \(targetAccount.id) carries no OAuth secret")
+            throw ClaudeServiceError.backupCredentialsUnusable(email: targetAccount.email)
+        }
+
         // 1. Back up current account (token + oauthAccount)
+        //
+        // Kept in hand past the backup write as well. Step 3 overwrites the
+        // live credentials before Step 4 can judge them, so these two values
+        // are the only remaining copy of what the CLI was authenticated with
+        // if the switch is rejected.
         log.info("[switchAccount] Step 1: Backing up current account...")
-        if let currentToken = keychain.readClaudeToken(),
-           let currentOAuth = keychain.readOAuthAccount() {
+        let previousToken = keychain.readClaudeToken()
+        let previousOAuthAccount = keychain.readOAuthAccount()
+        if let currentToken = previousToken,
+           let currentOAuth = previousOAuthAccount {
             let email = (currentOAuth["emailAddress"]?.value as? String) ?? "?"
             if email == currentAccount.email {
                 let saved = keychain.saveAccountBackup(token: currentToken, oauthAccount: currentOAuth, forAccountId: currentAccount.id.uuidString)
@@ -410,6 +426,23 @@ final class ClaudeService: @unchecked Sendable {
             }
         } else {
             log.warning("[switchAccount] Step 1: Could not read current token or oauthAccount")
+        }
+
+        /// Restores the credentials the CLI held before Step 3 ran.
+        ///
+        /// Steps 3 and 4 are not one operation. Step 3 has already replaced the
+        /// live token and `~/.claude.json` by the time Step 4 gets to reject
+        /// them, so a failure that returns without this leaves the user signed
+        /// out of the account they were on as well as the one they asked for,
+        /// with no obvious way back other than a browser re-login.
+        func rollback(after reason: String) {
+            guard let previousToken, let previousOAuthAccount else {
+                log.error("[switchAccount] Rollback after \(reason) skipped: no pre-switch credentials were captured")
+                return
+            }
+            let tokenRestored = keychain.writeClaudeToken(previousToken)
+            let oauthRestored = keychain.writeOAuthAccount(previousOAuthAccount)
+            log.info("[switchAccount] Rolled back to \(currentAccount.id) after \(reason): token=\(tokenRestored), oauthAccount=\(oauthRestored)")
         }
 
         // 2. Target backup was resolved and validated by the caller.
@@ -423,21 +456,31 @@ final class ClaudeService: @unchecked Sendable {
         }
         guard keychain.writeOAuthAccount(targetBackup.oauthAccount) else {
             log.error("[switchAccount] Step 3: Failed to write oauthAccount to ~/.claude.json!")
+            rollback(after: "the oauthAccount write failed")
             throw ClaudeServiceError.oauthAccountWriteFailed
         }
         log.info("[switchAccount] Step 3: Both token and oauthAccount written")
 
         // 4. Verify
         log.info("[switchAccount] Step 4: Verifying with `claude auth status`...")
-        let status = try await getAuthStatus()
+        let status: AuthStatus
+        do {
+            status = try await getAuthStatus()
+        } catch {
+            log.error("[switchAccount] Step 4: Could not read auth status: \(error.localizedDescription)")
+            rollback(after: "the verification call failed")
+            throw error
+        }
         guard status.loggedIn else {
             log.error("[switchAccount] Step 4: Not logged in after switch!")
+            rollback(after: "the CLI reported no login")
             throw ClaudeServiceError.switchVerificationFailed
         }
 
         if let email = status.email {
             guard email == targetAccount.email else {
                 log.error("[switchAccount] Step 4: Logged in as \(email) instead of \(targetAccount.email)")
+                rollback(after: "the CLI reported a different account")
                 throw ClaudeServiceError.switchWrongAccount(expected: targetAccount.email, actual: email)
             }
             log.info("[switchAccount] Step 4: Switch verified — logged in as \(email)")
@@ -453,6 +496,7 @@ final class ClaudeService: @unchecked Sendable {
         let shadowedBy = status.shadowingAuthMethod ?? "unknown"
         log.warning("[switchAccount] Step 4: CLI reports authMethod=\(shadowedBy) and omits the account identity; verifying against the credential store instead")
         guard credentialsOnDiskMatch(backup: targetBackup, email: targetAccount.email) else {
+            rollback(after: "the credential store did not match what we wrote")
             throw ClaudeServiceError.switchVerificationFailed
         }
         log.info("[switchAccount] Step 4: Switch verified against the credential store (CLI identity hidden by \(shadowedBy))")
@@ -704,6 +748,7 @@ enum ClaudeServiceError: LocalizedError {
     case oauthAccountWriteFailed
     case switchVerificationFailed
     case switchWrongAccount(expected: String, actual: String)
+    case backupCredentialsUnusable(email: String)
 
     var errorDescription: String? {
         switch self {
@@ -723,6 +768,8 @@ enum ClaudeServiceError: LocalizedError {
             return "Account switch verification failed"
         case .switchWrongAccount(let expected, let actual):
             return "Switch failed: expected \(expected) but got \(actual). Try removing and re-adding the account."
+        case .backupCredentialsUnusable(let email):
+            return "The stored credentials for \(email) are empty. Use re-authenticate to sign in again."
         }
     }
 }
