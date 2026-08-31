@@ -443,6 +443,16 @@ final class AppState: ObservableObject {
         let targetBackup: AccountBackup
         switch keychain.lookupAccountBackup(forAccountId: account.id.uuidString) {
         case .found(let backup):
+            // "A backup exists" and "a backup that can log anyone in exists"
+            // are different facts. A capture taken while the CLI held no live
+            // login stores an intact envelope around two empty secrets, and it
+            // reads as present everywhere else in the app. Writing it would
+            // trade a working session for a dead one.
+            guard backup.hasUsableCredentials else {
+                log.error("[switchTo] ABORT: backup for target account carries no OAuth secret")
+                errorMessage = String(localized: "The stored credentials for \(account.email) are empty. Use re-authenticate to sign in again.", bundle: L10n.bundle)
+                return
+            }
             targetBackup = backup
         case .missing:
             log.error("[switchTo] ABORT: no backup for target account")
@@ -488,10 +498,14 @@ final class AppState: ObservableObject {
     // MARK: - Auto-switch
 
     /// Whether an account can be switched to right now: it must have a stored
-    /// backup token and not be flagged expired (an expired backup would fail the
+    /// backup token that still carries an OAuth secret, and not be flagged
+    /// expired (an emptied or expired backup would fail the
     /// switch verification, or silently swap in a dead session).
     private func isSwitchable(_ account: Account) -> Bool {
-        guard keychain.getAccountBackup(forAccountId: account.id.uuidString) != nil else { return false }
+        guard let backup = keychain.getAccountBackup(forAccountId: account.id.uuidString) else { return false }
+        // An emptied backup would fail the switch the same way an expired one
+        // does, and auto-switch has no user in front of it to read the error.
+        guard backup.hasUsableCredentials else { return false }
         if let error = accountUsageErrors[account.id], error.isExpired { return false }
         return true
     }
