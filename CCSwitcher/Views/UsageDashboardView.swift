@@ -279,22 +279,25 @@ struct UsageDashboardView: View {
 
     @ViewBuilder
     private func usageBars(_ usage: UsageAPIResponse) -> some View {
-        if let session = usage.fiveHour {
+        ForEach(usage.displayWindows) { row in
             usageRow(
-                label: "Session",
-                resetText: session.resetTimeString,
-                utilization: session.utilization ?? 0,
-                kind: .session
+                title: title(for: row),
+                resetText: row.window.resetTimeString,
+                utilization: row.utilization ?? 0,
+                kind: row.isSession ? .session : .weekly,
+                isLimiting: row.isLimiting
             )
         }
-        if let weekly = usage.sevenDay {
-            usageRow(
-                label: "Weekly",
-                resetText: weekly.resetTimeString,
-                utilization: weekly.utilization ?? 0,
-                kind: .weekly
-            )
-        }
+    }
+
+    /// "Session", "Weekly", or "Weekly · Fable" — the scope name comes from the
+    /// API and is a product name, so it is appended rather than translated.
+    private func title(for row: UsageDisplayWindow) -> String {
+        let base = row.isSession
+            ? String(localized: "Session", bundle: L10n.bundle)
+            : String(localized: "Weekly", bundle: L10n.bundle)
+        guard let scopeName = row.scopeName else { return base }
+        return "\(base) · \(scopeName)"
     }
 
     @ViewBuilder
@@ -320,14 +323,17 @@ struct UsageDashboardView: View {
 
     // MARK: - Usage Row
 
-    private func usageRow(label: LocalizedStringKey, resetText: String?, utilization: Double, kind: LimitBarKind) -> some View {
+    private func usageRow(title: String, resetText: String?, utilization: Double, kind: LimitBarKind, isLimiting: Bool = false) -> some View {
         let fillColor = menuBarConfig.limitBarColor(for: kind, utilization: utilization, context: .dashboard)
 
         return VStack(spacing: 5) {
             HStack {
-                Text(label)
+                Text(title)
                     .font(.caption)
                     .foregroundStyle(.textSecondary)
+                if isLimiting {
+                    Badge(text: String(localized: "Limiting", bundle: L10n.bundle), color: .orange)
+                }
                 Spacer()
                 if let resetText {
                     Text("Resets in \(resetText)")
