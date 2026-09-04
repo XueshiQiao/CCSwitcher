@@ -55,6 +55,7 @@
 "Token expired. Switch to this account in Claude Code to refresh." = "Token abgelaufen. Wechseln Sie in Claude Code zu diesem Konto, um es zu aktualisieren.";
 "Session" = "Sitzung";
 "Weekly" = "Wöchentlich";
+"Limiting" = "Begrenzend";
 "Extra usage" = "Zusätzliche Nutzung";
 "On" = "An";
 "Off" = "Aus";

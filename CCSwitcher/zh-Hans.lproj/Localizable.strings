@@ -55,6 +55,7 @@
 "Token expired. Switch to this account in Claude Code to refresh." = "令牌已过期。请在 Claude Code 中切换到此账户以刷新。";
 "Session" = "会话";
 "Weekly" = "每周";
+"Limiting" = "受限中";
 "Extra usage" = "额外用量";
 "On" = "开启";
 "Off" = "关闭";
