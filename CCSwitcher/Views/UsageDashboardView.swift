@@ -60,6 +60,10 @@ struct UsageDashboardView: View {
                     ForEach(appState.accounts) { account in
                         accountUsageCard(account: account, usage: appState.accountUsage[account.id])
                     }
+                    Text("Quota is refreshed per account. Each attempt waits at least 15 minutes; no automatic retries.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 16)
                 }
 
                 // Last updated
@@ -206,40 +210,76 @@ struct UsageDashboardView: View {
                 usageBars(usage)
                 extraUsageRow(usage.extraUsage)
                 sampleAgeLabel(account)
-            } else if let errorState = appState.accountUsageErrors[account.id] {
+            }
+            if let errorState = appState.accountUsageErrors[account.id] {
                 HStack {
                     Image(systemName: errorState.isRateLimited ? "timer" : (errorState.isExpired ? "exclamationmark.triangle" : "xmark.circle"))
                         .foregroundStyle(errorState.isExpired ? .yellow : .red)
                     Text(errorState.message)
                         .font(.caption)
                         .foregroundStyle(.textSecondary)
-                        .lineLimit(2)
                     Spacer()
                 }
                 .padding(.top, 4)
-            } else {
+            } else if usage == nil {
                 // No sample yet (accounts are polled round-robin) - this is a
                 // waiting state, not an error. The old hardcoded "Token expired"
                 // text here made healthy accounts look broken.
                 HStack {
                     Image(systemName: "hourglass")
                         .foregroundStyle(.secondary)
-                    Text("Waiting for usage data...")
+                    Text("Use Refresh quota to request this account's usage.")
                         .font(.caption)
                         .foregroundStyle(.textSecondary)
                     Spacer()
                 }
                 .padding(.top, 4)
             }
+            quotaRefreshControl(account)
         }
         .cardStyle(fill: account.isActive ? .cardFill : .cardFill)
         .sectionPadding()
     }
 
-    /// Accounts are polled round-robin (active + one other per cycle), so a
-    /// card's numbers can be several cycles old — say so instead of letting a
-    /// stale percentage render exactly like a live one. Hidden while the sample
-    /// is fresh (< 90s); the relative text then counts up by itself.
+    private func quotaRefreshControl(_ account: Account) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle("Automatic quota refresh", isOn: Binding(
+                get: { appState.automaticUsageAccountIDs.contains(account.id.uuidString) },
+                set: { enabled in
+                    if enabled {
+                        appState.automaticUsageAccountIDs.insert(account.id.uuidString)
+                    } else {
+                        appState.automaticUsageAccountIDs.remove(account.id.uuidString)
+                    }
+                }
+            ))
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+            .font(.caption)
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                let deadline = appState.usageNextRefreshAt[account.id]
+                let coolingDown = deadline.map { $0 > context.date } ?? false
+                HStack(spacing: 8) {
+                    if let deadline, coolingDown {
+                        Text("Available after \(Text(deadline, style: .time))")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                    if appState.refreshingUsageAccountIDs.contains(account.id) {
+                        ProgressView().controlSize(.small)
+                    }
+                    Button("Refresh quota") {
+                        Task { await appState.refreshAccountUsage(account) }
+                    }
+                    .controlSize(.small)
+                    .disabled(coolingDown || appState.isLoggingIn || appState.isSwitching || appState.refreshingUsageAccountIDs.contains(account.id))
+                }
+            }
+        }
+    }
+
+    /// Preserve the age of cached readings after unsuccessful refresh attempts.
     @ViewBuilder
     private func sampleAgeLabel(_ account: Account) -> some View {
         if let sampledAt = appState.accountUsageSampledAt[account.id],
@@ -264,6 +304,8 @@ struct UsageDashboardView: View {
             Text(account.displayEmail(obfuscated: !showFullEmail))
                 .font(.subheadline.weight(.medium))
                 .lineLimit(1)
+
+            CopyEmailButton(email: account.email)
 
             if account.isActive {
                 Badge(text: String(localized: "Active", bundle: L10n.bundle), color: .green)

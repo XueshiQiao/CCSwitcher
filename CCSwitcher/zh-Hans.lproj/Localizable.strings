@@ -178,3 +178,48 @@
 "Updated %@ ago" = "%@前更新";
 "Could not save the refreshed sign-in; will retry automatically." = "无法保存刷新后的登录凭据；将自动重试。";
 "Credential storage is temporarily unavailable. Try again shortly." = "凭据存储暂时不可用。请稍后重试。";
+
+/* Login cancellation and cautious quota refresh */
+"Cancel login" = "取消登录";
+"Cancelling..." = "正在取消…";
+"Finishing sign-in..." = "正在完成登录…";
+"Login cancelled. If browser authorization already finished, use Add Current Account to keep that login." = "已取消登录。若浏览器已完成授权，可使用“添加当前账户”保留该登录。";
+"Refresh quota" = "刷新额度";
+"Available after %@" = "%@ 后可刷新";
+"Quota is refreshed per account. Each attempt waits at least 15 minutes; no automatic retries." = "额度按账号单独刷新。每次尝试至少间隔 15 分钟，不自动重试。";
+"Use Refresh quota to request this account's usage." = "点击“刷新额度”查询此账号的额度。";
+"Stored credentials are unavailable. Re-authenticate this account to refresh quota." = "无法读取已存凭据，请重新登录此账号后再刷新额度。";
+"Quota refresh is cooling down. No request was sent." = "额度刷新冷却中，本次未发送请求。";
+"Another quota request is running. No request was sent." = "另一个额度请求正在进行，本次未发送请求。";
+"Rate limited. Waiting for the server's deadline; no automatic retry." = "已触发限流，等待服务器指定时间后再操作，不自动重试。";
+"Quota access was refused. No automatic retry." = "额度访问被拒绝，不自动重试。";
+"Refresh quota in the background" = "在后台刷新额度";
+"Quota refresh is manual by default. Each account waits at least 15 minutes; server limits may require longer. This does not guarantee protection from account restrictions." = "默认仅手动刷新额度，每账号至少间隔 15 分钟；服务器可能要求更久。这不能保证避免平台风控。";
+"Auto-switch requires background quota refresh and uses recent saved readings without extra requests." = "自动切换需要开启后台额度刷新，仅使用近期缓存数据，不额外请求额度。";
+"Refresh statistics; background quota follows your settings" = "刷新统计；后台额度刷新遵循设置中的开关";
+
+// Per-account refresh controls
+"Automatic quota refresh" = "自动刷新额度";
+"Enable automatic quota refresh separately on each account's quota card. It is off by default." = "在每个账号的额度卡片上分别开启自动刷新，默认关闭。";
+"This account's quota request is running. No request was sent." = "此账号的额度请求正在进行，本次未发送请求。";
+
+// Copy login address
+"Login address copied" = "登录地址已复制";
+"Copy login address" = "复制登录地址";
+"Copy the address into your preferred browser to sign in, then return here." = "复制地址，在你选择的浏览器中登录，然后返回这里。";
+"Preparing login address..." = "正在生成登录地址…";
+
+// Saved quota and account authorization viewer
+"Could not restore saved quota: %@" = "无法恢复已保存的用量：%@";
+"Edit account" = "编辑账号";
+"Account backup" = "账号授权备份";
+"View the saved token and OAuth identity for this account. This is a read-only backup, not the current CLI credentials." = "查看此账号保存的令牌和 OAuth 身份信息。这里展示的是只读备份，不是 CLI 当前使用的凭据。";
+"Show saved authorization" = "查看存储的授权信息";
+"Save" = "保存";
+"No authorization backup is stored for this account." = "此账号尚未存储授权备份。";
+"The authorization store is unavailable. Unlock the keychain or allow access, then close and reopen this editor." = "无法读取授权存储。请解锁钥匙串或允许访问，然后关闭并重新打开此编辑页。";
+"The saved authorization could not be formatted." = "无法格式化已保存的授权信息。";
+
+// Copy the original email, independent of masking
+"Copy full email" = "复制完整邮箱";
+"Email copied" = "邮箱已复制";

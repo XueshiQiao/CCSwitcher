@@ -5,8 +5,8 @@ struct AccountSwitcherView: View {
     @EnvironmentObject private var appState: AppState
     @AppStorage("showFullEmail") private var showFullEmail = false
     @State private var showingAddConfirm = false
-    @State private var editingAccountId: UUID?
-    @State private var editingLabel = ""
+    @State private var editingAccount: Account?
+    @State private var copiedLoginURL = false
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -29,6 +29,10 @@ struct AccountSwitcherView: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 12)
                 .padding(.top, 8)
+        }
+        .sheet(item: $editingAccount) { account in
+            AccountEditView(account: account)
+                .environmentObject(appState)
         }
     }
 
@@ -64,54 +68,32 @@ struct AccountSwitcherView: View {
 
             // Account info
             VStack(alignment: .leading, spacing: 2) {
-                if editingAccountId == account.id {
-                    HStack(spacing: 4) {
-                        TextField("Custom label", text: $editingLabel)
-                            .textFieldStyle(.roundedBorder)
-                            .font(.subheadline)
-                            .onSubmit { commitLabelEdit(account) }
+                HStack(spacing: 6) {
+                    Text(account.effectiveDisplayName(obfuscated: !showFullEmail))
+                        .font(.subheadline.weight(.medium))
 
-                        Button {
-                            commitLabelEdit(account)
-                        } label: {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
-                        }
-                        .buttonStyle(.plain)
-
-                        Button {
-                            editingAccountId = nil
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.textSecondary)
-                        }
-                        .buttonStyle(.plain)
+                    Button {
+                        editingAccount = account
+                    } label: {
+                        Image(systemName: "pencil")
+                            .font(.caption2)
+                            .foregroundStyle(.textSecondary)
                     }
-                } else {
-                    HStack(spacing: 6) {
-                        Text(account.effectiveDisplayName(obfuscated: !showFullEmail))
-                            .font(.subheadline.weight(.medium))
+                    .buttonStyle(.plain)
+                    .help("Edit account")
+                    .accessibilityLabel("Edit account")
 
-                        Button {
-                            editingLabel = account.customLabel ?? ""
-                            editingAccountId = account.id
-                        } label: {
-                            Image(systemName: "pencil")
-                                .font(.caption2)
-                                .foregroundStyle(.textSecondary)
-                        }
-                        .buttonStyle(.plain)
-                        .help("Edit label")
-
-                        if account.isActive {
-                            Badge(text: String(localized: "Active", bundle: L10n.bundle), color: .green)
-                        }
+                    if account.isActive {
+                        Badge(text: String(localized: "Active", bundle: L10n.bundle), color: .green)
                     }
                 }
 
-                Text(account.displayEmail(obfuscated: !showFullEmail))
-                    .font(.caption)
-                    .foregroundStyle(.textSecondary)
+                HStack(spacing: 6) {
+                    Text(account.displayEmail(obfuscated: !showFullEmail))
+                        .font(.caption)
+                        .foregroundStyle(.textSecondary)
+                    CopyEmailButton(email: account.email)
+                }
 
                 HStack(spacing: 8) {
                     if let sub = account.displaySubscriptionType {
@@ -166,11 +148,6 @@ struct AccountSwitcherView: View {
         )
     }
 
-    private func commitLabelEdit(_ account: Account) {
-        appState.updateAccountLabel(account, label: editingLabel)
-        editingAccountId = nil
-    }
-
     // MARK: - Add Account Buttons
 
     @ViewBuilder
@@ -183,11 +160,38 @@ struct AccountSwitcherView: View {
                 Text("Waiting for browser login...")
                     .font(.caption)
                     .foregroundStyle(.textSecondary)
-                Text("Complete the login in your browser, then return here.")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .multilineTextAlignment(.center)
+                if let url = appState.loginURL {
+                    Button {
+                        NSPasteboard.general.clearContents()
+                        copiedLoginURL = NSPasteboard.general.setString(url.absoluteString, forType: .string)
+                    } label: {
+                        Label(LocalizedStringKey(copiedLoginURL ? "Login address copied" : "Copy login address"), systemImage: "doc.on.doc")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    Text("Copy the address into your preferred browser to sign in, then return here.")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .multilineTextAlignment(.center)
+                } else if appState.canCancelLogin {
+                    Text("Preparing login address...")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+                if appState.canCancelLogin || appState.isCancellingLogin {
+                    Button(LocalizedStringKey(appState.isCancellingLogin ? "Cancelling..." : "Cancel login")) {
+                        appState.cancelLogin()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(appState.isCancellingLogin)
+                } else {
+                    Text("Finishing sign-in...")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
             }
+            .onChange(of: appState.loginURL) { _, _ in copiedLoginURL = false }
             .frame(maxWidth: .infinity)
             .padding(12)
             .background(

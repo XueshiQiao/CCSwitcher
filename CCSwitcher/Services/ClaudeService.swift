@@ -156,7 +156,7 @@ final class ClaudeService: @unchecked Sendable {
         process.executableURL = URL(fileURLWithPath: "/bin/zsh")
         process.arguments = ["-ilc", "command -v claude"]
         process.standardOutput = stdout
-        process.standardError = Pipe()
+        process.standardError = FileHandle.nullDevice
         process.environment = ProcessInfo.processInfo.environment
 
         do {
@@ -230,46 +230,9 @@ final class ClaudeService: @unchecked Sendable {
         case forbidden(String)
     }
 
-    /// Fetch usage for a specific access token
-    func getUsageLimits(accessToken: String) async throws -> UsageAPIResponse {
-        guard let url = URL(string: "https://api.anthropic.com/api/oauth/usage") else { throw UsageError.network("invalid url") }
-        var request = URLRequest(url: url)
-        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-        request.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
-
-        log.debug("[getUsageLimits] REQUEST URL: \(url.absoluteString)")
-
-        let (responseData, response) = try await URLSession.shared.data(for: request)
-        let httpResponse = response as? HTTPURLResponse
-        guard httpResponse?.statusCode == 200 else {
-            let responseString = String(data: responseData, encoding: .utf8) ?? ""
-            log.error("[getUsageLimits] HTTP \(httpResponse?.statusCode ?? 0)")
-
-            if httpResponse?.statusCode == 401 || responseString.contains("token_expired") {
-                throw UsageError.expired
-            }
-            if httpResponse?.statusCode == 429 {
-                let retryAfter = httpResponse?.value(forHTTPHeaderField: "Retry-After")
-                    .flatMap(TimeInterval.init)
-                log.warning("[getUsageLimits] 429, Retry-After: \(retryAfter.map { String(format: "%.0f", $0) } ?? "none")s")
-                throw UsageError.rateLimited(retryAfter: retryAfter)
-            }
-            if httpResponse?.statusCode == 403 {
-                // Typically: no active Pro/Max subscription on the account.
-                log.warning("[getUsageLimits] 403 permission error: \(responseString.prefix(200))")
-                throw UsageError.forbidden(responseString)
-            }
-            throw UsageError.network("HTTP \(httpResponse?.statusCode ?? 0)")
-        }
-        
-        do {
-            let usage = try JSONDecoder().decode(UsageAPIResponse.self, from: responseData)
-            log.info("[getUsageLimits] session=\(usage.fiveHour?.utilization ?? -1)%, weekly=\(usage.sevenDay?.utilization ?? -1)%")
-            return usage
-        } catch {
-            log.error("[getUsageLimits] Decode Error: \(error.localizedDescription)")
-            throw UsageError.decode(error.localizedDescription)
-        }
+    /// Every usage entry point shares the same persistent request limits.
+    func getUsageLimits(accessToken: String, accountID: UUID) async throws -> UsageAPIResponse {
+        try await UsageRequestLimiter.shared.getUsageLimits(accessToken: accessToken, accountID: accountID)
     }
 
     // MARK: - OAuth refresh (direct token endpoint, no keychain swap)
@@ -392,24 +355,26 @@ final class ClaudeService: @unchecked Sendable {
     /// missing backup from a briefly unreadable store) and handed down so no
     /// second, ambiguity-collapsing lookup happens here.
     @discardableResult
-    func switchAccount(from currentAccount: Account, to targetAccount: Account, targetBackup: AccountBackup) async throws -> SwitchOutcome {
+    func switchAccount(from currentAccount: Account?, to targetAccount: Account, targetBackup: AccountBackup) async throws -> SwitchOutcome {
         let keychain = KeychainService.shared
 
-        log.info("[switchAccount] Switching from \(currentAccount.id) to \(targetAccount.id)")
+        log.info("[switchAccount] Switching from \(currentAccount?.id.uuidString ?? "none") to \(targetAccount.id)")
 
         // 1. Back up current account (token + oauthAccount)
-        log.info("[switchAccount] Step 1: Backing up current account...")
-        if let currentToken = keychain.readClaudeToken(),
-           let currentOAuth = keychain.readOAuthAccount() {
-            let email = (currentOAuth["emailAddress"]?.value as? String) ?? "?"
-            if email == currentAccount.email {
-                let saved = keychain.saveAccountBackup(token: currentToken, oauthAccount: currentOAuth, forAccountId: currentAccount.id.uuidString)
-                log.info("[switchAccount] Step 1: Backup saved: \(saved)")
+        if let currentAccount {
+            log.info("[switchAccount] Step 1: Backing up current account...")
+            if let currentToken = keychain.readClaudeToken(),
+               let currentOAuth = keychain.readOAuthAccount() {
+                let email = (currentOAuth["emailAddress"]?.value as? String) ?? "?"
+                if email == currentAccount.email {
+                    let saved = keychain.saveAccountBackup(token: currentToken, oauthAccount: currentOAuth, forAccountId: currentAccount.id.uuidString)
+                    log.info("[switchAccount] Step 1: Backup saved: \(saved)")
+                } else {
+                    log.warning("[switchAccount] Step 1: oauthAccount email (\(email)) != source (\(currentAccount.email)), skipping backup")
+                }
             } else {
-                log.warning("[switchAccount] Step 1: oauthAccount email (\(email)) != source (\(currentAccount.email)), skipping backup")
+                log.warning("[switchAccount] Step 1: Could not read current token or oauthAccount")
             }
-        } else {
-            log.warning("[switchAccount] Step 1: Could not read current token or oauthAccount")
         }
 
         // 2. Target backup was resolved and validated by the caller.
@@ -501,15 +466,54 @@ final class ClaudeService: @unchecked Sendable {
         return result
     }
 
-    /// Run `claude auth login` which opens browser for OAuth.
-    func login() async throws {
-        log.info("[login] Starting `claude auth login`... (will open browser)")
-        _ = try await runClaude(args: ["auth", "login"])
-        log.info("[login] `claude auth login` process exited")
-
-        // Give keychain a moment to sync after CLI writes
+    /// Capture the CLI's browser URL, keeping its localhost callback alive until login completes.
+    func login(onURL: @escaping @Sendable (URL) async -> Void) async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false,
+                                                attributes: [.posixPermissions: 0o700])
+        defer {
+            do { try FileManager.default.removeItem(at: directory) }
+            catch { log.warning("[login] Could not remove temporary browser helper: \(error.localizedDescription)") }
+        }
+        let opener = directory.appendingPathComponent("copy-login-url")
+        let capturedURL = directory.appendingPathComponent("authorization-url")
+        // CLI stdout contains the manual-code URL. Capture the actual browser URL
+        // instead so the existing callback finishes sign-in without a code input.
+        let script = """
+        #!/bin/sh
+        set -eu
+        umask 077
+        printf '%s' "$1" > "$CCSWITCHER_LOGIN_URL_FILE.tmp"
+        /bin/mv -f "$CCSWITCHER_LOGIN_URL_FILE.tmp" "$CCSWITCHER_LOGIN_URL_FILE"
+        """
+        try script.write(to: opener, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: opener.path)
+        let environment = ["BROWSER": opener.path, "CCSWITCHER_LOGIN_URL_FILE": capturedURL.path]
+        try await withThrowingTaskGroup(of: Bool.self) { group in
+            group.addTask { [self] in
+                _ = try await runClaude(args: ["auth", "login"], environment: environment)
+                return true
+            }
+            group.addTask {
+                while !FileManager.default.fileExists(atPath: capturedURL.path) {
+                    try await Task.sleep(for: .milliseconds(100))
+                }
+                try Task.checkCancellation()
+                let value = try String(contentsOf: capturedURL, encoding: .utf8)
+                guard let url = URL(string: value), url.scheme == "https",
+                      let host = url.host, !host.isEmpty, url.user == nil, url.password == nil else {
+                    throw ClaudeServiceError.cliError("Invalid login authorization URL")
+                }
+                await onURL(url)
+                return false
+            }
+            while let processFinished = try await group.next() {
+                if processFinished { group.cancelAll(); break }
+            }
+        }
+        try Task.checkCancellation()
+        // Give keychain a moment to sync after CLI writes.
         try await Task.sleep(for: .seconds(1))
-        log.info("[login] Post-login delay complete, ready for token capture")
     }
 
     /// Run `claude auth logout`
@@ -532,7 +536,7 @@ final class ClaudeService: @unchecked Sendable {
                 process.executableURL = URL(fileURLWithPath: path)
                 process.arguments = ["--version"]
                 process.standardOutput = stdout
-                process.standardError = Pipe()
+                process.standardError = FileHandle.nullDevice
 
                 // Inject same PATH augmentation as runClaude so NVM-installed
                 // claude can find `node` when invoked here.
@@ -634,62 +638,69 @@ final class ClaudeService: @unchecked Sendable {
 
     // MARK: - CLI Runner
 
-    private func runClaude(args: [String]) async throws -> String {
+    private func runClaude(args: [String], environment: [String: String] = [:]) async throws -> String {
         let claudePath = self.claudePath
         log.debug("[runClaude] Running: \(claudePath) \(args.joined(separator: " "))")
-        return try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async { [claudePath] in
-                let process = Process()
-                let pipe = Pipe()
+        let process = Process()
+        let pipe = Pipe()
+        let invocation = CancelableProcess(process: process, output: pipe)
+        let result: String = try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                DispatchQueue.global(qos: .userInitiated).async { [claudePath] in
+                    process.executableURL = URL(fileURLWithPath: claudePath)
+                    process.arguments = args
+                    process.standardOutput = pipe
+                    process.standardError = pipe
 
-                process.executableURL = URL(fileURLWithPath: claudePath)
-                process.arguments = args
-                process.standardOutput = pipe
-                process.standardError = pipe
-
-                var env = ProcessInfo.processInfo.environment
-                let homeDir = NSHomeDirectory()
-                // Include the parent directory of the discovered claude binary
-                // so that `node` is on PATH for NVM-installed scripts.
-                // Only add it when claudePath is absolute (skip the bare "claude" fallback).
-                var extraPaths = [
-                    "/opt/homebrew/bin",
-                    "/usr/local/bin",
-                    "\(homeDir)/.local/bin",
-                    "\(homeDir)/.npm-global/bin"
-                ]
-                if claudePath.contains("/") {
-                    // Resolve symlinks so that e.g. /usr/local/bin/claude -> ~/.nvm/.../bin/claude
-                    // yields the NVM bin dir where `node` actually lives
-                    let resolved = URL(fileURLWithPath: claudePath).resolvingSymlinksInPath().path
-                    let resolvedBinDir = URL(fileURLWithPath: resolved).deletingLastPathComponent().path
-                    extraPaths.insert(resolvedBinDir, at: 0)
-                }
-                let existingPath = env["PATH"] ?? "/usr/bin:/bin"
-                env["PATH"] = (extraPaths + [existingPath]).joined(separator: ":")
-                env["HOME"] = homeDir
-                process.environment = env
-
-                do {
-                    try process.run()
-                    process.waitUntilExit()
-
-                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                    let output = String(data: data, encoding: .utf8) ?? ""
-
-                    if process.terminationStatus == 0 {
-                        log.debug("[runClaude] Success (exit 0), output length: \(output.count)")
-                        continuation.resume(returning: output)
-                    } else {
-                        log.error("[runClaude] Failed (exit \(process.terminationStatus))")
-                        continuation.resume(throwing: ClaudeServiceError.cliError("exit \(process.terminationStatus)"))
+                    var env = ProcessInfo.processInfo.environment
+                    let homeDir = NSHomeDirectory()
+                    // Include the parent directory of the discovered claude binary
+                    // so that `node` is on PATH for NVM-installed scripts.
+                    // Only add it when claudePath is absolute (skip the bare "claude" fallback).
+                    var extraPaths = [
+                        "/opt/homebrew/bin",
+                        "/usr/local/bin",
+                        "\(homeDir)/.local/bin",
+                        "\(homeDir)/.npm-global/bin"
+                    ]
+                    if claudePath.contains("/") {
+                        // Resolve symlinks so that e.g. /usr/local/bin/claude -> ~/.nvm/.../bin/claude
+                        // yields the NVM bin dir where `node` actually lives
+                        let resolved = URL(fileURLWithPath: claudePath).resolvingSymlinksInPath().path
+                        let resolvedBinDir = URL(fileURLWithPath: resolved).deletingLastPathComponent().path
+                        extraPaths.insert(resolvedBinDir, at: 0)
                     }
-                } catch {
-                    log.error("[runClaude] Process launch failed: \(error.localizedDescription)")
-                    continuation.resume(throwing: ClaudeServiceError.processLaunchFailed(error))
+                    let existingPath = env["PATH"] ?? "/usr/bin:/bin"
+                    env["PATH"] = (extraPaths + [existingPath]).joined(separator: ":")
+                    env["HOME"] = homeDir
+                    env.merge(environment) { _, override in override }
+                    process.environment = env
+
+                    do {
+                        // The owner drains both streams before waiting and reaps on cancellation.
+                        let data = try invocation.run()
+                        let output = String(data: data, encoding: .utf8) ?? ""
+
+                        if process.terminationStatus == 0 {
+                            log.debug("[runClaude] Success (exit 0), output length: \(output.count)")
+                            continuation.resume(returning: output)
+                        } else {
+                            log.error("[runClaude] Failed (exit \(process.terminationStatus))")
+                            continuation.resume(throwing: ClaudeServiceError.cliError("exit \(process.terminationStatus)"))
+                        }
+                    } catch is CancellationError {
+                        continuation.resume(throwing: CancellationError())
+                    } catch {
+                        log.error("[runClaude] Process launch failed: \(error.localizedDescription)")
+                        continuation.resume(throwing: ClaudeServiceError.processLaunchFailed(error))
+                    }
                 }
             }
+        } onCancel: {
+            invocation.cancel()
         }
+        try Task.checkCancellation()
+        return result
     }
 }
 

@@ -47,6 +47,12 @@ struct SettingsView: View {
     private var generalTab: some View {
         Form {
             Section("Refresh") {
+                Text("Enable automatic quota refresh separately on each account's quota card. It is off by default.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("Quota refresh is manual by default. Each account waits at least 15 minutes; server limits may require longer. This does not guarantee protection from account restrictions.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 Picker("Auto-refresh interval", selection: $refreshInterval) {
                     Text("15 seconds").tag(15.0)
                     Text("30 seconds").tag(30.0)
@@ -61,6 +67,10 @@ struct SettingsView: View {
 
             Section("Auto-switch") {
                 Toggle("Switch account before hitting the limit", isOn: $autoSwitchEnabled)
+                    .disabled(!appState.backgroundUsageRefreshEnabled)
+                Text("Auto-switch requires background quota refresh and uses recent saved readings without extra requests.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 if autoSwitchEnabled {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {

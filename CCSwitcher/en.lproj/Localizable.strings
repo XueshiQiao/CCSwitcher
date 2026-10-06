@@ -182,3 +182,48 @@
 "Updated %@ ago" = "Updated %@ ago";
 "Could not save the refreshed sign-in; will retry automatically." = "Could not save the refreshed sign-in; will retry automatically.";
 "Credential storage is temporarily unavailable. Try again shortly." = "Credential storage is temporarily unavailable. Try again shortly.";
+
+/* Login cancellation and cautious quota refresh */
+"Cancel login" = "Cancel login";
+"Cancelling..." = "Cancelling...";
+"Finishing sign-in..." = "Finishing sign-in...";
+"Login cancelled. If browser authorization already finished, use Add Current Account to keep that login." = "Login cancelled. If browser authorization already finished, use Add Current Account to keep that login.";
+"Refresh quota" = "Refresh quota";
+"Available after %@" = "Available after %@";
+"Quota is refreshed per account. Each attempt waits at least 15 minutes; no automatic retries." = "Quota is refreshed per account. Each attempt waits at least 15 minutes; no automatic retries.";
+"Use Refresh quota to request this account's usage." = "Use Refresh quota to request this account's usage.";
+"Stored credentials are unavailable. Re-authenticate this account to refresh quota." = "Stored credentials are unavailable. Re-authenticate this account to refresh quota.";
+"Quota refresh is cooling down. No request was sent." = "Quota refresh is cooling down. No request was sent.";
+"Another quota request is running. No request was sent." = "Another quota request is running. No request was sent.";
+"Rate limited. Waiting for the server's deadline; no automatic retry." = "Rate limited. Waiting for the server's deadline; no automatic retry.";
+"Quota access was refused. No automatic retry." = "Quota access was refused. No automatic retry.";
+"Refresh quota in the background" = "Refresh quota in the background";
+"Quota refresh is manual by default. Each account waits at least 15 minutes; server limits may require longer. This does not guarantee protection from account restrictions." = "Quota refresh is manual by default. Each account waits at least 15 minutes; server limits may require longer. This does not guarantee protection from account restrictions.";
+"Auto-switch requires background quota refresh and uses recent saved readings without extra requests." = "Auto-switch requires background quota refresh and uses recent saved readings without extra requests.";
+"Refresh statistics; background quota follows your settings" = "Refresh statistics; background quota follows your settings";
+
+// Per-account refresh controls
+"Automatic quota refresh" = "Automatic quota refresh";
+"Enable automatic quota refresh separately on each account's quota card. It is off by default." = "Enable automatic quota refresh separately on each account's quota card. It is off by default.";
+"This account's quota request is running. No request was sent." = "This account's quota request is running. No request was sent.";
+
+// Copy login address
+"Login address copied" = "Login address copied";
+"Copy login address" = "Copy login address";
+"Copy the address into your preferred browser to sign in, then return here." = "Copy the address into your preferred browser to sign in, then return here.";
+"Preparing login address..." = "Preparing login address...";
+
+// Saved quota and account authorization viewer
+"Could not restore saved quota: %@" = "Could not restore saved quota: %@";
+"Edit account" = "Edit account";
+"Account backup" = "Account backup";
+"View the saved token and OAuth identity for this account. This is a read-only backup, not the current CLI credentials." = "View the saved token and OAuth identity for this account. This is a read-only backup, not the current CLI credentials.";
+"Show saved authorization" = "Show saved authorization";
+"Save" = "Save";
+"No authorization backup is stored for this account." = "No authorization backup is stored for this account.";
+"The authorization store is unavailable. Unlock the keychain or allow access, then close and reopen this editor." = "The authorization store is unavailable. Unlock the keychain or allow access, then close and reopen this editor.";
+"The saved authorization could not be formatted." = "The saved authorization could not be formatted.";
+
+// Copy the original email, independent of masking
+"Copy full email" = "Copy full email";
+"Email copied" = "Email copied";

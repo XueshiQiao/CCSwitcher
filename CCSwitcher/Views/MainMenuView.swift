@@ -354,7 +354,7 @@ struct MainMenuView: View {
             }
             .buttonStyle(.plain)
             .focusable(false)
-            .help("Refresh")
+            .help("Refresh statistics; background quota follows your settings")
 
             Button {
                 NSApp.activate(ignoringOtherApps: true)
