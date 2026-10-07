@@ -6,12 +6,12 @@ enum AppStyle {
     // Layout
     static let cardCornerRadius: CGFloat = 10
     static let cardPadding: CGFloat = 12
-    static let screenHorizontalPadding: CGFloat = 16
+    static let screenHorizontalPadding: CGFloat = 12
 
     // Shadow
-    static let cardShadowColor = Color.black.opacity(0.10)
-    static let cardShadowRadius: CGFloat = 5
-    static let cardShadowY: CGFloat = 6
+    static let cardShadowColor = Color.black.opacity(0.04)
+    static let cardShadowRadius: CGFloat = 2
+    static let cardShadowY: CGFloat = 1
 
     // Badge
     static let badgeHPadding: CGFloat = 6

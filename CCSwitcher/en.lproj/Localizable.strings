@@ -227,3 +227,92 @@
 // Copy the original email, independent of masking
 "Copy full email" = "Copy full email";
 "Email copied" = "Email copied";
+
+// Recycled accounts and relative quota recovery
+"Recycled" = "Recycled";
+"Recycled accounts keep their authorization and saved usage. Restore an account to use it again." = "Recycled accounts keep their authorization and saved usage. Restore an account to use it again.";
+"No recycled accounts" = "No recycled accounts";
+"Accounts you recycle will appear here." = "Accounts you recycle will appear here.";
+"Restore account" = "Restore account";
+"Recycle account" = "Recycle account";
+"Account actions" = "Account actions";
+"Recycling keeps the current CLI login unchanged." = "Recycling keeps the current CLI login unchanged.";
+"This account is recycled. Restore it from Recycled Accounts." = "This account is recycled. Restore it from Recycled Accounts.";
+"Weekly · Opus" = "Weekly · Opus";
+"Weekly · Sonnet" = "Weekly · Sonnet";
+"Weekly · OAuth apps" = "Weekly · OAuth apps";
+"Weekly · Cowork" = "Weekly · Cowork";
+"Iguana necktie" = "Iguana necktie";
+"Usage unknown" = "Usage unknown";
+"Reset time unknown" = "Reset time unknown";
+"Reset time reached · refresh to update" = "Reset time reached · refresh to update";
+"Ready to refresh" = "Ready to refresh";
+"Resets in %lld hr %lld min" = "Resets in %lld hr %lld min";
+"Refresh available in %lld hr %lld min" = "Refresh available in %lld hr %lld min";
+
+"Auto refresh" = "Auto refresh";
+"Resets in %lld hr %lld min (%lld days)" = "Resets in %lld hr %lld min (%lld days)";
+"Used %lld%%" = "Used %lld%%";
+"Quota comes only from local CLI records. No quota requests are sent." = "Quota comes only from local CLI records. No quota requests are sent.";
+"Not collected yet. Use Claude Code in a new session, then sync local data." = "Not collected yet. Use Claude Code in a new session, then sync local data.";
+"Auto sync" = "Auto sync";
+"Sync local data" = "Sync local data";
+"CLI record" = "CLI record";
+"Historical record" = "Historical record";
+"Auto sync reads local CLI quota records only. Enable it separately on each account's card." = "Auto sync reads local CLI quota records only. Enable it separately on each account's card.";
+"Start a new Claude Code session after installing the collector. Missing quota data never triggers a network request." = "Start a new Claude Code session after installing the collector. Missing quota data never triggers a network request.";
+"Auto-switch requires automatic local sync and recent CLI records. It never requests quota." = "Auto-switch requires automatic local sync and recent CLI records. It never requests quota.";
+"Local account identity unavailable. No quota request was sent." = "Local account identity unavailable. No quota request was sent.";
+"Could not read local CLI quota: %@" = "Could not read local CLI quota: %@";
+"Reset time reached · waiting for CLI data" = "Reset time reached · waiting for CLI data";
+"Local-only mode does not switch accounts automatically. Switch accounts manually in Accounts." = "Local-only mode does not switch accounts automatically. Switch accounts manually in Accounts.";
+
+// Current-account official CLI cache
+"Accounts & Usage" = "Accounts & Usage";
+"Local statistics" = "Local statistics";
+"All local sessions, not per-account usage." = "All local sessions, not per-account usage.";
+"Read-only" = "Read-only";
+"No local quota record" = "No local quota record";
+"Weekly · Fable" = "Weekly · Fable";
+"Fable · Not collected yet" = "Fable · Not collected yet";
+"Use Claude Code normally, then sync its local quota cache." = "Use Claude Code normally, then sync its local quota cache.";
+"The current CLI account changed. Refresh the account list before syncing quota." = "The current CLI account changed. Refresh the account list before syncing quota.";
+"The local quota cache belongs to another account. Waiting for the current CLI account to update it." = "The local quota cache belongs to another account. Waiting for the current CLI account to update it.";
+"The local CLI quota cache contains invalid data." = "The local CLI quota cache contains invalid data.";
+"Only the current account can sync local quota. Other accounts keep their saved records." = "Only the current account can sync local quota. Other accounts keep their saved records.";
+"Quota is read from the official CLI cache. Missing data never triggers a network request." = "Quota is read from the official CLI cache. Missing data never triggers a network request.";
+
+// Stable window and explicit CLI check
+"Local cache" = "Local cache";
+"Hide saved quota" = "Hide saved quota";
+"Show saved quota" = "Show saved quota";
+"Read cache" = "Read cache";
+"Check with CLI" = "Check with CLI";
+"CLI in %lld min" = "CLI in %lld min";
+"Open the official CLI's /usage in safe mode. The CLI may connect to Anthropic. No model message is sent." = "Open the official CLI's /usage in safe mode. The CLI may connect to Anthropic. No model message is sent.";
+
+"CLI account configuration is not supported for a quota check." = "CLI account configuration is not supported for a quota check.";
+"Claude CLI executable is unavailable." = "Claude CLI executable is unavailable.";
+"Could not open Terminal for the Claude quota check." = "Could not open Terminal for the Claude quota check.";
+
+// Per-model cost and token cache efficiency
+"Period" = "Period";
+"All accounts on this Mac · API-equivalent estimate, not subscription charges or quota." = "All accounts on this Mac · API-equivalent estimate, not subscription charges or quota.";
+"By model" = "By model";
+"Priced subtotal" = "Priced subtotal";
+"Overall cache hit rate" = "Overall cache hit rate";
+"Unpriced" = "Unpriced";
+"Some models have no price and are excluded from the subtotal." = "Some models have no price and are excluded from the subtotal.";
+"Cache hit rate" = "Cache hit rate";
+"Token details" = "Token details";
+"Cache write" = "Cache write";
+"Cache read" = "Cache read";
+"Not applicable" = "Not applicable";
+"Cache hit rate = cache read / (input + cache write + cache read). Output is excluded." = "Cache hit rate = cache read / (input + cache write + cache read). Output is excluded.";
+"Rates are weighted by token count. No input means not applicable; an unknown price does not mean free usage." = "Rates are weighted by token count. No input means not applicable; an unknown price does not mean free usage.";
+
+"Current account" = "Current account";
+"Local logs · API-equivalent estimate" = "Local logs · API-equivalent estimate";
+"Unpriced usage excluded" = "Unpriced usage excluded";
+"Expanded" = "Expanded";
+"Collapsed" = "Collapsed";

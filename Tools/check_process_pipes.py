@@ -142,7 +142,6 @@ def main():
     sources = [
         "Services/ClaudeService.swift",
         "Services/CancelableProcess.swift",
-        "Services/UsageRequestLimiter.swift",
         "Services/KeychainService.swift",
         "Models/Account.swift",
         "Models/String+Obfuscation.swift",

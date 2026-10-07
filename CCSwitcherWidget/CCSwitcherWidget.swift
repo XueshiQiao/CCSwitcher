@@ -56,8 +56,8 @@ struct CCSwitcherProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<CCSwitcherEntry>) -> Void) {
         let entry = currentEntry()
-        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: .now)!
-        completion(Timeline(entries: [entry], policy: .after(nextUpdate)))
+        // The main app reloads timelines after saving fresh local data.
+        completion(Timeline(entries: [entry], policy: .never))
     }
 
     private func currentEntry() -> CCSwitcherEntry {

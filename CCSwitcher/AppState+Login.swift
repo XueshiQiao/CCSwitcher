@@ -108,11 +108,15 @@ extension AppState {
                     accounts[i].isActive = (i == existing)
                 }
                 accounts[existing].lastUsed = Date()
+                if accounts[existing].recycledAt != nil {
+                    automaticUsageAccountIDs.remove(accounts[existing].id.uuidString)
+                }
+                accounts[existing].recycledAt = nil
                 activeAccount = accounts[existing]
                 // A login is a deliberate account choice; grant it the same
                 // auto-switch grace period a manual switch gets.
                 lastAutoSwitchAt = Date()
-                saveAccounts()
+                saveAccounts(refreshWidget: true)
                 if captured {
                     errorMessage = String(localized: "Account already exists - credentials refreshed", bundle: L10n.bundle)
                 } else {
@@ -164,6 +168,7 @@ extension AppState {
 
     /// Re-authenticate an account by running `claude auth login` and capturing fresh credentials.
     func reauthenticateAccount(_ account: Account) async {
+        guard let account = visibleAccounts.first(where: { $0.id == account.id }) else { return }
         log.info("[reauth] ===== Re-authenticating account \(account.id) (\(account.email)) =====")
         guard claudeAvailable else {
             errorMessage = String(localized: "Claude CLI not found", bundle: L10n.bundle)

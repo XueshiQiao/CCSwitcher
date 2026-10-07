@@ -10,9 +10,11 @@ final class AppState: ObservableObject {
     // MARK: - Published State
 
     @Published var accounts: [Account] = []
+    var visibleAccounts: [Account] { accounts.filter { $0.recycledAt == nil } }
+    var recycledAccounts: [Account] { accounts.filter { $0.recycledAt != nil } }
     @Published var activeAccount: Account?
     @Published var accountUsage: [UUID: UsageAPIResponse] = [:]
-    /// Only successful quota requests advance a sample's timestamp.
+    /// Time the CLI last emitted changed quota data, or the original historical sample time.
     @Published var accountUsageSampledAt: [UUID: Date] = [:]
     @Published var usageSummary: UsageSummary = .empty
     @Published var recentActivity: [DailyActivity] = []
@@ -23,7 +25,8 @@ final class AppState: ObservableObject {
     @Published var isCancellingLogin = false
     @Published var loginURL: URL?
     @Published var refreshingUsageAccountIDs: Set<UUID> = []
-    @Published var usageNextRefreshAt: [UUID: Date] = [:]
+    @Published var cliUsageAccountIDs: Set<UUID> = []
+    var officialCLIUsageAccountIDs: Set<UUID> = []
     @Published var automaticUsageAccountIDs = Set(UserDefaults.standard.stringArray(forKey: "automaticUsageAccountIDs") ?? []) {
         didSet { UserDefaults.standard.set(Array(automaticUsageAccountIDs), forKey: "automaticUsageAccountIDs") }
     }
@@ -31,7 +34,7 @@ final class AppState: ObservableObject {
     var suppressAutomaticAccountDiscovery = false
 
     var backgroundUsageRefreshEnabled: Bool {
-        accounts.contains { automaticUsageAccountIDs.contains($0.id.uuidString) }
+        visibleAccounts.contains { $0.id == activeAccount?.id && automaticUsageAccountIDs.contains($0.id.uuidString) }
     }
     @Published var errorMessage: String?
     @Published var claudeAvailable = false
@@ -61,12 +64,8 @@ final class AppState: ObservableObject {
 
     // MARK: - Usage polling state
 
-    /// Re-entrancy guard: overlapping refreshes (timer + manual button + post-switch)
-    /// would each burst per-account usage requests and trip the endpoint's rate limit.
+    /// Prevent overlapping local statistics scans and account mutations.
     var isRefreshing = false
-
-    /// Background opt-in fetches at most one due account per cycle.
-    var usageFetchCursor = 0
 
     /// One switch (manual or automatic) may mutate live credentials at a time.
     /// `switchTo` suspends across subprocess and keychain work while the UI stays
@@ -75,28 +74,8 @@ final class AppState: ObservableObject {
     /// ~/.claude.json writes with the first.
     @Published var isSwitching = false
 
-    // MARK: - Auto-switch
-
-    /// Whether proactive auto-switch is on (written by SettingsView via @AppStorage).
-    private var autoSwitchEnabled: Bool {
-        UserDefaults.standard.bool(forKey: "autoSwitchEnabled")
-    }
-
-    /// Utilization percentage at which we switch. Defaults to 90 when unset.
-    private var autoSwitchThreshold: Double {
-        let stored = UserDefaults.standard.double(forKey: "autoSwitchThreshold")
-        return stored == 0 ? 90 : stored
-    }
-
-    /// A candidate must sit at least this far below the threshold to be eligible,
-    /// so two accounts hovering at the line never ping-pong.
-    private let autoSwitchHysteresis: Double = 10
-
-    /// Minimum gap between two automatic switches, to avoid rapid flip-flopping.
-    private let autoSwitchCooldown: TimeInterval = 300
-
+    /// Retained as the last explicit account-selection time.
     var lastAutoSwitchAt: Date?
-    private var isEvaluatingAutoSwitch = false
 
     // MARK: - Initialization
 
@@ -109,20 +88,9 @@ final class AppState: ObservableObject {
 
     // MARK: - Refresh
 
-    /// Refresh everything, then decide whether to auto-switch.
-    ///
-    /// The two halves are deliberately separate: `refreshData()` holds the
-    /// `isRefreshing` re-entrancy guard for its whole body, so evaluating
-    /// auto-switch *inside* it would mean the `switchTo() -> refresh()` that
-    /// follows an automatic switch gets swallowed by that guard — leaving the
-    /// spinner stuck and the new active account showing pre-switch numbers.
-    /// And when `refreshData()` did NOT run (login in progress, another refresh
-    /// already running), auto-switch must not be evaluated either: it would act
-    /// on state mid-mutation — swapping credentials during a login, or deciding
-    /// on samples a concurrent refresh is rewriting.
+    /// Background refresh is local-only; account switching is always explicit.
     func refresh() async {
-        guard await refreshData() else { return }
-        await evaluateAutoSwitch()
+        if await refreshData() { refreshLocalUsage() }
     }
 
     /// Returns true only when a full refresh actually ran.
@@ -140,25 +108,15 @@ final class AppState: ObservableObject {
         isLoading = true
         errorMessage = nil
 
-        claudeAvailable = await claudeService.isClaudeAvailable()
-        log.info("[refresh] Claude available: \(self.claudeAvailable)")
-
-        if claudeAvailable {
-            do {
-                let status = try await claudeService.getAuthStatus()
-                updateActiveAccount(from: status)
-            } catch {
-                log.error("[refresh] getAuthStatus failed: \(error.localizedDescription)")
-                errorMessage = error.localizedDescription
-            }
-        }
-
-        // Passive token health check (no CLI calls, keychain reads only)
-        diagnoseTokenHealth()
-
-        // Quota requests require explicit background opt-in.
-        if await refreshUsageCooldowns(), backgroundUsageRefreshEnabled {
-            await refreshNextAccountUsage()
+        claudeAvailable = FileManager.default.isExecutableFile(atPath: claudeService.claudePath)
+        // Passive refresh reads identity already stored by the CLI; it never launches it.
+        if let identity = keychain.readOAuthAccount(),
+           let email = identity["emailAddress"]?.value as? String {
+            let known = accounts.first { $0.email == email }
+            let status = AuthStatus(loggedIn: true, authMethod: "claude.ai", apiProvider: "firstParty",
+                                    email: email, orgId: nil, orgName: known?.orgName,
+                                    subscriptionType: known?.subscriptionType)
+            updateActiveAccount(from: status)
         }
         lastUsageRefresh = Date()
 
@@ -182,9 +140,9 @@ final class AppState: ObservableObject {
         return true
     }
 
-    func startAutoRefresh(interval: TimeInterval = 300) {
+    func startAutoRefresh() {
         stopAutoRefresh()
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
             guard let self else { return }
             Task { @MainActor in
                 await self.refresh()
@@ -224,8 +182,10 @@ final class AppState: ObservableObject {
             }
             log.info("[addAccount] Current auth: logged in, sub=\(status.subscriptionType ?? "nil")")
 
-            if accounts.contains(where: { $0.email == email }) {
-                errorMessage = String(localized: "Account already exists", bundle: L10n.bundle)
+            if let existing = accounts.first(where: { $0.email == email }) {
+                errorMessage = existing.recycledAt == nil
+                    ? String(localized: "Account already exists", bundle: L10n.bundle)
+                    : String(localized: "This account is recycled. Restore it from Recycled Accounts.", bundle: L10n.bundle)
                 log.warning("[addAccount] Aborted: duplicate account")
                 return
             }
@@ -277,30 +237,28 @@ final class AppState: ObservableObject {
         log.info("[updateAccountLabel] Set label for \(account.email): \(trimmed ?? "nil")")
     }
 
-    func removeAccount(_ account: Account) {
-        log.info("[removeAccount] Removing account \(account.id)")
-        guard !isLoggingIn, !isSwitching, refreshingUsageAccountIDs.isEmpty else { return }
-        keychain.removeAccountBackup(forAccountId: account.id.uuidString)
-        accounts.removeAll { $0.id == account.id }
+    func recycleAccount(_ account: Account) {
+        guard !isLoggingIn, !isSwitching, !isRefreshing, refreshingUsageAccountIDs.isEmpty,
+              let index = accounts.firstIndex(where: { $0.id == account.id && $0.recycledAt == nil }) else { return }
+        accounts[index].recycledAt = Date()
         automaticUsageAccountIDs.remove(account.id.uuidString)
-        // Drop every per-account cache too, or a re-added account inherits the
-        // removed one's readings, error banner and rate-limit park.
-        accountUsage[account.id] = nil
-        accountUsageSampledAt[account.id] = nil
-        accountUsageErrors[account.id] = nil
-        usageNextRefreshAt[account.id] = nil
-        UserDefaults.standard.removeObject(forKey: "savedUsage." + account.id.uuidString)
-        if account.isActive, let first = accounts.first {
-            accounts[accounts.startIndex].isActive = true
-            activeAccount = accounts.first
-            log.info("[removeAccount] Removed active account, switching to first remaining")
-            Task { await switchTo(first) }
-        }
-        saveAccounts()
-        log.info("[removeAccount] Done. Remaining accounts: \(self.accounts.count)")
+        if activeAccount?.id == account.id { activeAccount = accounts[index] }
+        saveAccounts(refreshWidget: true)
+    }
+
+    func restoreAccount(_ account: Account) {
+        guard !isLoggingIn, !isSwitching, !isRefreshing, refreshingUsageAccountIDs.isEmpty,
+              let index = accounts.firstIndex(where: { $0.id == account.id && $0.recycledAt != nil }) else { return }
+        accounts[index].recycledAt = nil
+        automaticUsageAccountIDs.remove(account.id.uuidString)
+        if activeAccount?.id == account.id { activeAccount = accounts[index] }
+        saveAccounts(refreshWidget: true)
     }
 
     func switchTo(_ account: Account) async {
+        guard let account = visibleAccounts.first(where: { $0.id == account.id }) else {
+            return
+        }
         let currentActive = activeAccount
         guard currentActive?.id != account.id else {
             log.info("[switchTo] No switch needed (same account)")
@@ -370,119 +328,16 @@ final class AppState: ObservableObject {
         }
     }
 
-    // MARK: - Auto-switch
-
-    /// Whether an account can be switched to right now: it must have a stored
-    /// backup token and not be flagged expired (an expired backup would fail the
-    /// switch verification, or silently swap in a dead session).
-    private func isSwitchable(_ account: Account) -> Bool {
-        guard keychain.getAccountBackup(forAccountId: account.id.uuidString) != nil else { return false }
-        if accountUsageErrors[account.id] != nil { return false }
-        return true
-    }
-
-    /// Evaluate whether the active account has reached the threshold and, if so,
-    /// switch to the same-provider account with the most quota left.
-    /// Called after every completed refresh. Safe to call repeatedly.
-    ///
-    /// Use only samples younger than 15 minutes. Verification never sends
-    /// extra quota requests, and manual-only mode does not auto-switch.
-    private func evaluateAutoSwitch() async {
-        guard backgroundUsageRefreshEnabled, autoSwitchEnabled, !isEvaluatingAutoSwitch else { return }
-        guard !isLoggingIn, !isSwitching, refreshingUsageAccountIDs.isEmpty, let active = activeAccount else { return }
-
-        // Cooldown: never auto-switch more than once per window.
-        if let last = lastAutoSwitchAt, Date().timeIntervalSince(last) < autoSwitchCooldown {
-            return
-        }
-
-        // Only consider same-provider accounts (a Claude switch never touches Codex/Gemini).
-        let candidates = accounts.filter { $0.provider == active.provider && $0.id != active.id }
-        let recentUsage = accountUsage.filter { id, _ in
-            guard let sampledAt = accountUsageSampledAt[id] else { return false }
-            return Date().timeIntervalSince(sampledAt) < 15 * 60
-        }
-        let ranked = AutoSwitchEngine.rankedTargets(
-            active: active,
-            candidates: candidates,
-            usageByAccount: recentUsage,
-            isSwitchable: { [unowned self] in self.isSwitchable($0) },
-            activeSampledThisCycle: false,
-            threshold: autoSwitchThreshold,
-            hysteresisPct: autoSwitchHysteresis
-        )
-        guard !ranked.isEmpty else { return }
-
-        isEvaluatingAutoSwitch = true
-        defer { isEvaluatingAutoSwitch = false }
-
-        let activeUtil = AutoSwitchEngine.bindingUtilization(accountUsage[active.id]) ?? -1
-        let ceiling = autoSwitchThreshold - autoSwitchHysteresis
-        log.info("[autoSwitch] Active \(active.id) at \(String(format: "%.0f", activeUtil))% (threshold \(String(format: "%.0f", self.autoSwitchThreshold))%); \(ranked.count) candidate(s)")
-
-        // Background opt-in permits switching from recent samples, never extra HTTP probes.
-        for target in ranked {
-            let usage = recentUsage[target.id]
-            guard let verifiedUtil = AutoSwitchEngine.bindingUtilization(usage),
-                  verifiedUtil <= ceiling else {
-                log.info("[autoSwitch] Candidate \(target.id) failed verification (\(AutoSwitchEngine.bindingUtilization(usage).map { String(format: "%.0f%%", $0) } ?? "no reading")); trying next")
-                continue
-            }
-
-            log.info("[autoSwitch] Switching to \(target.id), verified at \(String(format: "%.0f", verifiedUtil))%")
-            lastAutoSwitchAt = Date()
-            // switchTo() calls refresh() -> evaluateAutoSwitch() again, but the
-            // re-entrancy flag + the freshly-set cooldown make that a no-op.
-            // The active account visibly changes in the menu bar as feedback.
-            await switchTo(target)
-            return
-        }
-        log.info("[autoSwitch] Threshold reached but no candidate verified; staying put")
-    }
-
-    // MARK: - Diagnostics
-
-    /// Message for the case where the CLI *is* authenticated but reports no
-    /// account, because a credential source outranking the stored claude.ai login
-    /// is in play. Without this the user only saw "Not logged in" / "Login did not
-    /// complete" and re-authorized in a loop that could never help (issue #18).
     func shadowedIdentityMessage(_ status: AuthStatus) -> String {
         let method = status.shadowingAuthMethod ?? "unknown"
         return String(localized: "Claude CLI is authenticating via \(method) instead of a stored claude.ai login, so it reports no account. Unset ANTHROPIC_AUTH_TOKEN / CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_PROFILE and remove any apiKeyHelper, then try again.", bundle: L10n.bundle)
     }
 
-    /// Passive health check — verifies backup existence and identity consistency.
-    private func diagnoseTokenHealth() {
-        guard !accounts.isEmpty else { return }
-
-        log.info("[diagnose] === Health Check ===")
-        log.info("[diagnose] Accounts: \(self.accounts.count), active: \(self.activeAccount?.email ?? "none")")
-
-        // Check live oauthAccount identity
-        if let liveOAuth = keychain.readOAuthAccount() {
-            let liveEmail = (liveOAuth["emailAddress"]?.value as? String) ?? "?"
-            log.info("[diagnose] Live oauthAccount: \(liveEmail)")
-        } else {
-            log.warning("[diagnose] Live oauthAccount: MISSING")
-        }
-
-        // Check each account has a backup
-        for account in accounts {
-            if let backup = keychain.getAccountBackup(forAccountId: account.id.uuidString) {
-                let backupEmail = (backup.oauthAccount["emailAddress"]?.value as? String) ?? "?"
-                log.info("[diagnose] Backup [\(account.email)]: OK (email=\(backupEmail))")
-            } else {
-                log.warning("[diagnose] Backup [\(account.email)]: MISSING — switch will fail")
-            }
-        }
-
-        log.info("[diagnose] === End Health Check ===")
-    }
 
     // MARK: - Widget
 
     func updateWidgetData() {
-        let widgetAccounts = accounts.map { account in
+        let widgetAccounts = visibleAccounts.map { account in
             let usage = accountUsage[account.id]
             let error = accountUsageErrors[account.id]
             return WidgetAccountData(

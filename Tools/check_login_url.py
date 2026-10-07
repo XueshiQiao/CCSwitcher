@@ -87,7 +87,7 @@ while [ ! -f "$LOGIN_CHECK_DIR/finish" ]; do /bin/sleep 0.1; done
 def main():
     root = Path(__file__).resolve().parent.parent
     sources = [
-        "Services/UsageRequestLimiter.swift", "Services/ClaudeService.swift",
+        "Services/ClaudeService.swift",
         "Services/CancelableProcess.swift", "Services/KeychainService.swift",
         "Models/Account.swift", "Models/String+Obfuscation.swift", "Models/UsageData.swift",
     ]

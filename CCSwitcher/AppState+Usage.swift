@@ -4,6 +4,8 @@ extension AppState {
     private struct SavedUsage: Codable {
         let usage: UsageAPIResponse
         let sampledAt: Date
+        let fromCLI: Bool?
+        let source: String?
     }
 
     func loadSavedUsage() {
@@ -14,6 +16,8 @@ extension AppState {
                 let saved = try JSONDecoder().decode(SavedUsage.self, from: data)
                 accountUsage[account.id] = saved.usage
                 accountUsageSampledAt[account.id] = saved.sampledAt
+                if saved.fromCLI == true { cliUsageAccountIDs.insert(account.id) }
+                if saved.source == "officialCLI" { officialCLIUsageAccountIDs.insert(account.id) }
             } catch {
                 accountUsageErrors[account.id] = UsageErrorState(
                     isExpired: false, isRateLimited: false,
@@ -22,94 +26,85 @@ extension AppState {
         }
     }
 
-    @discardableResult
-    func refreshUsageCooldowns() async -> Bool {
+    func cliUsageCheckAvailableAt(_ account: Account) -> Date? {
+        guard let started = UserDefaults.standard.object(forKey: "cliUsageCheckStarted." + account.id.uuidString) as? Date else { return nil }
+        let available = started.addingTimeInterval(15 * 60)
+        return available > Date() ? available : nil
+    }
+
+    func openCLIUsageSession(_ account: Account) {
+        guard !isLoggingIn, !isSwitching, !isLoading, !isRefreshing, refreshingUsageAccountIDs.isEmpty,
+              activeAccount?.id == account.id,
+              let current = visibleAccounts.first(where: { $0.id == account.id }),
+              cliUsageCheckAvailableAt(current) == nil else { return }
+        guard let identity = keychain.readOAuthAccount(),
+              let accountUuid = identity["accountUuid"]?.value as? String, UUID(uuidString: accountUuid) != nil,
+              let email = identity["emailAddress"]?.value as? String, email == current.email else {
+            errorMessage = String(localized: "Local account identity unavailable. No quota request was sent.", bundle: L10n.bundle)
+            return
+        }
         do {
-            for account in accounts {
-                usageNextRefreshAt[account.id] = try await UsageRequestLimiter.shared.nextAllowedDate(for: account.id)
-            }
-            return true
+            try CLIUsageSession.open(claudePath: claudeService.claudePath, accountUuid: accountUuid, email: email)
+            UserDefaults.standard.set(Date(), forKey: "cliUsageCheckStarted." + current.id.uuidString)
+            errorMessage = nil
+            // Opening Terminal is not a completed quota fetch; keep the real sample timestamp.
+            objectWillChange.send()
         } catch {
             errorMessage = error.localizedDescription
-            return false
         }
     }
 
     func refreshAccountUsage(_ account: Account) async {
-        guard !isLoggingIn, !isSwitching,
-              !refreshingUsageAccountIDs.contains(account.id),
-              let current = accounts.first(where: { $0.id == account.id }) else { return }
-        await performUsageRefresh(current)
+        guard !isLoggingIn, !isSwitching, !isLoading, !isRefreshing, refreshingUsageAccountIDs.isEmpty,
+              activeAccount?.id == account.id,
+              let current = visibleAccounts.first(where: { $0.id == account.id }) else { return }
+        importCLIUsage(current)
+        updateWidgetData()
     }
 
-    func refreshNextAccountUsage() async {
-        guard !isLoggingIn, !isSwitching else { return }
-        let eligible = accounts.filter {
-            automaticUsageAccountIDs.contains($0.id.uuidString)
-                && !refreshingUsageAccountIDs.contains($0.id)
-                && (usageNextRefreshAt[$0.id] ?? .distantPast) <= Date()
-        }
-        guard !eligible.isEmpty else { return }
-        let target: Account
-        if let active = eligible.first(where: \.isActive) {
-            target = active
-        } else {
-            target = eligible[usageFetchCursor % eligible.count]
-            usageFetchCursor += 1
-        }
-        await performUsageRefresh(target)
+    /// Only the current account may import local data; inactive accounts retain history.
+    func refreshLocalUsage() {
+        guard !isLoggingIn, !isSwitching, !isLoading, !isRefreshing, refreshingUsageAccountIDs.isEmpty,
+              let account = visibleAccounts.first(where: { $0.id == activeAccount?.id }),
+              automaticUsageAccountIDs.contains(account.id.uuidString) else { return }
+        let previous = accountUsageSampledAt
+        importCLIUsage(account)
+        if accountUsageSampledAt != previous { updateWidgetData() }
     }
 
-    private func performUsageRefresh(_ account: Account) async {
-        refreshingUsageAccountIDs.insert(account.id)
-        defer { refreshingUsageAccountIDs.remove(account.id) }
-
+    private func importCLIUsage(_ account: Account) {
         do {
-            let tokenJSON = account.isActive
-                ? keychain.readClaudeToken()
-                : keychain.getAccountBackup(forAccountId: account.id.uuidString)?.token
-            guard let tokenJSON, let accessToken = ClaudeService.extractAccessToken(from: tokenJSON) else {
-                accountUsageErrors[account.id] = UsageErrorState(
-                    isExpired: true, isRateLimited: false,
-                    message: String(localized: "Stored credentials are unavailable. Re-authenticate this account to refresh quota.", bundle: L10n.bundle))
+            guard let identity = keychain.readOAuthAccount(),
+                  let accountUuid = identity["accountUuid"]?.value as? String,
+                  let email = identity["emailAddress"]?.value as? String,
+                  email == account.email else {
+                accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: false,
+                    message: String(localized: "Local account identity unavailable. No quota request was sent.", bundle: L10n.bundle))
                 return
             }
-
-            let usage = try await claudeService.getUsageLimits(accessToken: accessToken, accountID: account.id)
-            let sampledAt = Date()
-            let data = try JSONEncoder().encode(SavedUsage(usage: usage, sampledAt: sampledAt))
+            guard let snapshot = try CLIUsageStore.read(accountUuid: accountUuid, email: email) else {
+                accountUsageErrors[account.id] = nil
+                return
+            }
+            let observedAt = Date(timeIntervalSince1970: snapshot.observedAt)
+            // Re-reading a file never makes a historical record look newly sampled.
+            // Legacy bridge timestamps described CLI output observation, not the official sample.
+            if officialCLIUsageAccountIDs.contains(account.id),
+               let previous = accountUsageSampledAt[account.id], observedAt <= previous {
+                accountUsageErrors[account.id] = nil
+                return
+            }
+            let usage = snapshot.usage
+            let data = try JSONEncoder().encode(SavedUsage(usage: usage, sampledAt: observedAt, fromCLI: true, source: "officialCLI"))
             UserDefaults.standard.set(data, forKey: "savedUsage." + account.id.uuidString)
             accountUsage[account.id] = usage
-            accountUsageSampledAt[account.id] = sampledAt
+            accountUsageSampledAt[account.id] = observedAt
+            cliUsageAccountIDs.insert(account.id)
+            officialCLIUsageAccountIDs.insert(account.id)
             accountUsageErrors[account.id] = nil
-        } catch UsageRequestLimiter.RequestError.cooldown(let until) {
-            usageNextRefreshAt[account.id] = until
-            accountUsageErrors[account.id] = UsageErrorState(
-                isExpired: false, isRateLimited: false,
-                message: String(localized: "Quota refresh is cooling down. No request was sent.", bundle: L10n.bundle))
-        } catch UsageRequestLimiter.RequestError.busy {
-            accountUsageErrors[account.id] = UsageErrorState(
-                isExpired: false, isRateLimited: false,
-                message: String(localized: "This account's quota request is running. No request was sent.", bundle: L10n.bundle))
-        } catch ClaudeService.UsageError.rateLimited {
-            accountUsageErrors[account.id] = UsageErrorState(
-                isExpired: false, isRateLimited: true,
-                message: String(localized: "Rate limited. Waiting for the server's deadline; no automatic retry.", bundle: L10n.bundle))
-        } catch ClaudeService.UsageError.expired {
-            accountUsageErrors[account.id] = UsageErrorState(
-                isExpired: true, isRateLimited: false,
-                message: String(localized: "Session expired. Re-authenticate (↻) to fix.", bundle: L10n.bundle))
-        } catch ClaudeService.UsageError.forbidden {
-            accountUsageErrors[account.id] = UsageErrorState(
-                isExpired: false, isRateLimited: false,
-                message: String(localized: "Quota access was refused. No automatic retry.", bundle: L10n.bundle))
         } catch {
-            accountUsageErrors[account.id] = UsageErrorState(
-                isExpired: false, isRateLimited: false,
-                message: String(localized: "Could not fetch usage: \(error.localizedDescription)", bundle: L10n.bundle))
+            accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: false,
+                message: String(localized: "Could not read local CLI quota: \(error.localizedDescription)", bundle: L10n.bundle))
         }
-        // Failed requests keep both the previous sample and its original timestamp.
-        await refreshUsageCooldowns()
-        updateWidgetData()
     }
 }

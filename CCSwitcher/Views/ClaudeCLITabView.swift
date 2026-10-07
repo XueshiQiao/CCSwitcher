@@ -13,7 +13,6 @@ struct ClaudeCLITabView: View {
     @State private var customInput: String = ""
     @State private var customError: String? = nil
     @State private var installedVersion: String? = nil
-    @State private var latestVersion: String? = nil
     @State private var isLoading: Bool = false
     /// When non-nil, the next onChange callback receiving this exact value is treated as
     /// a programmatic write and suppressed. Tying the suppression to a specific value
@@ -74,21 +73,6 @@ struct ClaudeCLITabView: View {
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                 }
-                HStack {
-                    Text("Latest")
-                    Spacer()
-                    Text(latestVersion ?? (isLoading ? "Checking…" : "—"))
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                    if let installed = installedVersion, let latest = latestVersion, installed != latest {
-                        Text("Update available")
-                            .font(.caption2.weight(.semibold))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.orange.opacity(0.2), in: Capsule())
-                            .foregroundStyle(.orange)
-                    }
-                }
             }
 
             Section {
@@ -125,18 +109,14 @@ struct ClaudeCLITabView: View {
         await reloadVersions()
     }
 
-    /// Cancel any prior version fetch, then load installed + latest fresh.
+    /// Cancel any prior version fetch, then read the installed version.
     private func reloadVersions() async {
         versionLoadTask?.cancel()
         let activePath = ClaudeService.shared.claudePath
         let task = Task { @MainActor in
-            async let installed = ClaudeService.readVersion(at: activePath)
-            async let latest = ClaudeService.fetchLatestVersion()
-            let i = await installed
-            let l = await latest
+            let installed = await ClaudeService.readVersion(at: activePath)
             guard !Task.isCancelled else { return }
-            installedVersion = i
-            latestVersion = l
+            installedVersion = installed
         }
         versionLoadTask = task
         await task.value

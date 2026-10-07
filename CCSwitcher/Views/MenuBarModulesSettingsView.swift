@@ -9,8 +9,7 @@ struct MenuBarModulesSettingsView: View {
     @EnvironmentObject private var config: MenuBarConfig
 
     @State private var rows: [Row] = []
-    @State private var tick: Date = Date()
-    private let previewTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
+    private var tick: Date { Date() }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -73,7 +72,6 @@ struct MenuBarModulesSettingsView: View {
             .padding(.top, 2)
         }
         .onAppear(perform: load)
-        .onReceive(previewTimer) { tick = $0 }
     }
 
     // MARK: - Preview

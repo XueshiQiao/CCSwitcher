@@ -23,7 +23,6 @@ struct CCSwitcherApp: App {
     @StateObject private var appState = AppState()
     @StateObject private var updateChecker = UpdateChecker()
     @StateObject private var menuBarConfig = MenuBarConfig.shared
-    @AppStorage("refreshInterval") private var refreshInterval: Double = 300
     @AppStorage("appLanguage") private var appLanguage = "auto"
 
     @State private var statusItemController = StatusItemController()
@@ -37,9 +36,6 @@ struct CCSwitcherApp: App {
                 .onAppear {
                     guard !didBootstrap else { return }
                     didBootstrap = true
-                    // Sparkle's SPUStandardUpdaterController(startingUpdater: true)
-                    // schedules its own background update checks; no need to
-                    // call checkForUpdates here.
                     _ = updateChecker
                     statusItemController.install(
                         appState: appState,
@@ -49,7 +45,7 @@ struct CCSwitcherApp: App {
                     // Kick off background usage tracking immediately upon app start
                     Task {
                         await appState.refresh()
-                        appState.startAutoRefresh(interval: refreshInterval)
+                        appState.startAutoRefresh()
                     }
                 }
                 .onChange(of: appLanguage) { _, _ in

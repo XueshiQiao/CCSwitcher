@@ -38,6 +38,7 @@ struct Account: Identifiable, Codable, Hashable {
     var isActive: Bool
     var lastUsed: Date?
     var customLabel: String?
+    var recycledAt: Date?
 
     /// Subscription type with first letter capitalized (e.g., "max" → "Max").
     var displaySubscriptionType: String? {
@@ -90,7 +91,8 @@ struct Account: Identifiable, Codable, Hashable {
         subscriptionType: String? = nil,
         isActive: Bool = false,
         lastUsed: Date? = nil,
-        customLabel: String? = nil
+        customLabel: String? = nil,
+        recycledAt: Date? = nil
     ) {
         self.id = id
         self.email = email
@@ -101,6 +103,7 @@ struct Account: Identifiable, Codable, Hashable {
         self.isActive = isActive
         self.lastUsed = lastUsed
         self.customLabel = customLabel
+        self.recycledAt = recycledAt
     }
 }
 

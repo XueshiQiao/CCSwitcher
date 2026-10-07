@@ -74,7 +74,50 @@ struct TokenUsage {
     }
 }
 
-/// Aggregated cost for a single day.
+/// Exact model identity and deduplicated request totals.
+struct ModelCost: Identifiable {
+    let modelID: String
+    var inputTokens: Int
+    var outputTokens: Int
+    var cacheWriteTokens: Int
+    var cacheReadTokens: Int
+    var requestCount: Int
+    var cost: Double?
+
+    var id: String { modelID }
+    var totalTokens: Int { inputTokens + outputTokens + cacheWriteTokens + cacheReadTokens }
+    var cacheHitRate: Double? {
+        let input = inputTokens + cacheWriteTokens + cacheReadTokens
+        return input > 0 ? Double(cacheReadTokens) / Double(input) * 100 : nil
+    }
+
+    mutating func add(_ other: ModelCost) {
+        inputTokens += other.inputTokens
+        outputTokens += other.outputTokens
+        cacheWriteTokens += other.cacheWriteTokens
+        cacheReadTokens += other.cacheReadTokens
+        requestCount += other.requestCount
+        if let current = cost, let additional = other.cost { cost = current + additional }
+        else { cost = nil }
+    }
+}
+
+struct CostPeriodSummary {
+    let models: [ModelCost]
+    let dailyCosts: [DailyCost]
+
+    var knownCost: Double { dailyCosts.reduce(0) { $0 + $1.totalCost } }
+    var hasUnpricedUsage: Bool { models.contains { $0.cost == nil } }
+    var totalTokens: Int { models.reduce(0) { $0 + $1.totalTokens } }
+    var requestCount: Int { models.reduce(0) { $0 + $1.requestCount } }
+    var cacheHitRate: Double? {
+        let reads = models.reduce(0) { $0 + $1.cacheReadTokens }
+        let input = models.reduce(0) { $0 + $1.inputTokens + $1.cacheWriteTokens + $1.cacheReadTokens }
+        return input > 0 ? Double(reads) / Double(input) * 100 : nil
+    }
+}
+
+/// Aggregated cost for a single local calendar day.
 struct DailyCost: Identifiable {
     let date: String // "yyyy-MM-dd"
     let totalCost: Double
@@ -84,6 +127,7 @@ struct DailyCost: Identifiable {
     let outputTokens: Int
     let cacheWriteTokens: Int
     let cacheReadTokens: Int
+    var models: [ModelCost] = []
 
     var id: String { date }
 
@@ -105,6 +149,30 @@ struct CostSummary {
 
     var totalCost: Double {
         dailyCosts.reduce(0) { $0 + $1.totalCost }
+    }
+
+    /// Includes the ending local day and the preceding days; future records are excluded.
+    func period(days: Int, ending: Date = .now, calendar: Calendar = .current) -> CostPeriodSummary {
+        // Parsed cache keys use Gregorian dates even when the user's calendar does not.
+        var dateCalendar = Calendar(identifier: .gregorian)
+        dateCalendar.timeZone = calendar.timeZone
+        let end = dateCalendar.startOfDay(for: ending)
+        let start = dateCalendar.date(byAdding: .day, value: -(days - 1), to: end)!
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = dateCalendar
+        formatter.timeZone = dateCalendar.timeZone
+        formatter.dateFormat = "yyyy-MM-dd"
+        let startKey = formatter.string(from: start), endKey = formatter.string(from: end)
+        let selectedDays = dailyCosts.filter { $0.date >= startKey && $0.date <= endKey }
+        var models: [String: ModelCost] = [:]
+        for day in selectedDays {
+            for model in day.models {
+                if models[model.modelID] != nil { models[model.modelID]!.add(model) }
+                else { models[model.modelID] = model }
+            }
+        }
+        return CostPeriodSummary(models: models.values.sorted { $0.modelID < $1.modelID }, dailyCosts: selectedDays)
     }
 
     static let empty = CostSummary(todayCost: 0, dailyCosts: [])

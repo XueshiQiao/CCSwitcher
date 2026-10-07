@@ -21,6 +21,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     private var stripRefreshCancellables = Set<AnyCancellable>()
     private var isStripRefreshScheduled = false
     private var installed = false
+    private var popoverSize = NSSize(width: 420, height: 600)
+    private var pendingStripWidth: CGFloat?
 
     func install(appState: AppState, config: MenuBarConfig, locale: Locale) {
         guard !installed else { return }
@@ -68,17 +70,17 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         popover.animates = false
         let popoverController = NSHostingController(
             rootView: AnyView(
-                MainMenuView()
+                MainMenuView(height: popoverSize.height)
                     .environmentObject(appState)
                     .environmentObject(config)
                     .environment(\.locale, locale)
             )
         )
         if #available(macOS 13.0, *) {
-            popoverController.sizingOptions = [.preferredContentSize]
-        } else {
-            popoverController.preferredContentSize = NSSize(width: 360, height: 520)
+            popoverController.sizingOptions = []
         }
+        popoverController.preferredContentSize = popoverSize
+        popoverController.view.setFrameSize(popoverSize)
         popover.contentViewController = popoverController
         popover.delegate = self
         self.popover = popover
@@ -92,7 +94,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         guard let appState, let config = menuBarConfig else { return }
         stripController?.rootView = makeStripView(appState: appState, config: config, locale: locale)
         popoverController?.rootView = AnyView(
-            MainMenuView()
+            MainMenuView(height: popoverSize.height)
                 .environmentObject(appState)
                 .environmentObject(config)
                 .environment(\.locale, locale)
@@ -104,23 +106,42 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         if popover.isShown {
             popover.performClose(sender)
         } else {
+            // Choose one size for this opening. Content changes scroll inside it.
+            if let screen = sender.window?.screen {
+                popoverSize.height = min(600, screen.visibleFrame.height - 40)
+            }
+            updateLocale(currentLocale)
+            popoverController?.preferredContentSize = popoverSize
+            popoverController?.view.setFrameSize(popoverSize)
+            popover.contentSize = popoverSize
             popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()
         }
     }
 
     private func makeStripView(appState: AppState, config: MenuBarConfig, locale: Locale) -> AnyView {
-        let statusItem = self.statusItem
         return AnyView(
             MenuBarStripView(
                 appState: appState,
                 config: config,
-                onWidth: { [weak statusItem] width in
-                    statusItem?.length = max(width, 1)
+                onWidth: { [weak self] width in
+                    guard let self else { return }
+                    if popover?.isShown == true {
+                        pendingStripWidth = max(width, 1)
+                    } else {
+                        statusItem?.length = max(width, 1)
+                    }
                 }
             )
             .environment(\.locale, locale)
         )
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        if let pendingStripWidth {
+            statusItem?.length = pendingStripWidth
+            self.pendingStripWidth = nil
+        }
     }
 
     private func observeStripRefreshes(appState: AppState, config: MenuBarConfig) {
