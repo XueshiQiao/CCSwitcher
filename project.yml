@@ -34,6 +34,8 @@ targets:
     sources:
       - path: CCSwitcher
       - path: Shared
+      - path: Tools/ccswitch
+        buildPhase: resources
     info:
       path: CCSwitcher/Info.plist
       properties:

@@ -23,6 +23,7 @@ CCSwitcher is a lightweight, pure menu bar macOS application designed to help de
 
 - **Non-Interruptive Account Switching**: The native `claude auth logout` clears the current account's credentials, and switching back requires another full OAuth. CCSwitcher keeps a separate backup of each account (keychain token + `~/.claude.json` `oauthAccount` block), atomically swaps both on switch — every added account's credentials stay intact, one-click swap-back, no workflow interruption. (Note: an in-flight `claude` session will pick up the newly-switched credentials on its next API call — this is Claude CLI behavior, not something CCSwitcher controls.)
 - **Multi-Account Management**: Add and switch between different Claude Code accounts with a single click from the macOS menu bar.
+- **CLI Account Switching**: Switch a saved account from the terminal with `ccswitch <email>`. The command delegates the credential swap to the running CCSwitcher app and verifies the result against both Claude Code identity records.
 - **Usage Dashboard**: Real-time monitoring of your Claude API usage limits (5-hour session and weekly) directly in the menu bar dropdown, plus today's API-equivalent cost and activity stats (turns, active minutes, lines written, model breakdown).
 - **Configurable Menu Bar Modules**: Build your own iStats-style menu bar readout. Choose any combination of account name, 5-hour session usage, weekly usage, today's cost, and session/weekly reset countdowns — each rendered as a compact two-line module (label over value, with monochrome progress bars for utilization). Drag to reorder and toggle modules in Settings, with a live preview.
 - **Desktop Widgets**: Native macOS desktop widgets in small, medium, and large sizes showing account usage, costs, and activity stats. Includes a circular ring variant for at-a-glance usage monitoring.
@@ -66,6 +67,24 @@ CCSwitcher is a lightweight, pure menu bar macOS application designed to help de
 <p align="center">
   <video src="https://github.com/user-attachments/assets/ca37eaae-e8d8-4557-995e-bc154442c833" width="864" autoplay loop muted playsinline />
 </p>
+
+## Command-line switching
+
+The release app bundles a small `ccswitch` command. Link it into your PATH once:
+
+```bash
+sudo ln -sf /Applications/CCSwitcher.app/Contents/Resources/ccswitch /usr/local/bin/ccswitch
+```
+
+Then list saved accounts, show the current account, or switch by email:
+
+```bash
+ccswitch list
+ccswitch current
+ccswitch account@example.com
+```
+
+CCSwitcher may already be running or closed. The command launches it in the background when needed, asks the app to perform the same atomic switch used by the menu-bar UI, and exits only after `claude auth status` and `~/.claude.json` both report the requested account.
 
 ## Key Features & Architecture
 

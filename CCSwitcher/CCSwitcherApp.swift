@@ -34,6 +34,9 @@ struct CCSwitcherApp: App {
         // shows the native toolbar tabs even though the UI is AppKit-based.
         WindowGroup("CCSwitcherKeepalive") {
             HiddenWindowView()
+                .onOpenURL { url in
+                    handleCommandURL(url)
+                }
                 .onAppear {
                     guard !didBootstrap else { return }
                     didBootstrap = true
@@ -70,5 +73,27 @@ struct CCSwitcherApp: App {
 
     private var currentLocale: Locale {
         appLanguage == "auto" ? .autoupdatingCurrent : Locale(identifier: appLanguage)
+    }
+
+    /// Headless command bridge for the local `ccswitch` CLI.
+    /// Example: ccswitcher://switch?email=person%40example.com
+    private func handleCommandURL(_ url: URL) {
+        guard url.scheme?.lowercased() == "ccswitcher",
+              url.host?.lowercased() == "switch",
+              let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let email = components.queryItems?.first(where: { $0.name == "email" })?.value,
+              !email.isEmpty else {
+            return
+        }
+
+        guard let account = appState.accounts.first(where: {
+            $0.email.caseInsensitiveCompare(email) == .orderedSame
+        }) else {
+            return
+        }
+
+        Task { @MainActor in
+            await appState.switchTo(account)
+        }
     }
 }
