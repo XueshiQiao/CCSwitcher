@@ -11,6 +11,15 @@ struct UsageAPIResponse: Codable {
     let sevenDayCowork: UsageWindow?
     let iguanaNecktie: UsageWindow?
     let extraUsage: ExtraUsage?
+    /// Canonical list of every limit window the account is subject to.
+    ///
+    /// The top-level keys above are a fixed, partly code-named set: a weekly
+    /// limit scoped to one model arrives as `weekly_scoped` in here, and the
+    /// only place its model name exists is `scope.model.display_name`. An
+    /// account can therefore sit at 100% on a per-model weekly limit while
+    /// `five_hour` and `seven_day` both look healthy, which is exactly the
+    /// case the card used to render as "everything is fine".
+    let limits: [UsageLimit]?
 
     enum CodingKeys: String, CodingKey {
         case fiveHour = "five_hour"
@@ -21,6 +30,116 @@ struct UsageAPIResponse: Codable {
         case sevenDayCowork = "seven_day_cowork"
         case iguanaNecktie = "iguana_necktie"
         case extraUsage = "extra_usage"
+        case limits
+    }
+}
+
+// MARK: - Limits array
+
+/// One entry of `limits`. `kind` is `session`, `weekly_all` or `weekly_scoped`
+/// today; unknown kinds are kept and rendered from their own name so a new
+/// server-side window shows up without an app update.
+struct UsageLimit: Codable {
+    let kind: String?
+    let group: String?
+    let percent: Double?
+    let severity: String?
+    let resetsAt: String?
+    let scope: UsageLimitScope?
+    let isActive: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case kind, group, percent, severity, scope
+        case resetsAt = "resets_at"
+        case isActive = "is_active"
+    }
+
+    /// "Fable", "Opus"… for a model-scoped window; nil for account-wide ones.
+    var scopeName: String? {
+        scope?.model?.displayName ?? scope?.surface
+    }
+}
+
+struct UsageLimitScope: Codable {
+    let model: UsageLimitModel?
+    let surface: String?
+}
+
+struct UsageLimitModel: Codable {
+    let id: String?
+    let displayName: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case displayName = "display_name"
+    }
+}
+
+// MARK: - Display windows
+
+/// A single row of an account card, already resolved to a title and a bar.
+struct UsageDisplayWindow: Identifiable {
+    let id: String
+    /// Untranslated scope suffix ("Fable"); nil for Session / account-wide Weekly.
+    let scopeName: String?
+    let isSession: Bool
+    let utilization: Double?
+    let resetsAt: String?
+    /// The window the API says is the one actually constraining the account.
+    let isLimiting: Bool
+
+    var window: UsageWindow { UsageWindow(utilization: utilization, resetsAt: resetsAt) }
+}
+
+extension UsageAPIResponse {
+    /// Every limit row to draw, in a stable order: session first, then the
+    /// account-wide weekly, then model-scoped weeklies (worst first).
+    ///
+    /// Falls back to the legacy top-level keys when `limits` is absent, so an
+    /// older or trimmed response still renders exactly what it used to.
+    var displayWindows: [UsageDisplayWindow] {
+        if let limits, !limits.isEmpty {
+            var rows: [UsageDisplayWindow] = []
+            for (index, limit) in limits.enumerated() {
+                let kind = limit.kind ?? limit.group ?? "limit"
+                let isSession = (kind == "session") || (limit.group == "session")
+                rows.append(
+                    UsageDisplayWindow(
+                        id: "\(kind)-\(limit.scopeName ?? "all")-\(index)",
+                        scopeName: limit.scopeName,
+                        isSession: isSession,
+                        utilization: limit.percent,
+                        resetsAt: limit.resetsAt,
+                        isLimiting: limit.isActive == true
+                    )
+                )
+            }
+            return rows.sorted { lhs, rhs in
+                if lhs.isSession != rhs.isSession { return lhs.isSession }
+                if (lhs.scopeName == nil) != (rhs.scopeName == nil) { return lhs.scopeName == nil }
+                return (lhs.utilization ?? 0) > (rhs.utilization ?? 0)
+            }
+        }
+
+        var rows: [UsageDisplayWindow] = []
+        if let fiveHour {
+            rows.append(UsageDisplayWindow(id: "five_hour", scopeName: nil, isSession: true,
+                                           utilization: fiveHour.utilization, resetsAt: fiveHour.resetsAt,
+                                           isLimiting: false))
+        }
+        if let sevenDay {
+            rows.append(UsageDisplayWindow(id: "seven_day", scopeName: nil, isSession: false,
+                                           utilization: sevenDay.utilization, resetsAt: sevenDay.resetsAt,
+                                           isLimiting: false))
+        }
+        for (name, window) in [("Opus", sevenDayOpus), ("Sonnet", sevenDaySonnet)] {
+            if let window, window.utilization != nil {
+                rows.append(UsageDisplayWindow(id: "seven_day_\(name)", scopeName: name, isSession: false,
+                                               utilization: window.utilization, resetsAt: window.resetsAt,
+                                               isLimiting: false))
+            }
+        }
+        return rows
     }
 }
 
