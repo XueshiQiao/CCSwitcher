@@ -7,6 +7,31 @@ private let log = FileLog("Keychain")
 struct AccountBackup: Codable {
     let token: String
     let oauthAccount: [String: AnyCodable]
+
+    /// Whether the stored token still carries an OAuth secret the CLI could
+    /// authenticate with.
+    ///
+    /// A capture that runs while the CLI holds no live login writes back a
+    /// full-looking envelope with `accessToken` and `refreshToken` both set to
+    /// the empty string. Nothing else about that backup looks wrong: the
+    /// `oauthAccount` block is intact, the email is right, the scopes and
+    /// `subscriptionType` are right, and the JSON is only a couple of hundred
+    /// bytes shorter than a good one. So it survives every existing check,
+    /// gets written over a working login, and fails verification a moment
+    /// later.
+    ///
+    /// An envelope with no `claudeAiOauth` block at all is left alone: that is
+    /// an auth shape this check does not know about, and refusing it would
+    /// block switches that work today.
+    var hasUsableCredentials: Bool {
+        guard let data = token.data(using: .utf8),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return false }
+        guard let oauth = root["claudeAiOauth"] as? [String: Any] else { return true }
+        let accessToken = oauth["accessToken"] as? String ?? ""
+        let refreshToken = oauth["refreshToken"] as? String ?? ""
+        return !accessToken.isEmpty || !refreshToken.isEmpty
+    }
 }
 
 /// Type-erased Codable wrapper for heterogeneous JSON values.
