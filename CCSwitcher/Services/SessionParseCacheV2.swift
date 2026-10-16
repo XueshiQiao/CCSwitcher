@@ -90,12 +90,22 @@ actor SessionParseCacheV2 {
     // max-output-wins; bump forces a full re-parse so old caches don't serve
     // entries missing the new field or deduped under the old first-wins rule.
     private static let currentVersion = 3
+    /// Minimum time between cache writes. A save re-encodes and rewrites the
+    /// whole cache (100+ MB on a large history), and a running Claude session
+    /// touches its transcript between refreshes, so saving on every refresh
+    /// rewrites the file continuously. Deferring is safe because the cache is
+    /// rebuildable from the transcripts: a stale on-disk copy only means the
+    /// files changed since then are re-parsed at next launch.
+    static let minSaveInterval: TimeInterval = 15 * 60
     private let claudeProjectsDir: String
     private let cacheURL: URL
 
     private var files: [String: CachedFileV2] = [:]
     private var pricingMeta: PricingMeta = .init(source: "unknown", fetchedAt: nil)
     private var loaded = false
+    /// True when the in-memory cache differs from the copy on disk.
+    private var dirty = false
+    private var lastSavedAt: Date?
 
     private init() {
         self.claudeProjectsDir = NSHomeDirectory() + "/.claude/projects"
@@ -110,9 +120,10 @@ actor SessionParseCacheV2 {
     // MARK: Public API
 
     /// Walk `~/.claude/projects/**/*.jsonl`, re-parse any file whose mtime
-    /// has changed, evict missing files, persist the result. All work runs
-    /// on the actor's executor; the actor is on the cooperative pool, not
-    /// the main thread, so the UI is never blocked.
+    /// has changed, evict missing files, persist the result (at most once
+    /// per `minSaveInterval`). All work runs on the actor's executor; the
+    /// actor is on the cooperative pool, not the main thread, so the UI is
+    /// never blocked.
     func refreshFromFilesystem() async {
         ensureLoaded()
         await PricingService.shared.ensureLoaded()
@@ -123,7 +134,9 @@ actor SessionParseCacheV2 {
         await PricingService.shared.reloadIfFreshChanged()
         // Capture the current pricing source for the envelope stamp.
         let src = await PricingService.shared.currentSource()
-        pricingMeta = stampFor(source: src)
+        let stamp = stampFor(source: src)
+        if stamp.source != pricingMeta.source { dirty = true }
+        pricingMeta = stamp
         // Trigger a TTL'd background refresh of the LiteLLM JSON. No-op if fresh.
         PricingService.shared.refreshInBackground()
 
@@ -140,6 +153,7 @@ actor SessionParseCacheV2 {
             evicted += 1
             log.debug("EVICT \(path) reason=file-deleted")
         }
+        if !result.updates.isEmpty || evicted > 0 { dirty = true }
 
         let totalMs = Int(Date().timeIntervalSince(start) * 1000)
         log.info(
@@ -150,7 +164,13 @@ actor SessionParseCacheV2 {
             + "pricing=\(pricingMeta.source)"
         )
 
-        save()
+        if dirty, !savedRecently { save() }
+    }
+
+    /// Write unsaved changes now, ignoring `minSaveInterval`. Called before
+    /// the app exits so a quit doesn't drop what the throttle was holding.
+    func flush() {
+        if dirty { save() }
     }
 
     /// Per-day, per-model cost summary. Applies global max-output-wins dedup
@@ -389,6 +409,13 @@ actor SessionParseCacheV2 {
         log.info("LOAD bytes=\(data.count) entries=\(files.count) pricing=\(envelope.pricing.source)")
     }
 
+    /// False until the first save of this launch, so a freshly parsed cache
+    /// is persisted right away rather than `minSaveInterval` later.
+    private var savedRecently: Bool {
+        guard let lastSavedAt else { return false }
+        return Date().timeIntervalSince(lastSavedAt) < Self.minSaveInterval
+    }
+
     private func save() {
         let envelope = CacheEnvelopeV2(
             version: Self.currentVersion,
@@ -404,6 +431,8 @@ actor SessionParseCacheV2 {
         }
         do {
             try data.write(to: cacheURL, options: .atomic)
+            dirty = false
+            lastSavedAt = Date()
             log.info("SAVE bytes=\(data.count) entries=\(files.count)")
         } catch {
             log.error("SAVE failed: \(error.localizedDescription)")
