@@ -152,18 +152,22 @@
 "Limit bars" = "额度条";
 "Session bar color" = "会话条颜色";
 "Weekly bar color" = "每周条颜色";
+"Model weekly bar color" = "模型每周条颜色";
 "Low remaining color" = "低剩余额度颜色";
 "Low remaining threshold" = "低剩余额度阈值";
 "Account name" = "账户名称";
 "Session usage (5h)" = "会话用量（5小时）";
 "Weekly usage (7d)" = "每周用量（7天）";
+"Model weekly usage (7d)" = "模型每周用量（7天）";
 "Daily cost" = "今日花费";
 "Session reset countdown" = "会话重置倒计时";
 "Weekly reset countdown" = "每周重置倒计时";
+"Model weekly reset countdown" = "模型每周重置倒计时";
 "Menu Bar" = "菜单栏";
 "Account display" = "账户显示";
 "Session — usage vs time (5h)" = "会话 — 用量 vs 时间（5小时）";
 "Weekly — usage vs time (7d)" = "每周 — 用量 vs 时间（7天）";
+"Model weekly — usage vs time (7d)" = "模型每周 — 用量 vs 时间（7天）";
 "The vertical line marks time elapsed in the window; fill past it means you're using faster than the clock." = "竖线 = 时间进度（该时段已过去多少）；填充超过它 = 你用得比时间快。";
 "Claude Fable 5 — most powerful model, the new flagship tier" = "Claude Fable 5 — 最强大的模型，全新旗舰层级";
 

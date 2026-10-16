@@ -31,7 +31,7 @@ struct MenuBarModuleView: View {
                 .fixedSize()
         } else {
             VStack(alignment: .center, spacing: 0) {
-                Text(module.compactLabel)
+                Text(module.compactLabel(modelName: modelWeeklyName))
                     .font(.system(size: 8, weight: .semibold))
                     .kerning(0.2)
                     .foregroundStyle(.primary)
@@ -81,6 +81,19 @@ struct MenuBarModuleView: View {
                 fillColor: config.limitBarColor(for: .weekly, utilization: weeklyUtilization, context: .menuBar)
             )
 
+        case .modelWeeklyBar:
+            UtilizationBar(
+                utilization: modelWeeklyUtilization,
+                markerPercent: modelWeeklyTimeElapsed,
+                fillColor: config.limitBarColor(for: .modelWeekly, utilization: modelWeeklyUtilization, context: .menuBar)
+            )
+
+        case .modelWeeklyBarPlain:
+            UtilizationBar(
+                utilization: modelWeeklyUtilization,
+                fillColor: config.limitBarColor(for: .modelWeekly, utilization: modelWeeklyUtilization, context: .menuBar)
+            )
+
         case .dailyCost:
             Text(dailyCostText)
                 .font(.system(size: 10, weight: .medium).monospacedDigit())
@@ -95,6 +108,12 @@ struct MenuBarModuleView: View {
 
         case .weeklyReset:
             Text(weeklyResetText)
+                .font(.system(size: 10, weight: .medium).monospacedDigit())
+                .foregroundStyle(.primary)
+                .fixedSize()
+
+        case .modelWeeklyReset:
+            Text(modelWeeklyResetText)
                 .font(.system(size: 10, weight: .medium).monospacedDigit())
                 .foregroundStyle(.primary)
                 .fixedSize()
@@ -117,6 +136,22 @@ struct MenuBarModuleView: View {
     private var weeklyUtilization: Double? {
         guard let id = appState.activeAccount?.id else { return nil }
         return appState.accountUsage[id]?.sevenDay?.utilization
+    }
+
+    /// The whole model-scoped weekly window for the active account, resolved
+    /// once so label, bar and countdown always describe the same limit.
+    private var modelWeekly: ModelScopedWeekly? {
+        guard let id = appState.activeAccount?.id else { return nil }
+        return appState.accountUsage[id]?.modelScopedWeekly
+    }
+
+    private var modelWeeklyName: String? { modelWeekly?.modelName }
+
+    private var modelWeeklyUtilization: Double? { modelWeekly?.window.utilization }
+
+    private var modelWeeklyTimeElapsed: Double? {
+        _ = tick
+        return modelWeekly?.window.elapsedPercent(windowSeconds: RateLimitWindow.sevenDaySeconds)
     }
 
     private var sessionTimeElapsed: Double? {
@@ -156,6 +191,11 @@ struct MenuBarModuleView: View {
             return "—"
         }
         return s
+    }
+
+    private var modelWeeklyResetText: String {
+        _ = tick
+        return modelWeekly?.window.compactResetString ?? "—"
     }
 }
 

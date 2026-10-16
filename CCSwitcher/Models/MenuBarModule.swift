@@ -11,37 +11,58 @@ enum MenuBarModule: String, Codable, CaseIterable, Identifiable {
     case sessionBarPlain
     case weeklyBar
     case weeklyBarPlain
+    case modelWeeklyBar
+    case modelWeeklyBarPlain
     case dailyCost
     case sessionReset
     case weeklyReset
+    case modelWeeklyReset
 
     var id: String { rawValue }
 
     /// Short uppercase label shown on the top line of the module.
-    var compactLabel: String {
+    ///
+    /// `modelName` is the display name the usage API gives the model-scoped
+    /// weekly limit ("Fable", …). Only the model-scoped modules read it; they
+    /// fall back to a generic marker on accounts that have no scoped limit, so
+    /// the module still identifies itself next to the plain weekly one.
+    func compactLabel(modelName: String? = nil) -> String {
         switch self {
-        case .account:         return "@"
-        case .sessionBar:      return "5H"
-        case .sessionBarPlain: return "5H"
-        case .weeklyBar:       return "7D"
-        case .weeklyBarPlain:  return "7D"
-        case .dailyCost:       return "TODAY"
-        case .sessionReset:    return "5H↻"
-        case .weeklyReset:     return "7D↻"
+        case .account:              return "@"
+        case .sessionBar:           return "5H"
+        case .sessionBarPlain:      return "5H"
+        case .weeklyBar:            return "7D"
+        case .weeklyBarPlain:       return "7D"
+        case .modelWeeklyBar:       return Self.modelLabel(modelName)
+        case .modelWeeklyBarPlain:  return Self.modelLabel(modelName)
+        case .dailyCost:            return "TODAY"
+        case .sessionReset:         return "5H↻"
+        case .weeklyReset:          return "7D↻"
+        case .modelWeeklyReset:     return Self.modelLabel(modelName) + "↻"
         }
+    }
+
+    /// Uppercased model name, capped so an unexpectedly long tier name can't
+    /// stretch the menu bar. "MODEL" stands in until a sample arrives.
+    private static func modelLabel(_ modelName: String?) -> String {
+        guard let modelName, !modelName.isEmpty else { return "MODEL" }
+        return String(modelName.prefix(6)).uppercased()
     }
 
     /// Human-readable name shown in the Settings reorder list.
     var localizedDisplayName: String {
         switch self {
-        case .account:         return String(localized: "Account name", bundle: L10n.bundle)
-        case .sessionBar:      return String(localized: "Session — usage vs time (5h)", bundle: L10n.bundle)
-        case .sessionBarPlain: return String(localized: "Session usage (5h)", bundle: L10n.bundle)
-        case .weeklyBar:       return String(localized: "Weekly — usage vs time (7d)", bundle: L10n.bundle)
-        case .weeklyBarPlain:  return String(localized: "Weekly usage (7d)", bundle: L10n.bundle)
-        case .dailyCost:       return String(localized: "Daily cost", bundle: L10n.bundle)
-        case .sessionReset:    return String(localized: "Session reset countdown", bundle: L10n.bundle)
-        case .weeklyReset:     return String(localized: "Weekly reset countdown", bundle: L10n.bundle)
+        case .account:              return String(localized: "Account name", bundle: L10n.bundle)
+        case .sessionBar:           return String(localized: "Session — usage vs time (5h)", bundle: L10n.bundle)
+        case .sessionBarPlain:      return String(localized: "Session usage (5h)", bundle: L10n.bundle)
+        case .weeklyBar:            return String(localized: "Weekly — usage vs time (7d)", bundle: L10n.bundle)
+        case .weeklyBarPlain:       return String(localized: "Weekly usage (7d)", bundle: L10n.bundle)
+        case .modelWeeklyBar:       return String(localized: "Model weekly — usage vs time (7d)", bundle: L10n.bundle)
+        case .modelWeeklyBarPlain:  return String(localized: "Model weekly usage (7d)", bundle: L10n.bundle)
+        case .dailyCost:            return String(localized: "Daily cost", bundle: L10n.bundle)
+        case .sessionReset:         return String(localized: "Session reset countdown", bundle: L10n.bundle)
+        case .weeklyReset:          return String(localized: "Weekly reset countdown", bundle: L10n.bundle)
+        case .modelWeeklyReset:     return String(localized: "Model weekly reset countdown", bundle: L10n.bundle)
         }
     }
 }

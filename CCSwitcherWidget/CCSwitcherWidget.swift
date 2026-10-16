@@ -24,6 +24,9 @@ struct CCSwitcherEntry: TimelineEntry {
                     sessionResetTime: "2 hr 15 min",
                     weeklyUtilization: 28,
                     weeklyResetTime: "in 3 days",
+                    modelWeeklyLabel: "Fable",
+                    modelWeeklyUtilization: 34,
+                    modelWeeklyResetTime: "in 3 days",
                     extraUsageEnabled: true,
                     hasError: false,
                     errorMessage: nil
@@ -106,6 +109,23 @@ struct CCSwitcherWidgetEntryView: View {
 
 // MARK: - Small Widget
 
+/// Vertical density for the small widget.
+///
+/// A model-scoped weekly bar (e.g. "Fable") adds a third row to a layout that
+/// was already close to the 155pt edge, so the whole layout is offered at
+/// several densities and `ViewThatFits` picks the roomiest one that still fits.
+/// Accounts without a scoped limit keep the original `.roomy` look.
+private struct BarDensity {
+    let stackSpacing: CGFloat
+    let barSpacing: CGFloat
+    let barHeight: CGFloat
+    let costFont: Font
+
+    static let roomy = BarDensity(stackSpacing: 6, barSpacing: 3, barHeight: 5, costFont: .title3)
+    static let tight = BarDensity(stackSpacing: 4, barSpacing: 2, barHeight: 4, costFont: .callout)
+    static let tightest = BarDensity(stackSpacing: 2, barSpacing: 2, barHeight: 4, costFont: .subheadline)
+}
+
 private struct SmallWidgetView: View {
     let data: WidgetData
 
@@ -114,32 +134,16 @@ private struct SmallWidgetView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            // Header — icon + account + badge
-            HStack(spacing: 5) {
-                Image(systemName: "brain.head.profile")
-                    .font(.caption)
-                    .foregroundStyle(brandColor)
-                    .widgetAccentable()
-                if let account = activeAccount {
-                    Text(account.displayName)
-                        .font(.caption.weight(.semibold))
-                        .lineLimit(1)
-                    Spacer()
-                    if let sub = account.subscriptionType {
-                        Text(sub)
-                            .font(.caption2.weight(.medium))
-                            .foregroundStyle(brandColor)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 1)
-                            .background(brandColor.opacity(0.15), in: Capsule())
-                    }
-                } else {
-                    Text("CCSwitcher")
-                        .font(.caption.weight(.semibold))
-                    Spacer()
-                }
-            }
+        ViewThatFits(in: .vertical) {
+            content(.roomy)
+            content(.tight)
+            content(.tightest)
+        }
+    }
+
+    private func content(_ density: BarDensity) -> some View {
+        VStack(alignment: .leading, spacing: density.stackSpacing) {
+            header
 
             if let account = activeAccount {
                 Spacer(minLength: 2)
@@ -163,8 +167,11 @@ private struct SmallWidgetView: View {
                         }
                     }
                 } else {
-                    compactUsageBar(label: "Session", utilization: account.sessionUtilization)
-                    compactUsageBar(label: "Weekly", utilization: account.weeklyUtilization)
+                    compactUsageBar(label: Text("Session"), utilization: account.sessionUtilization, density: density)
+                    compactUsageBar(label: Text("Weekly"), utilization: account.weeklyUtilization, density: density)
+                    if let model = account.modelWeeklyLabel {
+                        compactUsageBar(label: Text(verbatim: model), utilization: account.modelWeeklyUtilization, density: density)
+                    }
                 }
 
                 Spacer(minLength: 2)
@@ -172,7 +179,7 @@ private struct SmallWidgetView: View {
                 // Today's cost
                 HStack {
                     Text(formatCost(data.todayCost))
-                        .font(.title3.weight(.semibold).monospacedDigit())
+                        .font(density.costFont.weight(.semibold).monospacedDigit())
                         .foregroundStyle(.green)
                     Text("today")
                         .font(.caption)
@@ -189,13 +196,42 @@ private struct SmallWidgetView: View {
         }
     }
 
-    private func compactUsageBar(label: LocalizedStringKey, utilization: Double?) -> some View {
+    // Header — icon + account + badge
+    private var header: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "brain.head.profile")
+                .font(.caption)
+                .foregroundStyle(brandColor)
+                .widgetAccentable()
+            if let account = activeAccount {
+                Text(account.displayName)
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1)
+                Spacer()
+                if let sub = account.subscriptionType {
+                    Text(sub)
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(brandColor)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(brandColor.opacity(0.15), in: Capsule())
+                }
+            } else {
+                Text("CCSwitcher")
+                    .font(.caption.weight(.semibold))
+                Spacer()
+            }
+        }
+    }
+
+    private func compactUsageBar(label: Text, utilization: Double?, density: BarDensity) -> some View {
         let pct = utilization ?? 0
-        return VStack(spacing: 3) {
+        return VStack(spacing: density.barSpacing) {
             HStack {
-                Text(label)
+                label
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
                 Spacer()
                 Text("\(Int(pct))%")
                     .font(.caption2.weight(.medium).monospacedDigit())
@@ -205,13 +241,13 @@ private struct SmallWidgetView: View {
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 2.5)
                         .fill(.quaternary)
-                        .frame(height: 5)
+                        .frame(height: density.barHeight)
                     RoundedRectangle(cornerRadius: 2.5)
                         .fill(colorForUtilization(pct))
-                        .frame(width: max(0, geo.size.width * min(pct / 100.0, 1.0)), height: 5)
+                        .frame(width: max(0, geo.size.width * min(pct / 100.0, 1.0)), height: density.barHeight)
                 }
             }
-            .frame(height: 5)
+            .frame(height: density.barHeight)
         }
     }
 }
@@ -279,9 +315,14 @@ private struct MediumWidgetView: View {
                             Spacer(minLength: 0)
                         } else {
                             Spacer(minLength: 0)
-                            usageBar(label: "Session", utilization: account.sessionUtilization, resetTime: account.sessionResetTime)
+                            usageBar(label: Text("Session"), utilization: account.sessionUtilization, resetTime: account.sessionResetTime)
                             Spacer(minLength: 4)
-                            usageBar(label: "Weekly", utilization: account.weeklyUtilization, resetTime: account.weeklyResetTime)
+                            usageBar(label: Text("Weekly"), utilization: account.weeklyUtilization, resetTime: account.weeklyResetTime)
+
+                            if let model = account.modelWeeklyLabel {
+                                Spacer(minLength: 4)
+                                usageBar(label: Text(verbatim: model), utilization: account.modelWeeklyUtilization, resetTime: account.modelWeeklyResetTime)
+                            }
 
                             if let extra = account.extraUsageEnabled {
                                 Spacer(minLength: 4)
@@ -325,18 +366,24 @@ private struct MediumWidgetView: View {
         }
     }
 
-    private func usageBar(label: LocalizedStringKey, utilization: Double?, resetTime: String?) -> some View {
+    private func usageBar(label: Text, utilization: Double?, resetTime: String?) -> some View {
         let pct = utilization ?? 0
         return VStack(spacing: 3) {
             HStack {
-                Text(label)
+                label
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
                 Spacer()
                 if let reset = resetTime {
+                    // Absolute reset times ("Wed 8:00 PM") wrap to two lines
+                    // otherwise, and with three bars stacked there is no room
+                    // for that.
                     Text(reset)
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 }
                 Text("\(Int(pct))%")
                     .font(.caption2.weight(.medium).monospacedDigit())
@@ -375,11 +422,38 @@ private struct MediumWidgetView: View {
 
 // MARK: - Large Widget
 
+/// Vertical density for the large widget.
+///
+/// A model-scoped weekly bar (e.g. "Fable") adds a row to *every* account card,
+/// which the stock spacing cannot absorb past a single account. Rather than
+/// clipping the last card, the whole layout is offered at several densities and
+/// `ViewThatFits` picks the roomiest that still fits — which also stops the
+/// three-account case from spilling over the way it used to.
+private struct LargeDensity {
+    let bodySpacing: CGFloat
+    let statsSpacing: CGFloat
+    let statsPadding: CGFloat
+    let cardSpacing: CGFloat
+    let cardPadding: CGFloat
+
+    static let roomy = LargeDensity(bodySpacing: 8, statsSpacing: 6, statsPadding: 10, cardSpacing: 10, cardPadding: 12)
+    static let tight = LargeDensity(bodySpacing: 6, statsSpacing: 5, statsPadding: 7, cardSpacing: 7, cardPadding: 9)
+    static let tightest = LargeDensity(bodySpacing: 4, statsSpacing: 3, statsPadding: 4, cardSpacing: 4, cardPadding: 5)
+}
+
 private struct LargeWidgetView: View {
     let data: WidgetData
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        ViewThatFits(in: .vertical) {
+            content(.roomy)
+            content(.tight)
+            content(.tightest)
+        }
+    }
+
+    private func content(_ density: LargeDensity) -> some View {
+        VStack(alignment: .leading, spacing: density.bodySpacing) {
             // Header
             HStack(spacing: 5) {
                 Image(systemName: "brain.head.profile")
@@ -395,7 +469,7 @@ private struct LargeWidgetView: View {
             }
 
             // Today's activity + model usage
-            VStack(spacing: 6) {
+            VStack(spacing: density.statsSpacing) {
                 HStack(spacing: 0) {
                     activityStat(icon: "bubble.left.and.bubble.right", value: "\(data.conversationTurns)", label: "Turns")
                     activityStat(icon: "clock", value: data.activeCodingTime, label: "Active")
@@ -417,12 +491,12 @@ private struct LargeWidgetView: View {
                     }
                 }
             }
-            .padding(.vertical, 10)
+            .padding(.vertical, density.statsPadding)
             .background(brandColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
 
             // Per-account cards — expand to fill remaining space
             ForEach(Array(data.accounts.enumerated()), id: \.offset) { _, account in
-                accountCard(account)
+                accountCard(account, spacing: density.cardSpacing, padding: density.cardPadding)
                     .frame(maxHeight: .infinity)
             }
         }
@@ -462,8 +536,8 @@ private struct LargeWidgetView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func accountCard(_ account: WidgetAccountData) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+    private func accountCard(_ account: WidgetAccountData, spacing: CGFloat, padding: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: spacing) {
             // Account header
             HStack(spacing: 6) {
                 Image(systemName: "brain.head.profile")
@@ -509,12 +583,15 @@ private struct LargeWidgetView: View {
                     }
                 }
             } else {
-                accountUsageBar(label: "Session", utilization: account.sessionUtilization, resetTime: account.sessionResetTime)
-                accountUsageBar(label: "Weekly", utilization: account.weeklyUtilization, resetTime: account.weeklyResetTime)
+                accountUsageBar(label: Text("Session"), utilization: account.sessionUtilization, resetTime: account.sessionResetTime)
+                accountUsageBar(label: Text("Weekly"), utilization: account.weeklyUtilization, resetTime: account.weeklyResetTime)
+                if let model = account.modelWeeklyLabel {
+                    accountUsageBar(label: Text(verbatim: model), utilization: account.modelWeeklyUtilization, resetTime: account.modelWeeklyResetTime)
+                }
             }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 12)
+        .padding(.vertical, padding)
         .background(
             RoundedRectangle(cornerRadius: 8)
                 .fill(account.isActive ? brandColor.opacity(0.22) : Color.white.opacity(0.04))
@@ -522,12 +599,13 @@ private struct LargeWidgetView: View {
         )
     }
 
-    private func accountUsageBar(label: LocalizedStringKey, utilization: Double?, resetTime: String?) -> some View {
+    private func accountUsageBar(label: Text, utilization: Double?, resetTime: String?) -> some View {
         let pct = utilization ?? 0
         return HStack(spacing: 6) {
-            Text(label)
+            label
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
                 .frame(width: 48, alignment: .leading)
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
@@ -582,19 +660,34 @@ private struct CircleWidgetView: View {
             Spacer(minLength: 0)
 
             if let account = activeAccount, !account.hasError {
-                HStack(spacing: 12) {
+                // A third ring has to share the same 155pt tile, so both the
+                // gap and the stroke get thinner rather than the rings.
+                let model = account.modelWeeklyLabel
+                let lineWidth: CGFloat = model == nil ? 6 : 5
+                HStack(spacing: model == nil ? 12 : 8) {
                     ringStat(
-                        label: "Session",
+                        label: Text("Session"),
                         resetTime: account.sessionResetTime,
                         utilization: account.sessionUtilization,
-                        accent: colorForUtilization(account.sessionUtilization ?? 0)
+                        accent: colorForUtilization(account.sessionUtilization ?? 0),
+                        lineWidth: lineWidth
                     )
                     ringStat(
-                        label: "Weekly",
+                        label: Text("Weekly"),
                         resetTime: account.weeklyResetTime,
                         utilization: account.weeklyUtilization,
-                        accent: colorForUtilization(account.weeklyUtilization ?? 0)
+                        accent: colorForUtilization(account.weeklyUtilization ?? 0),
+                        lineWidth: lineWidth
                     )
+                    if let model {
+                        ringStat(
+                            label: Text(verbatim: model),
+                            resetTime: account.modelWeeklyResetTime,
+                            utilization: account.modelWeeklyUtilization,
+                            accent: colorForUtilization(account.modelWeeklyUtilization ?? 0),
+                            lineWidth: lineWidth
+                        )
+                    }
                 }
                 .frame(maxWidth: .infinity)
             } else if let account = activeAccount, account.hasError {
@@ -626,29 +719,36 @@ private struct CircleWidgetView: View {
         }
     }
 
-    private func ringStat(label: LocalizedStringKey, resetTime: String?, utilization: Double?, accent: Color) -> some View {
+    private func ringStat(label: Text, resetTime: String?, utilization: Double?, accent: Color, lineWidth: CGFloat) -> some View {
         let pct = utilization ?? 0
         return VStack(spacing: 4) {
             ZStack {
                 Circle()
-                    .stroke(.quaternary, lineWidth: 6)
+                    .stroke(.quaternary, lineWidth: lineWidth)
                 Circle()
                     .trim(from: 0, to: min(pct / 100.0, 1.0))
-                    .stroke(accent, style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                    .stroke(accent, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                 Text("\(Int(pct))%")
                     .font(.caption.weight(.semibold).monospacedDigit())
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
             }
             .aspectRatio(1, contentMode: .fit)
 
-            Text(label)
+            label
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
             if let reset = resetTime {
+                // Three rings leave ~35pt per column; shrink the countdown
+                // rather than ellipsizing it down to "Wed…".
                 Text(reset)
                     .font(.system(size: 9))
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.65)
             }
         }
         .frame(maxWidth: .infinity)

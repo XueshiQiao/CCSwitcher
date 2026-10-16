@@ -4,6 +4,9 @@ import SwiftUI
 enum LimitBarKind {
     case session
     case weekly
+    /// The weekly limit scoped to a single model (e.g. Fable). Shares the
+    /// 7-day window with `.weekly` but has its own quota and its own color.
+    case modelWeekly
 }
 
 /// Where a limit bar is drawn. Only matters while the user keeps the stock
@@ -30,6 +33,7 @@ final class MenuBarConfig: ObservableObject {
     static let shared = MenuBarConfig()
     static let defaultSessionLimitBarColorHex = "#34C759"
     static let defaultWeeklyLimitBarColorHex = "#0A84FF"
+    static let defaultModelWeeklyLimitBarColorHex = "#AF52DE"
     static let defaultLowRemainingLimitBarColorHex = "#FF3B30"
     static let defaultLowRemainingThreshold = 30.0
 
@@ -55,6 +59,10 @@ final class MenuBarConfig: ObservableObject {
         didSet { persistWeeklyLimitBarColor() }
     }
 
+    @Published var modelWeeklyLimitBarColorHex: String {
+        didSet { persistModelWeeklyLimitBarColor() }
+    }
+
     @Published var lowRemainingLimitBarColorHex: String {
         didSet { persistLowRemainingLimitBarColor() }
     }
@@ -68,6 +76,7 @@ final class MenuBarConfig: ObservableObject {
     private let customizesLimitBarColorsKey = "customizesLimitBarColors"
     private let sessionLimitBarColorKey = "sessionLimitBarColor"
     private let weeklyLimitBarColorKey = "weeklyLimitBarColor"
+    private let modelWeeklyLimitBarColorKey = "modelWeeklyLimitBarColor"
     private let lowRemainingLimitBarColorKey = "lowRemainingLimitBarColor"
     private let lowRemainingWarningThresholdKey = "lowRemainingWarningThreshold"
 
@@ -88,6 +97,8 @@ final class MenuBarConfig: ObservableObject {
             ?? Self.defaultSessionLimitBarColorHex
         self.weeklyLimitBarColorHex = UserDefaults.standard.string(forKey: weeklyLimitBarColorKey)
             ?? Self.defaultWeeklyLimitBarColorHex
+        self.modelWeeklyLimitBarColorHex = UserDefaults.standard.string(forKey: modelWeeklyLimitBarColorKey)
+            ?? Self.defaultModelWeeklyLimitBarColorHex
         self.lowRemainingLimitBarColorHex = UserDefaults.standard.string(forKey: lowRemainingLimitBarColorKey)
             ?? Self.defaultLowRemainingLimitBarColorHex
         if let threshold = UserDefaults.standard.object(forKey: lowRemainingWarningThresholdKey) as? Double {
@@ -117,6 +128,10 @@ final class MenuBarConfig: ObservableObject {
         UserDefaults.standard.set(weeklyLimitBarColorHex, forKey: weeklyLimitBarColorKey)
     }
 
+    private func persistModelWeeklyLimitBarColor() {
+        UserDefaults.standard.set(modelWeeklyLimitBarColorHex, forKey: modelWeeklyLimitBarColorKey)
+    }
+
     private func persistLowRemainingLimitBarColor() {
         UserDefaults.standard.set(lowRemainingLimitBarColorHex, forKey: lowRemainingLimitBarColorKey)
     }
@@ -141,6 +156,10 @@ final class MenuBarConfig: ObservableObject {
 
     var weeklyLimitBarColor: Color {
         Self.color(from: weeklyLimitBarColorHex, fallback: Self.defaultWeeklyLimitBarColorHex)
+    }
+
+    var modelWeeklyLimitBarColor: Color {
+        Self.color(from: modelWeeklyLimitBarColorHex, fallback: Self.defaultModelWeeklyLimitBarColorHex)
     }
 
     var lowRemainingLimitBarColor: Color {
@@ -170,6 +189,8 @@ final class MenuBarConfig: ObservableObject {
             return sessionLimitBarColor
         case .weekly:
             return weeklyLimitBarColor
+        case .modelWeekly:
+            return modelWeeklyLimitBarColor
         }
     }
 

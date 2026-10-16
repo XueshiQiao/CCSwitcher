@@ -156,18 +156,22 @@
 "Limit bars" = "Limit bars";
 "Session bar color" = "Session bar color";
 "Weekly bar color" = "Weekly bar color";
+"Model weekly bar color" = "Model weekly bar color";
 "Low remaining color" = "Low remaining color";
 "Low remaining threshold" = "Low remaining threshold";
 "Account name" = "Account name";
 "Session usage (5h)" = "Session usage (5h)";
 "Weekly usage (7d)" = "Weekly usage (7d)";
+"Model weekly usage (7d)" = "Model weekly usage (7d)";
 "Daily cost" = "Daily cost";
 "Session reset countdown" = "Session reset countdown";
 "Weekly reset countdown" = "Weekly reset countdown";
+"Model weekly reset countdown" = "Model weekly reset countdown";
 "Menu Bar" = "Menu Bar";
 "Account display" = "Account display";
 "Session — usage vs time (5h)" = "Session — usage vs time (5h)";
 "Weekly — usage vs time (7d)" = "Weekly — usage vs time (7d)";
+"Model weekly — usage vs time (7d)" = "Model weekly — usage vs time (7d)";
 "The vertical line marks time elapsed in the window; fill past it means you're using faster than the clock." = "The vertical line marks time elapsed in the window; fill past it means you're using faster than the clock.";
 "Claude Fable 5 — most powerful model, the new flagship tier" = "Claude Fable 5 — most powerful model, the new flagship tier";
 

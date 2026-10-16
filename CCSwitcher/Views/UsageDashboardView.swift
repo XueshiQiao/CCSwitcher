@@ -281,7 +281,7 @@ struct UsageDashboardView: View {
     private func usageBars(_ usage: UsageAPIResponse) -> some View {
         if let session = usage.fiveHour {
             usageRow(
-                label: "Session",
+                label: Text("Session"),
                 resetText: session.resetTimeString,
                 utilization: session.utilization ?? 0,
                 kind: .session
@@ -289,10 +289,20 @@ struct UsageDashboardView: View {
         }
         if let weekly = usage.sevenDay {
             usageRow(
-                label: "Weekly",
+                label: Text("Weekly"),
                 resetText: weekly.resetTimeString,
                 utilization: weekly.utilization ?? 0,
                 kind: .weekly
+            )
+        }
+        // The weekly limit scoped to one model. The server names the model, so
+        // the label is verbatim rather than a localized key.
+        if let scoped = usage.modelScopedWeekly {
+            usageRow(
+                label: Text(verbatim: scoped.modelName),
+                resetText: scoped.window.resetTimeString,
+                utilization: scoped.window.utilization ?? 0,
+                kind: .modelWeekly
             )
         }
     }
@@ -320,14 +330,15 @@ struct UsageDashboardView: View {
 
     // MARK: - Usage Row
 
-    private func usageRow(label: LocalizedStringKey, resetText: String?, utilization: Double, kind: LimitBarKind) -> some View {
+    private func usageRow(label: Text, resetText: String?, utilization: Double, kind: LimitBarKind) -> some View {
         let fillColor = menuBarConfig.limitBarColor(for: kind, utilization: utilization, context: .dashboard)
 
         return VStack(spacing: 5) {
             HStack {
-                Text(label)
+                label
                     .font(.caption)
                     .foregroundStyle(.textSecondary)
+                    .lineLimit(1)
                 Spacer()
                 if let resetText {
                     Text("Resets in \(resetText)")
