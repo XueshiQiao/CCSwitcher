@@ -91,6 +91,7 @@ struct SettingsView: View {
                     Text("日本語").tag("ja")
                     Text("Deutsch").tag("de")
                     Text("Français").tag("fr")
+                    Text("Español").tag("es")
                 }
                 .onChange(of: appLanguage) { _, newValue in
                     applyLanguage(newValue)
