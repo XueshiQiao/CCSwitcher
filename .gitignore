@@ -17,6 +17,8 @@ Packages/
 Package.resolved
 
 # Misc
+__pycache__/
+*.pyc
 *.swp
 *~
 CCSwitcher/Info.plist

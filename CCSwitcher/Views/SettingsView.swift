@@ -6,12 +6,9 @@ struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var updateChecker: UpdateChecker
     @EnvironmentObject private var menuBarConfig: MenuBarConfig
-    @AppStorage("refreshInterval") private var refreshInterval: Double = 300
     @AppStorage("showFullEmail") private var showFullEmail = false
     @AppStorage("showInDock") private var showInDock = false
     @AppStorage("appLanguage") private var appLanguage = "auto"
-    @AppStorage("autoSwitchEnabled") private var autoSwitchEnabled = false
-    @AppStorage("autoSwitchThreshold") private var autoSwitchThreshold = 90.0
     @State private var launchAtLogin = false
 
     var body: some View {
@@ -47,35 +44,21 @@ struct SettingsView: View {
     private var generalTab: some View {
         Form {
             Section("Refresh") {
-                Picker("Auto-refresh interval", selection: $refreshInterval) {
-                    Text("15 seconds").tag(15.0)
-                    Text("30 seconds").tag(30.0)
-                    Text("1 minute").tag(60.0)
-                    Text("5 minutes").tag(300.0)
-                    Text("10 minutes").tag(600.0)
-                }
-                .onChange(of: refreshInterval) { _, newValue in
-                    appState.startAutoRefresh(interval: newValue)
+                Text("Only the current account can sync local quota. Other accounts keep their saved records.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("Quota is read from the official CLI cache. Missing data never triggers a network request.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                LabeledContent("Auto-refresh interval") {
+                    Text("5 minutes")
                 }
             }
 
             Section("Auto-switch") {
-                Toggle("Switch account before hitting the limit", isOn: $autoSwitchEnabled)
-                if autoSwitchEnabled {
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            Text("Switch at")
-                            Spacer()
-                            Text("\(Int(autoSwitchThreshold))%")
-                                .monospacedDigit()
-                                .foregroundStyle(.secondary)
-                        }
-                        Slider(value: $autoSwitchThreshold, in: 50...99, step: 1)
-                    }
-                    Text("When the active account's 5-hour or weekly usage reaches this level, CCSwitcher switches to the account with the most quota left. Checked on every refresh; a 5-minute cooldown prevents rapid flip-flopping.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                Text("Local-only mode does not switch accounts automatically. Switch accounts manually in Accounts.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Account display") {

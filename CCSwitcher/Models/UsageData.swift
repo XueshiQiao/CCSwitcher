@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - Usage API Response (from /api/oauth/usage)
+// MARK: - Persisted quota copied from the official CLI's local cache
 
 struct UsageAPIResponse: Codable {
     let fiveHour: UsageWindow?
@@ -11,6 +11,7 @@ struct UsageAPIResponse: Codable {
     let sevenDayCowork: UsageWindow?
     let iguanaNecktie: UsageWindow?
     let extraUsage: ExtraUsage?
+    var sevenDayFable: UsageWindow? = nil
 
     enum CodingKeys: String, CodingKey {
         case fiveHour = "five_hour"
@@ -21,6 +22,7 @@ struct UsageAPIResponse: Codable {
         case sevenDayCowork = "seven_day_cowork"
         case iguanaNecktie = "iguana_necktie"
         case extraUsage = "extra_usage"
+        case sevenDayFable = "seven_day_fable"
     }
 }
 
@@ -43,39 +45,21 @@ struct UsageWindow: Codable {
     }
 
     var resetTimeString: String? {
-        guard let date = resetsAtDate else { return nil }
-        let remaining = date.timeIntervalSinceNow
-        guard remaining > 0 else { return "now" }
-
-        let hours = Int(remaining) / 3600
-        let minutes = (Int(remaining) % 3600) / 60
-
-        if hours > 24 {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "EEE h:mm a"
-            return formatter.string(from: date)
-        } else if hours > 0 {
-            return "\(hours) hr \(minutes) min"
-        } else {
-            return "\(minutes) min"
+        switch HourMinuteCountdown(until: resetsAtDate, now: .now) {
+        case .unknown: return nil
+        case .elapsed: return "now"
+        case .remaining(let hours, let minutes): return "\(hours) hr \(minutes) min"
         }
     }
 
-    /// Compact countdown rendering for narrow menu-bar modules.
-    /// Always returns a fixed-shape string ("now", "5m", "2h 14m", "4d 6h").
-    /// Never falls back to a date format — the menu bar can't afford the width.
+    /// Keep all windows in cumulative hours, including weekly limits.
     var compactResetString: String? {
-        guard let date = resetsAtDate else { return nil }
-        let remaining = Int(date.timeIntervalSinceNow)
-        guard remaining > 0 else { return "now" }
-
-        let days = remaining / 86_400
-        let hours = (remaining % 86_400) / 3600
-        let minutes = (remaining % 3600) / 60
-
-        if days > 0 { return "\(days)d \(hours)h" }
-        if hours > 0 { return "\(hours)h \(minutes)m" }
-        return "\(max(minutes, 1))m"
+        switch HourMinuteCountdown(until: resetsAtDate, now: .now) {
+        case .unknown: return nil
+        case .elapsed: return "now"
+        case .remaining(let hours, let minutes):
+            return hours > 0 ? "\(hours)h \(minutes)m" : "\(minutes)m"
+        }
     }
 
     /// How much of the rate-limit window has already elapsed, as a 0–100
@@ -87,6 +71,21 @@ struct UsageWindow: Codable {
         guard windowSeconds > 0, let date = resetsAtDate else { return nil }
         let elapsed = 1.0 - (date.timeIntervalSinceNow / windowSeconds)
         return min(max(elapsed, 0), 1) * 100
+    }
+}
+
+/// Round up to the next minute so a future deadline never looks already elapsed.
+enum HourMinuteCountdown: Equatable {
+    case unknown
+    case elapsed
+    case remaining(hours: Int, minutes: Int)
+
+    init(until deadline: Date?, now: Date) {
+        guard let deadline else { self = .unknown; return }
+        let seconds = deadline.timeIntervalSince(now)
+        guard seconds > 0 else { self = .elapsed; return }
+        let totalMinutes = Int(ceil(seconds / 60))
+        self = .remaining(hours: totalMinutes / 60, minutes: totalMinutes % 60)
     }
 }
 

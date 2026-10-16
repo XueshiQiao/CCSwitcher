@@ -8,9 +8,7 @@ struct MenuBarModuleView: View {
     let appState: AppState
     let config: MenuBarConfig
     let showFullEmail: Bool
-    /// Tick value that recomputes reset countdowns once a minute.
-    /// Passed in (and ignored by non-countdown modules) so the parent timer
-    /// can drive view updates without each module owning a timer.
+    /// Recomputed when the parent receives local data or configuration changes.
     let tick: Date
 
     // Fixed row geometry so every module shares the same baseline grid: the
@@ -140,7 +138,7 @@ struct MenuBarModuleView: View {
     }
 
     private var sessionResetText: String {
-        // `tick` is read so SwiftUI recomputes on each timer fire.
+        // Re-evaluate countdowns with the parent view's data refresh.
         _ = tick
         guard let id = appState.activeAccount?.id,
               let s = appState.accountUsage[id]?.fiveHour?.compactResetString else {

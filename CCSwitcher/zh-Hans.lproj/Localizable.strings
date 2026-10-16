@@ -178,3 +178,137 @@
 "Updated %@ ago" = "%@前更新";
 "Could not save the refreshed sign-in; will retry automatically." = "无法保存刷新后的登录凭据；将自动重试。";
 "Credential storage is temporarily unavailable. Try again shortly." = "凭据存储暂时不可用。请稍后重试。";
+
+/* Login cancellation and cautious quota refresh */
+"Cancel login" = "取消登录";
+"Cancelling..." = "正在取消…";
+"Finishing sign-in..." = "正在完成登录…";
+"Login cancelled. If browser authorization already finished, use Add Current Account to keep that login." = "已取消登录。若浏览器已完成授权，可使用“添加当前账户”保留该登录。";
+"Refresh quota" = "刷新额度";
+"Available after %@" = "%@ 后可刷新";
+"Quota is refreshed per account. Each attempt waits at least 15 minutes; no automatic retries." = "额度按账号单独刷新。每次尝试至少间隔 15 分钟，不自动重试。";
+"Use Refresh quota to request this account's usage." = "点击“刷新额度”查询此账号的额度。";
+"Stored credentials are unavailable. Re-authenticate this account to refresh quota." = "无法读取已存凭据，请重新登录此账号后再刷新额度。";
+"Quota refresh is cooling down. No request was sent." = "额度刷新冷却中，本次未发送请求。";
+"Another quota request is running. No request was sent." = "另一个额度请求正在进行，本次未发送请求。";
+"Rate limited. Waiting for the server's deadline; no automatic retry." = "已触发限流，等待服务器指定时间后再操作，不自动重试。";
+"Quota access was refused. No automatic retry." = "额度访问被拒绝，不自动重试。";
+"Refresh quota in the background" = "在后台刷新额度";
+"Quota refresh is manual by default. Each account waits at least 15 minutes; server limits may require longer. This does not guarantee protection from account restrictions." = "默认仅手动刷新额度，每账号至少间隔 15 分钟；服务器可能要求更久。这不能保证避免平台风控。";
+"Auto-switch requires background quota refresh and uses recent saved readings without extra requests." = "自动切换需要开启后台额度刷新，仅使用近期缓存数据，不额外请求额度。";
+"Refresh statistics; background quota follows your settings" = "刷新统计；后台额度刷新遵循设置中的开关";
+
+// Per-account refresh controls
+"Automatic quota refresh" = "自动刷新额度";
+"Enable automatic quota refresh separately on each account's quota card. It is off by default." = "在每个账号的额度卡片上分别开启自动刷新，默认关闭。";
+"This account's quota request is running. No request was sent." = "此账号的额度请求正在进行，本次未发送请求。";
+
+// Copy login address
+"Login address copied" = "登录地址已复制";
+"Copy login address" = "复制登录地址";
+"Copy the address into your preferred browser to sign in, then return here." = "复制地址，在你选择的浏览器中登录，然后返回这里。";
+"Preparing login address..." = "正在生成登录地址…";
+
+// Saved quota and account authorization viewer
+"Could not restore saved quota: %@" = "无法恢复已保存的用量：%@";
+"Edit account" = "编辑账号";
+"Account backup" = "账号授权备份";
+"View the saved token and OAuth identity for this account. This is a read-only backup, not the current CLI credentials." = "查看此账号保存的令牌和 OAuth 身份信息。这里展示的是只读备份，不是 CLI 当前使用的凭据。";
+"Show saved authorization" = "查看存储的授权信息";
+"Save" = "保存";
+"No authorization backup is stored for this account." = "此账号尚未存储授权备份。";
+"The authorization store is unavailable. Unlock the keychain or allow access, then close and reopen this editor." = "无法读取授权存储。请解锁钥匙串或允许访问，然后关闭并重新打开此编辑页。";
+"The saved authorization could not be formatted." = "无法格式化已保存的授权信息。";
+
+// Copy the original email, independent of masking
+"Copy full email" = "复制完整邮箱";
+"Email copied" = "邮箱已复制";
+
+// Recycled accounts and relative quota recovery
+"Recycled" = "已回收";
+"Recycled accounts keep their authorization and saved usage. Restore an account to use it again." = "回收后保留授权和用量记录。恢复账号后即可继续使用。";
+"No recycled accounts" = "暂无回收账号";
+"Accounts you recycle will appear here." = "回收的账号会出现在这里，可随时恢复。";
+"Restore account" = "恢复账号";
+"Recycle account" = "回收账号";
+"Account actions" = "账号操作";
+"Recycling keeps the current CLI login unchanged." = "此账号仍是 CLI 当前登录账号，回收不会退出登录。";
+"This account is recycled. Restore it from Recycled Accounts." = "此账号已回收，请从顶部“已回收”中恢复。";
+"Weekly · Opus" = "每周 · Opus";
+"Weekly · Sonnet" = "每周 · Sonnet";
+"Weekly · OAuth apps" = "每周 · OAuth 应用";
+"Weekly · Cowork" = "每周 · Cowork";
+"Iguana necktie" = "Iguana necktie";
+"Usage unknown" = "用量未知";
+"Reset time unknown" = "恢复时间未知";
+"Reset time reached · refresh to update" = "已到恢复时间 · 刷新后更新用量";
+"Ready to refresh" = "可刷新";
+"Resets in %lld hr %lld min" = "距离恢复 %lld 小时 %lld 分钟";
+"Refresh available in %lld hr %lld min" = "距离可刷新 %lld 小时 %lld 分钟";
+
+"Auto refresh" = "自动刷新";
+"Resets in %lld hr %lld min (%lld days)" = "%lld 小时 %lld 分钟（%lld 天）后恢复";
+"Used %lld%%" = "已用 %lld%%";
+"Quota comes only from local CLI records. No quota requests are sent." = "额度仅来自 CLI 本地记录，软件不请求额度接口。";
+"Not collected yet. Use Claude Code in a new session, then sync local data." = "尚未获取。请在新会话中使用 Claude Code，再同步本地数据。";
+"Auto sync" = "自动同步";
+"Sync local data" = "同步本地数据";
+"CLI record" = "CLI记录";
+"Historical record" = "历史记录";
+"Auto sync reads local CLI quota records only. Enable it separately on each account's card." = "自动同步仅读取 CLI 本地额度记录，可在各账号卡片单独开启。";
+"Start a new Claude Code session after installing the collector. Missing quota data never triggers a network request." = "安装采集器后请新建 Claude Code 会话。缺少额度数据时不会发起网络请求。";
+"Auto-switch requires automatic local sync and recent CLI records. It never requests quota." = "自动切换需要开启本地自动同步，并使用近期 CLI 记录，不会请求额度接口。";
+"Local account identity unavailable. No quota request was sent." = "无法确认本地账号身份，未发送额度请求。";
+"Could not read local CLI quota: %@" = "无法读取 CLI 本地额度：%@";
+"Reset time reached · waiting for CLI data" = "已到恢复时间 · 等待 CLI 数据";
+"Local-only mode does not switch accounts automatically. Switch accounts manually in Accounts." = "本地模式不自动切换账号，请在“账户”中手动切换。";
+
+// Current-account official CLI cache
+"Accounts & Usage" = "账号与用量";
+"Local statistics" = "本机统计";
+"All local sessions, not per-account usage." = "汇总本机所有会话，不按账号区分。";
+"Read-only" = "仅查看历史";
+"No local quota record" = "暂无本地额度记录";
+"Weekly · Fable" = "每周 · Fable";
+"Fable · Not collected yet" = "Fable · 尚未获取";
+"Use Claude Code normally, then sync its local quota cache." = "正常使用 Claude Code 后，同步其本地额度缓存。";
+"The current CLI account changed. Refresh the account list before syncing quota." = "CLI 当前账号已变化，请刷新账号列表后再同步额度。";
+"The local quota cache belongs to another account. Waiting for the current CLI account to update it." = "本地额度缓存属于其他账号，等待当前 CLI 账号更新。";
+"The local CLI quota cache contains invalid data." = "CLI 本地额度缓存包含无效数据。";
+"Only the current account can sync local quota. Other accounts keep their saved records." = "仅当前账号可同步本地额度，其他账号保留历史记录。";
+"Quota is read from the official CLI cache. Missing data never triggers a network request." = "额度读取自官方 CLI 的本地缓存，缺少数据时不会发起网络请求。";
+
+// Stable window and explicit CLI check
+"Local cache" = "本地缓存";
+"Hide saved quota" = "收起历史用量";
+"Show saved quota" = "展开历史用量";
+"Read cache" = "读缓存";
+"Check with CLI" = "CLI 在线检查";
+"CLI in %lld min" = "%lld 分钟后可检查";
+"Open the official CLI's /usage in safe mode. The CLI may connect to Anthropic. No model message is sent." = "在安全模式中打开官方 CLI 的 /usage。CLI 可能连接官方服务，不发送模型消息。";
+
+"CLI account configuration is not supported for a quota check." = "当前 CLI 的认证配置不支持安全检查额度。";
+"Claude CLI executable is unavailable." = "找不到可执行的 Claude CLI。";
+"Could not open Terminal for the Claude quota check." = "无法打开终端进行 Claude 额度检查。";
+
+// Per-model cost and token cache efficiency
+"Period" = "时间范围";
+"All accounts on this Mac · API-equivalent estimate, not subscription charges or quota." = "本机全部账号日志 · API 等价估算，非订阅账单或额度。";
+"By model" = "按模型";
+"Priced subtotal" = "已计价小计";
+"Overall cache hit rate" = "整体缓存命中率";
+"Unpriced" = "未计价";
+"Some models have no price and are excluded from the subtotal." = "部分模型缺少价格，未计入费用小计。";
+"Cache hit rate" = "缓存命中率";
+"Token details" = "Token 明细";
+"Cache write" = "缓存写入";
+"Cache read" = "缓存读取";
+"Not applicable" = "不适用";
+"Cache hit rate = cache read / (input + cache write + cache read). Output is excluded." = "缓存命中率 = 缓存读取 ÷（普通输入 + 缓存写入 + 缓存读取），不含输出。";
+"Rates are weighted by token count. No input means not applicable; an unknown price does not mean free usage." = "按 token 总量加权。无输入时不适用；未计价不代表免费。";
+
+"Current account" = "当前使用";
+"Local logs · API-equivalent estimate" = "本地日志 · API 费用估算";
+"Unpriced usage excluded" = "未计价部分不计入合计";
+"Expanded" = "已展开";
+"Collapsed" = "已折叠";

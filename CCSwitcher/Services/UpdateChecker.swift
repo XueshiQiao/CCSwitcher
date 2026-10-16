@@ -18,24 +18,22 @@ final class UpdateChecker: ObservableObject {
     private let controller: SPUStandardUpdaterController
 
     init() {
-        // `startingUpdater: true` enables Sparkle's automatic background
-        // checks at the interval configured by Sparkle (default: 1 day).
-        // No delegates needed: standard UI behavior is what we want.
+        // Configure before starting: even a saved opt-in must not schedule checks.
         self.controller = SPUStandardUpdaterController(
-            startingUpdater: true,
+            startingUpdater: false,
             updaterDelegate: nil,
             userDriverDelegate: nil
         )
+        controller.updater.automaticallyChecksForUpdates = false
+        controller.updater.automaticallyDownloadsUpdates = false
     }
 
     /// Manual = user-initiated; shows Sparkle's full UI including
     /// "you're up to date" feedback when no update is available.
-    /// Background = silent unless an update is found.
+    /// Background checks are disabled; initialize Sparkle only on an explicit click.
     func checkForUpdates(manual: Bool = false) {
-        if manual {
-            controller.checkForUpdates(nil)
-        } else {
-            controller.updater.checkForUpdatesInBackground()
-        }
+        guard manual else { return }
+        controller.startUpdater()
+        controller.checkForUpdates(nil)
     }
 }

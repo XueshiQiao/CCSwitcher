@@ -156,7 +156,7 @@ final class ClaudeService: @unchecked Sendable {
         process.executableURL = URL(fileURLWithPath: "/bin/zsh")
         process.arguments = ["-ilc", "command -v claude"]
         process.standardOutput = stdout
-        process.standardError = Pipe()
+        process.standardError = FileHandle.nullDevice
         process.environment = ProcessInfo.processInfo.environment
 
         do {
@@ -218,156 +218,6 @@ final class ClaudeService: @unchecked Sendable {
         }
     }
 
-    // MARK: - Usage API
-
-    enum UsageError: Error {
-        case expired
-        case network(String)
-        case decode(String)
-        case rateLimited(retryAfter: TimeInterval?)
-        /// 403 permission_error - e.g. "OAuth authentication is currently not
-        /// allowed for this organization" (no active Pro/Max subscription).
-        case forbidden(String)
-    }
-
-    /// Fetch usage for a specific access token
-    func getUsageLimits(accessToken: String) async throws -> UsageAPIResponse {
-        guard let url = URL(string: "https://api.anthropic.com/api/oauth/usage") else { throw UsageError.network("invalid url") }
-        var request = URLRequest(url: url)
-        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-        request.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
-
-        log.debug("[getUsageLimits] REQUEST URL: \(url.absoluteString)")
-
-        let (responseData, response) = try await URLSession.shared.data(for: request)
-        let httpResponse = response as? HTTPURLResponse
-        guard httpResponse?.statusCode == 200 else {
-            let responseString = String(data: responseData, encoding: .utf8) ?? ""
-            log.error("[getUsageLimits] HTTP \(httpResponse?.statusCode ?? 0)")
-
-            if httpResponse?.statusCode == 401 || responseString.contains("token_expired") {
-                throw UsageError.expired
-            }
-            if httpResponse?.statusCode == 429 {
-                let retryAfter = httpResponse?.value(forHTTPHeaderField: "Retry-After")
-                    .flatMap(TimeInterval.init)
-                log.warning("[getUsageLimits] 429, Retry-After: \(retryAfter.map { String(format: "%.0f", $0) } ?? "none")s")
-                throw UsageError.rateLimited(retryAfter: retryAfter)
-            }
-            if httpResponse?.statusCode == 403 {
-                // Typically: no active Pro/Max subscription on the account.
-                log.warning("[getUsageLimits] 403 permission error: \(responseString.prefix(200))")
-                throw UsageError.forbidden(responseString)
-            }
-            throw UsageError.network("HTTP \(httpResponse?.statusCode ?? 0)")
-        }
-        
-        do {
-            let usage = try JSONDecoder().decode(UsageAPIResponse.self, from: responseData)
-            log.info("[getUsageLimits] session=\(usage.fiveHour?.utilization ?? -1)%, weekly=\(usage.sevenDay?.utilization ?? -1)%")
-            return usage
-        } catch {
-            log.error("[getUsageLimits] Decode Error: \(error.localizedDescription)")
-            throw UsageError.decode(error.localizedDescription)
-        }
-    }
-
-    // MARK: - OAuth refresh (direct token endpoint, no keychain swap)
-
-    /// Claude Code's public OAuth client id (PKCE public client - not a secret).
-    private static let oauthClientID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
-    private static let oauthTokenURL = "https://console.anthropic.com/v1/oauth/token"
-
-    /// Outcome of an OAuth refresh attempt. The `rejected`/`transient`
-    /// distinction is load-bearing for the caller: `rejected` means the refresh
-    /// token is dead and only re-authentication helps, while `transient` says
-    /// nothing about the token at all — showing "re-authenticate" for a network
-    /// blip would send the user through a pointless login.
-    enum OAuthRefreshResult {
-        case success(String)
-        /// The endpoint (or the stored credential itself) says this grant can
-        /// never work: no refresh token stored, or a 4xx rejection.
-        case rejected
-        /// Network trouble or a server-side error; the token's validity is unknown.
-        case transient
-    }
-
-    /// Silently refresh a credential JSON using its refresh token, via a direct
-    /// POST to the OAuth token endpoint. Never touches the keychain - safe to run
-    /// for non-active accounts while Claude Code sessions are working, because
-    /// only CCSwitcher holds these backups (rotation cannot race anyone).
-    func refreshOAuthCredentials(_ credentialsJSON: String) async -> OAuthRefreshResult {
-        guard var root = (try? JSONSerialization.jsonObject(with: Data(credentialsJSON.utf8))) as? [String: Any],
-              var oauth = root["claudeAiOauth"] as? [String: Any],
-              let refreshToken = oauth["refreshToken"] as? String, !refreshToken.isEmpty,
-              let url = URL(string: Self.oauthTokenURL)
-        else {
-            log.warning("[refreshOAuth] Stored credential has no refresh token")
-            return .rejected
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: [
-            "grant_type": "refresh_token",
-            "refresh_token": refreshToken,
-            "client_id": Self.oauthClientID,
-        ])
-
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-            guard status == 200,
-                  let resp = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
-                  let accessToken = resp["access_token"] as? String,
-                  let expiresIn = resp["expires_in"] as? Double
-            else {
-                // NEVER log the response body. This guard also fires when the
-                // status IS 200 but a field failed to parse (schema change) —
-                // in that case the body is a *successful* token response whose
-                // first bytes are a live access token, headed for a log file
-                // that outlives rotation and gets attached to bug reports.
-                // Log the status plus an allowlisted OAuth error code only.
-                let oauthError = ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any])?["error"] as? String
-                let knownCodes = ["invalid_grant", "invalid_request", "invalid_client", "unauthorized_client", "unsupported_grant_type", "invalid_scope"]
-                let loggedCode = oauthError.map { knownCodes.contains($0) ? $0 : "unrecognized" } ?? "none"
-                log.warning("[refreshOAuth] Refresh not applied (HTTP \(status), error=\(loggedCode), \(data.count) bytes)")
-
-                // A 200 that failed OUR parse is a schema change, not a dead
-                // grant. Otherwise only a grant-terminal OAuth error means the
-                // refresh token is dead (RFC 6749 §5.2: `invalid_grant` covers
-                // expired/revoked/invalid refresh tokens). Everything else —
-                // 5xx, 429, 408, an `invalid_request` from a request-shape
-                // mismatch — says nothing about the token, and demanding
-                // re-authentication for it would be a pointless login.
-                if status == 200 { return .transient }
-                return oauthError == "invalid_grant" ? .rejected : .transient
-            }
-
-            oauth["accessToken"] = accessToken
-            oauth["expiresAt"] = Int64(Date().timeIntervalSince1970 * 1000) + Int64(expiresIn * 1000)
-            if let newRefresh = resp["refresh_token"] as? String, !newRefresh.isEmpty {
-                oauth["refreshToken"] = newRefresh
-            }
-            // `scopes` is deliberately NOT rewritten from the refresh response.
-            // The CLI (verified against claude 2.1.220) decides whether it
-            // recognises a stored login by checking that `scopes` contains
-            // "user:inference"; a refresh response carrying a narrower scope
-            // string would make this credential invisible to `claude auth
-            // status`, and the account would read as not-logged-in with no
-            // visible cause. The login-time value is the one to keep.
-            root["claudeAiOauth"] = oauth
-            let out = try JSONSerialization.data(withJSONObject: root)
-            log.info("[refreshOAuth] Access token refreshed, valid for \(Int(expiresIn / 3600))h \(Int(expiresIn.truncatingRemainder(dividingBy: 3600) / 60))m")
-            guard let json = String(data: out, encoding: .utf8) else { return .transient }
-            return .success(json)
-        } catch {
-            log.warning("[refreshOAuth] Refresh failed: \(error.localizedDescription)")
-            return .transient
-        }
-    }
-
     /// Extract access token string from a token JSON (keychain format)
     static func extractAccessToken(from tokenJSON: String) -> String? {
         guard let data = tokenJSON.data(using: .utf8),
@@ -392,24 +242,26 @@ final class ClaudeService: @unchecked Sendable {
     /// missing backup from a briefly unreadable store) and handed down so no
     /// second, ambiguity-collapsing lookup happens here.
     @discardableResult
-    func switchAccount(from currentAccount: Account, to targetAccount: Account, targetBackup: AccountBackup) async throws -> SwitchOutcome {
+    func switchAccount(from currentAccount: Account?, to targetAccount: Account, targetBackup: AccountBackup) async throws -> SwitchOutcome {
         let keychain = KeychainService.shared
 
-        log.info("[switchAccount] Switching from \(currentAccount.id) to \(targetAccount.id)")
+        log.info("[switchAccount] Switching from \(currentAccount?.id.uuidString ?? "none") to \(targetAccount.id)")
 
         // 1. Back up current account (token + oauthAccount)
-        log.info("[switchAccount] Step 1: Backing up current account...")
-        if let currentToken = keychain.readClaudeToken(),
-           let currentOAuth = keychain.readOAuthAccount() {
-            let email = (currentOAuth["emailAddress"]?.value as? String) ?? "?"
-            if email == currentAccount.email {
-                let saved = keychain.saveAccountBackup(token: currentToken, oauthAccount: currentOAuth, forAccountId: currentAccount.id.uuidString)
-                log.info("[switchAccount] Step 1: Backup saved: \(saved)")
+        if let currentAccount {
+            log.info("[switchAccount] Step 1: Backing up current account...")
+            if let currentToken = keychain.readClaudeToken(),
+               let currentOAuth = keychain.readOAuthAccount() {
+                let email = (currentOAuth["emailAddress"]?.value as? String) ?? "?"
+                if email == currentAccount.email {
+                    let saved = keychain.saveAccountBackup(token: currentToken, oauthAccount: currentOAuth, forAccountId: currentAccount.id.uuidString)
+                    log.info("[switchAccount] Step 1: Backup saved: \(saved)")
+                } else {
+                    log.warning("[switchAccount] Step 1: oauthAccount email (\(email)) != source (\(currentAccount.email)), skipping backup")
+                }
             } else {
-                log.warning("[switchAccount] Step 1: oauthAccount email (\(email)) != source (\(currentAccount.email)), skipping backup")
+                log.warning("[switchAccount] Step 1: Could not read current token or oauthAccount")
             }
-        } else {
-            log.warning("[switchAccount] Step 1: Could not read current token or oauthAccount")
         }
 
         // 2. Target backup was resolved and validated by the caller.
@@ -501,15 +353,54 @@ final class ClaudeService: @unchecked Sendable {
         return result
     }
 
-    /// Run `claude auth login` which opens browser for OAuth.
-    func login() async throws {
-        log.info("[login] Starting `claude auth login`... (will open browser)")
-        _ = try await runClaude(args: ["auth", "login"])
-        log.info("[login] `claude auth login` process exited")
-
-        // Give keychain a moment to sync after CLI writes
+    /// Capture the CLI's browser URL, keeping its localhost callback alive until login completes.
+    func login(onURL: @escaping @Sendable (URL) async -> Void) async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false,
+                                                attributes: [.posixPermissions: 0o700])
+        defer {
+            do { try FileManager.default.removeItem(at: directory) }
+            catch { log.warning("[login] Could not remove temporary browser helper: \(error.localizedDescription)") }
+        }
+        let opener = directory.appendingPathComponent("copy-login-url")
+        let capturedURL = directory.appendingPathComponent("authorization-url")
+        // CLI stdout contains the manual-code URL. Capture the actual browser URL
+        // instead so the existing callback finishes sign-in without a code input.
+        let script = """
+        #!/bin/sh
+        set -eu
+        umask 077
+        printf '%s' "$1" > "$CCSWITCHER_LOGIN_URL_FILE.tmp"
+        /bin/mv -f "$CCSWITCHER_LOGIN_URL_FILE.tmp" "$CCSWITCHER_LOGIN_URL_FILE"
+        """
+        try script.write(to: opener, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: opener.path)
+        let environment = ["BROWSER": opener.path, "CCSWITCHER_LOGIN_URL_FILE": capturedURL.path]
+        try await withThrowingTaskGroup(of: Bool.self) { group in
+            group.addTask { [self] in
+                _ = try await runClaude(args: ["auth", "login"], environment: environment)
+                return true
+            }
+            group.addTask {
+                while !FileManager.default.fileExists(atPath: capturedURL.path) {
+                    try await Task.sleep(for: .milliseconds(100))
+                }
+                try Task.checkCancellation()
+                let value = try String(contentsOf: capturedURL, encoding: .utf8)
+                guard let url = URL(string: value), url.scheme == "https",
+                      let host = url.host, !host.isEmpty, url.user == nil, url.password == nil else {
+                    throw ClaudeServiceError.cliError("Invalid login authorization URL")
+                }
+                await onURL(url)
+                return false
+            }
+            while let processFinished = try await group.next() {
+                if processFinished { group.cancelAll(); break }
+            }
+        }
+        try Task.checkCancellation()
+        // Give keychain a moment to sync after CLI writes.
         try await Task.sleep(for: .seconds(1))
-        log.info("[login] Post-login delay complete, ready for token capture")
     }
 
     /// Run `claude auth logout`
@@ -532,7 +423,7 @@ final class ClaudeService: @unchecked Sendable {
                 process.executableURL = URL(fileURLWithPath: path)
                 process.arguments = ["--version"]
                 process.standardOutput = stdout
-                process.standardError = Pipe()
+                process.standardError = FileHandle.nullDevice
 
                 // Inject same PATH augmentation as runClaude so NVM-installed
                 // claude can find `node` when invoked here.
@@ -582,31 +473,6 @@ final class ClaudeService: @unchecked Sendable {
         }
     }
 
-    /// Fetch the latest published claude-code version. Returns nil on any failure.
-    static func fetchLatestVersion() async -> String? {
-        guard let url = URL(string: "https://downloads.claude.ai/claude-code-releases/latest") else {
-            return nil
-        }
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 5.0
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                log.warning("[fetchLatestVersion] non-200 response")
-                return nil
-            }
-            let raw = String(data: data, encoding: .utf8) ?? ""
-            let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-            // Strict: the entire body must BE a semver. Protects against the CDN
-            // returning an HTML error page with 200 status that happens to contain
-            // dotted numbers (CSS dimensions, version strings in copy, etc.).
-            return Self.isPureSemver(trimmed) ? trimmed : nil
-        } catch {
-            log.warning("[fetchLatestVersion] error: \(error.localizedDescription)")
-            return nil
-        }
-    }
-
     /// True if the whole string is ASCII digits separated by dots (e.g. "1.0.42", "2.1.139").
     private static func isPureSemver(_ s: String) -> Bool {
         guard !s.isEmpty, s.count <= 32 else { return false }
@@ -634,62 +500,69 @@ final class ClaudeService: @unchecked Sendable {
 
     // MARK: - CLI Runner
 
-    private func runClaude(args: [String]) async throws -> String {
+    private func runClaude(args: [String], environment: [String: String] = [:]) async throws -> String {
         let claudePath = self.claudePath
         log.debug("[runClaude] Running: \(claudePath) \(args.joined(separator: " "))")
-        return try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async { [claudePath] in
-                let process = Process()
-                let pipe = Pipe()
+        let process = Process()
+        let pipe = Pipe()
+        let invocation = CancelableProcess(process: process, output: pipe)
+        let result: String = try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                DispatchQueue.global(qos: .userInitiated).async { [claudePath] in
+                    process.executableURL = URL(fileURLWithPath: claudePath)
+                    process.arguments = args
+                    process.standardOutput = pipe
+                    process.standardError = pipe
 
-                process.executableURL = URL(fileURLWithPath: claudePath)
-                process.arguments = args
-                process.standardOutput = pipe
-                process.standardError = pipe
-
-                var env = ProcessInfo.processInfo.environment
-                let homeDir = NSHomeDirectory()
-                // Include the parent directory of the discovered claude binary
-                // so that `node` is on PATH for NVM-installed scripts.
-                // Only add it when claudePath is absolute (skip the bare "claude" fallback).
-                var extraPaths = [
-                    "/opt/homebrew/bin",
-                    "/usr/local/bin",
-                    "\(homeDir)/.local/bin",
-                    "\(homeDir)/.npm-global/bin"
-                ]
-                if claudePath.contains("/") {
-                    // Resolve symlinks so that e.g. /usr/local/bin/claude -> ~/.nvm/.../bin/claude
-                    // yields the NVM bin dir where `node` actually lives
-                    let resolved = URL(fileURLWithPath: claudePath).resolvingSymlinksInPath().path
-                    let resolvedBinDir = URL(fileURLWithPath: resolved).deletingLastPathComponent().path
-                    extraPaths.insert(resolvedBinDir, at: 0)
-                }
-                let existingPath = env["PATH"] ?? "/usr/bin:/bin"
-                env["PATH"] = (extraPaths + [existingPath]).joined(separator: ":")
-                env["HOME"] = homeDir
-                process.environment = env
-
-                do {
-                    try process.run()
-                    process.waitUntilExit()
-
-                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                    let output = String(data: data, encoding: .utf8) ?? ""
-
-                    if process.terminationStatus == 0 {
-                        log.debug("[runClaude] Success (exit 0), output length: \(output.count)")
-                        continuation.resume(returning: output)
-                    } else {
-                        log.error("[runClaude] Failed (exit \(process.terminationStatus))")
-                        continuation.resume(throwing: ClaudeServiceError.cliError("exit \(process.terminationStatus)"))
+                    var env = ProcessInfo.processInfo.environment
+                    let homeDir = NSHomeDirectory()
+                    // Include the parent directory of the discovered claude binary
+                    // so that `node` is on PATH for NVM-installed scripts.
+                    // Only add it when claudePath is absolute (skip the bare "claude" fallback).
+                    var extraPaths = [
+                        "/opt/homebrew/bin",
+                        "/usr/local/bin",
+                        "\(homeDir)/.local/bin",
+                        "\(homeDir)/.npm-global/bin"
+                    ]
+                    if claudePath.contains("/") {
+                        // Resolve symlinks so that e.g. /usr/local/bin/claude -> ~/.nvm/.../bin/claude
+                        // yields the NVM bin dir where `node` actually lives
+                        let resolved = URL(fileURLWithPath: claudePath).resolvingSymlinksInPath().path
+                        let resolvedBinDir = URL(fileURLWithPath: resolved).deletingLastPathComponent().path
+                        extraPaths.insert(resolvedBinDir, at: 0)
                     }
-                } catch {
-                    log.error("[runClaude] Process launch failed: \(error.localizedDescription)")
-                    continuation.resume(throwing: ClaudeServiceError.processLaunchFailed(error))
+                    let existingPath = env["PATH"] ?? "/usr/bin:/bin"
+                    env["PATH"] = (extraPaths + [existingPath]).joined(separator: ":")
+                    env["HOME"] = homeDir
+                    env.merge(environment) { _, override in override }
+                    process.environment = env
+
+                    do {
+                        // The owner drains both streams before waiting and reaps on cancellation.
+                        let data = try invocation.run()
+                        let output = String(data: data, encoding: .utf8) ?? ""
+
+                        if process.terminationStatus == 0 {
+                            log.debug("[runClaude] Success (exit 0), output length: \(output.count)")
+                            continuation.resume(returning: output)
+                        } else {
+                            log.error("[runClaude] Failed (exit \(process.terminationStatus))")
+                            continuation.resume(throwing: ClaudeServiceError.cliError("exit \(process.terminationStatus)"))
+                        }
+                    } catch is CancellationError {
+                        continuation.resume(throwing: CancellationError())
+                    } catch {
+                        log.error("[runClaude] Process launch failed: \(error.localizedDescription)")
+                        continuation.resume(throwing: ClaudeServiceError.processLaunchFailed(error))
+                    }
                 }
             }
+        } onCancel: {
+            invocation.cancel()
         }
+        try Task.checkCancellation()
+        return result
     }
 }
 

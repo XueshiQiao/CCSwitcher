@@ -196,10 +196,10 @@ final class KeychainService: Sendable {
         case storeUnavailable
     }
 
-    func lookupAccountBackup(forAccountId accountId: String) -> BackupLookup {
+    func lookupAccountBackup(forAccountId accountId: String, migrateLegacyStore: Bool = true) -> BackupLookup {
         storeLock.lock()
         defer { storeLock.unlock() }
-        switch loadBackupStore() {
+        switch loadBackupStore(migrateLegacyStore: migrateLegacyStore) {
         case .loaded(let store):
             guard let backup = store[accountId] else {
                 log.error("[getBackup] No backup for accountId=\(accountId)")
@@ -269,7 +269,7 @@ final class KeychainService: Sendable {
     }
 
     /// Must be called with `storeLock` held.
-    private func loadBackupStore() -> BackupStoreLoad {
+    private func loadBackupStore(migrateLegacyStore: Bool = true) -> BackupStoreLoad {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: appBackupService,
@@ -300,6 +300,7 @@ final class KeychainService: Sendable {
             if FileManager.default.fileExists(atPath: backupsFilePath) {
                 guard let data = FileManager.default.contents(atPath: backupsFilePath),
                       let dict = try? JSONDecoder().decode([String: AccountBackup].self, from: data) else {
+                    guard migrateLegacyStore else { return .failed("legacy backups.json unreadable") }
                     // The legacy file EXISTS but can't be read or parsed. It may
                     // hold every credential the user has; falling through to
                     // `.empty` here would let the next save create a keychain
@@ -317,6 +318,7 @@ final class KeychainService: Sendable {
                         return .failed("legacy backups.json unreadable")
                     }
                 }
+                guard migrateLegacyStore else { return .loaded(dict) }
                 log.info("[loadBackupStore] Migrating from local backups.json to Keychain...")
                 guard saveBackupStore(dict) else {
                     // Do not delete the file until the keychain copy is real.
@@ -388,12 +390,13 @@ final class KeychainService: Sendable {
 
         do {
             try process.run()
+            // Drain before waiting: a full stdout pipe prevents the child from exiting.
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
             process.waitUntilExit()
             guard process.terminationStatus == 0 else {
                 log.debug("[runSecurity] Exit \(process.terminationStatus) for: security \(args.prefix(3).joined(separator: " "))...")
                 return nil
             }
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
             let output = String(data: data, encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             return output?.isEmpty == true ? nil : output

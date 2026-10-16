@@ -20,66 +20,18 @@ private struct StatWithTooltip<Content: View>: View {
     }
 }
 
-/// Shows real usage limits from Claude API, one card per account.
-struct UsageDashboardView: View {
+/// Local statistics aggregate all CLI sessions, independently of saved accounts.
+struct LocalUsageSummaryView: View {
     @EnvironmentObject private var appState: AppState
-    @EnvironmentObject private var menuBarConfig: MenuBarConfig
-    @AppStorage("showFullEmail") private var showFullEmail = false
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                if appState.accounts.isEmpty && appState.isLoading {
-                    VStack(spacing: 12) {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text("Loading usage data...")
-                            .font(.caption)
-                            .foregroundStyle(.textSecondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 40)
-                } else if appState.accounts.isEmpty {
-                    VStack(spacing: 12) {
-                        Image(systemName: "chart.bar.xaxis")
-                            .font(.system(size: 32))
-                            .foregroundStyle(.textSecondary)
-                        Text("Usage data unavailable")
-                            .font(.subheadline)
-                            .foregroundStyle(.textSecondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 40)
-                } else {
-                    // Today's cost banner (local parsing, no API needed)
-                    todayCostBanner
-
-                    // Today's activity stats
-                    todayActivityCard
-
-                    ForEach(appState.accounts) { account in
-                        accountUsageCard(account: account, usage: appState.accountUsage[account.id])
-                    }
-                }
-
-                // Last updated
-                if let lastRefresh = appState.lastUsageRefresh {
-                    HStack(spacing: 4) {
-                        Spacer()
-                        Image(systemName: "arrow.clockwise")
-                            .font(.caption2)
-                        Text(lastRefresh, style: .relative)
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.textSecondary)
-                    .padding(.horizontal, 16)
-                }
-            }
-            .padding(.vertical, 12)
-            // Report this VStack's intrinsic height to MainMenuView so it can
-            // size the popover frame to fit the Usage tab's content exactly.
-            // See MainMenuView.swift for the measurement contract.
-            .measureUsageContentHeight()
+        VStack(spacing: 10) {
+            Text("All local sessions, not per-account usage.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            todayCostBanner
+            todayActivityCard
         }
     }
 
@@ -105,7 +57,6 @@ struct UsageDashboardView: View {
             }
         }
         .cardStyle()
-        .sectionPadding()
     }
 
     private static let costDisclaimer: LocalizedStringKey = "Estimated API-equivalent cost of your Claude Code usage, for reference only."
@@ -147,7 +98,6 @@ struct UsageDashboardView: View {
             }
         }
         .cardStyle()
-        .sectionPadding()
     }
 
     private func activityStat(icon: String, value: String, label: LocalizedStringKey, tooltip: LocalizedStringKey) -> some View {
@@ -197,163 +147,177 @@ struct UsageDashboardView: View {
         }
     }
 
-    // MARK: - Per-Account Card
+}
 
-    private func accountUsageCard(account: Account, usage: UsageAPIResponse?) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            accountHeader(account)
-            if let usage = usage {
-                usageBars(usage)
-                extraUsageRow(usage.extraUsage)
-                sampleAgeLabel(account)
-            } else if let errorState = appState.accountUsageErrors[account.id] {
-                HStack {
-                    Image(systemName: errorState.isRateLimited ? "timer" : (errorState.isExpired ? "exclamationmark.triangle" : "xmark.circle"))
-                        .foregroundStyle(errorState.isExpired ? .yellow : .red)
-                    Text(errorState.message)
-                        .font(.caption)
-                        .foregroundStyle(.textSecondary)
-                        .lineLimit(2)
-                    Spacer()
-                }
-                .padding(.top, 4)
-            } else {
-                // No sample yet (accounts are polled round-robin) - this is a
-                // waiting state, not an error. The old hardcoded "Token expired"
-                // text here made healthy accounts look broken.
-                HStack {
-                    Image(systemName: "hourglass")
-                        .foregroundStyle(.secondary)
-                    Text("Waiting for usage data...")
-                        .font(.caption)
-                        .foregroundStyle(.textSecondary)
-                    Spacer()
-                }
-                .padding(.top, 4)
-            }
-        }
-        .cardStyle(fill: account.isActive ? .cardFill : .cardFill)
-        .sectionPadding()
+/// Stored quota belongs to one account; syncing is only available for the current login.
+struct AccountUsageView: View {
+    let account: Account
+    @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var menuBarConfig: MenuBarConfig
+
+    private var canSync: Bool { account.id == appState.activeAccount?.id && account.recycledAt == nil }
+    private var syncBusy: Bool {
+        appState.isLoggingIn || appState.isSwitching || appState.isLoading
+            || !appState.refreshingUsageAccountIDs.isEmpty
     }
 
-    /// Accounts are polled round-robin (active + one other per cycle), so a
-    /// card's numbers can be several cycles old — say so instead of letting a
-    /// stale percentage render exactly like a live one. Hidden while the sample
-    /// is fresh (< 90s); the relative text then counts up by itself.
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let usage = appState.accountUsage[account.id] {
+                usageBars(usage, now: Date())
+                extraUsageRow(usage.extraUsage)
+            }
+            if let errorState = appState.accountUsageErrors[account.id] {
+                Label(errorState.message, systemImage: "exclamationmark.triangle")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if appState.accountUsage[account.id] == nil {
+                Text(LocalizedStringKey(canSync
+                     ? "Use Claude Code normally, then sync its local quota cache."
+                     : "No local quota record"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            quotaRefreshControl(account)
+        }
+    }
+
+    private func quotaRefreshControl(_ account: Account) -> some View {
+        let available = appState.cliUsageCheckAvailableAt(account)
+        return HStack(spacing: 10) {
+            sampleAgeLabel(account)
+            Spacer(minLength: 4)
+            if canSync {
+                Toggle("Auto sync", isOn: Binding(
+                    get: { appState.automaticUsageAccountIDs.contains(account.id.uuidString) },
+                    set: { enabled in
+                        if enabled {
+                            appState.automaticUsageAccountIDs.insert(account.id.uuidString)
+                            appState.refreshLocalUsage()
+                        } else {
+                            appState.automaticUsageAccountIDs.remove(account.id.uuidString)
+                        }
+                    }
+                ))
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .font(.caption2)
+                .fixedSize()
+                .disabled(syncBusy)
+                Button {
+                    Task { await appState.refreshAccountUsage(account) }
+                } label: {
+                    Label("Read cache", systemImage: "arrow.clockwise")
+                }
+                .buttonStyle(.borderless)
+                .help("Sync local data")
+                .disabled(syncBusy)
+                Button {
+                    appState.openCLIUsageSession(account)
+                } label: {
+                    Label("Check with CLI", systemImage: "terminal")
+                        .labelStyle(.iconOnly)
+                }
+                .buttonStyle(.bordered)
+                .help(available.map {
+                    Text("CLI in \(max(1, Int(ceil($0.timeIntervalSinceNow / 60)))) min")
+                } ?? Text("Open the official CLI's /usage in safe mode. The CLI may connect to Anthropic. No model message is sent."))
+                .disabled(syncBusy || available != nil)
+            }
+        }
+        .font(.caption)
+        .controlSize(.small)
+    }
+
+    /// Preserve the age of cached readings after unsuccessful refresh attempts.
     @ViewBuilder
     private func sampleAgeLabel(_ account: Account) -> some View {
-        if let sampledAt = appState.accountUsageSampledAt[account.id],
-           Date().timeIntervalSince(sampledAt) >= 90 {
+        if let sampledAt = appState.accountUsageSampledAt[account.id] {
             HStack(spacing: 3) {
                 Image(systemName: "clock")
-                    .font(.caption2)
-                Text("Updated \(Text(sampledAt, style: .relative)) ago")
-                    .font(.caption2)
+                Text(sampledAt, format: .relative(presentation: .numeric, unitsStyle: .abbreviated))
             }
+            .font(.caption2)
             .foregroundStyle(.textSecondary)
         }
     }
 
     @ViewBuilder
-    private func accountHeader(_ account: Account) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: account.provider.iconName)
-                .font(.subheadline)
-                .foregroundStyle(account.isActive ? .brand : .secondary)
-
-            Text(account.displayEmail(obfuscated: !showFullEmail))
-                .font(.subheadline.weight(.medium))
-                .lineLimit(1)
-
-            if account.isActive {
-                Badge(text: String(localized: "Active", bundle: L10n.bundle), color: .green)
-            }
-
-            Spacer()
-
-            if let sub = account.displaySubscriptionType {
-                Badge(text: sub, color: .brand)
-            }
+    private func usageBars(_ usage: UsageAPIResponse, now: Date) -> some View {
+        if let window = usage.fiveHour {
+            usageRow(label: "Session", window: window, kind: .session, now: now)
         }
-    }
-
-    @ViewBuilder
-    private func usageBars(_ usage: UsageAPIResponse) -> some View {
-        if let session = usage.fiveHour {
-            usageRow(
-                label: "Session",
-                resetText: session.resetTimeString,
-                utilization: session.utilization ?? 0,
-                kind: .session
-            )
+        if let window = usage.sevenDay {
+            usageRow(label: "Weekly", window: window, kind: .weekly, now: now)
         }
-        if let weekly = usage.sevenDay {
-            usageRow(
-                label: "Weekly",
-                resetText: weekly.resetTimeString,
-                utilization: weekly.utilization ?? 0,
-                kind: .weekly
-            )
+        if let window = usage.sevenDayFable {
+            usageRow(label: "Weekly · Fable", window: window, kind: .weekly, now: now)
+        } else {
+            Text("Fable · Not collected yet")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        if let window = usage.sevenDayOpus {
+            usageRow(label: "Weekly · Opus", window: window, kind: .weekly, now: now)
+        }
+        if let window = usage.sevenDaySonnet {
+            usageRow(label: "Weekly · Sonnet", window: window, kind: .weekly, now: now)
+        }
+        if let window = usage.sevenDayOauthApps {
+            usageRow(label: "Weekly · OAuth apps", window: window, kind: .weekly, now: now)
+        }
+        if let window = usage.sevenDayCowork {
+            usageRow(label: "Weekly · Cowork", window: window, kind: .weekly, now: now)
+        }
+        if let window = usage.iguanaNecktie {
+            usageRow(label: "Iguana necktie", window: window, kind: .weekly, now: now)
         }
     }
 
     @ViewBuilder
     private func extraUsageRow(_ extra: ExtraUsage?) -> some View {
-        if let extra {
-            let enabled = extra.isEnabled == true
-            let iconColor: Color = enabled ? .orange : .gray
-            let statusColor: Color = enabled ? .orange : .gray
-            HStack(spacing: 6) {
-                Image(systemName: enabled ? "bolt.fill" : "bolt.slash")
-                    .font(.caption)
-                    .foregroundStyle(iconColor)
-                Text("Extra usage")
-                    .font(.caption)
-                    .foregroundStyle(.textSecondary)
-                Spacer()
-                Text(LocalizedStringKey(enabled ? "On" : "Off"))
-                    .font(.caption)
-                    .foregroundStyle(statusColor)
-            }
+        if extra?.isEnabled == true {
+            Label("Extra usage", systemImage: "bolt.fill")
+                .font(.caption2)
+                .foregroundStyle(.orange)
         }
     }
 
     // MARK: - Usage Row
 
-    private func usageRow(label: LocalizedStringKey, resetText: String?, utilization: Double, kind: LimitBarKind) -> some View {
-        let fillColor = menuBarConfig.limitBarColor(for: kind, utilization: utilization, context: .dashboard)
+    private func usageRow(label: LocalizedStringKey, window: UsageWindow, kind: LimitBarKind, now: Date) -> some View {
+        let fillColor = menuBarConfig.limitBarColor(for: kind, utilization: window.utilization, context: .dashboard)
 
-        return VStack(spacing: 5) {
+        return VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(label)
-                    .font(.caption)
-                    .foregroundStyle(.textSecondary)
-                Spacer()
-                if let resetText {
-                    Text("Resets in \(resetText)")
+                    .font(.caption.weight(.medium))
+                CountdownLabel(deadline: window.resetsAtDate, now: now, purpose: .quotaReset)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 4)
+                if let utilization = window.utilization {
+                    Text("Used \(Int(utilization))%")
+                        .font(.caption.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(fillColor)
+                } else {
+                    Text("Usage unknown")
                         .font(.caption)
-                        .foregroundStyle(.textSecondary)
+                        .foregroundStyle(.secondary)
                 }
             }
-
-            HStack(spacing: 8) {
+            if let utilization = window.utilization {
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(.progressTrack)
-                            .frame(height: 7)
-
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(fillColor)
-                            .frame(width: max(0, geo.size.width * min(utilization / 100.0, 1.0)), height: 7)
+                        Capsule().fill(.progressTrack)
+                        Capsule().fill(fillColor)
+                            .frame(width: max(0, geo.size.width * min(utilization / 100.0, 1.0)))
                     }
                 }
-                .frame(height: 7)
-
-                Text("\(Int(utilization))%")
-                    .font(.caption.weight(.medium).monospacedDigit())
-                    .foregroundStyle(fillColor)
-                    .frame(width: 34, alignment: .trailing)
+                .frame(height: 5)
             }
         }
     }

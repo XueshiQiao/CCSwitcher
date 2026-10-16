@@ -116,16 +116,11 @@ actor SessionParseCacheV2 {
     func refreshFromFilesystem() async {
         ensureLoaded()
         await PricingService.shared.ensureLoaded()
-        // Pick up a newer pricing snapshot the background download may have
-        // written since launch — otherwise a long-lived session prices any
-        // model released mid-session at $0. Runs before stamping/pricing so
-        // this cycle's cost output already reflects the reloaded table.
+        // Pick up pricing changes already present on disk without downloading.
         await PricingService.shared.reloadIfFreshChanged()
         // Capture the current pricing source for the envelope stamp.
         let src = await PricingService.shared.currentSource()
         pricingMeta = stampFor(source: src)
-        // Trigger a TTL'd background refresh of the LiteLLM JSON. No-op if fresh.
-        PricingService.shared.refreshInBackground()
 
         let start = Date()
         let cachedMtimes: [String: Double] = files.mapValues { $0.mtimeUnix }
@@ -164,6 +159,16 @@ actor SessionParseCacheV2 {
     func costSummary() async -> CostSummary {
         await PricingService.shared.ensureLoaded()
 
+        let snapshot = files
+        let models = Set(snapshot.values.flatMap { $0.entries.map(\.model) })
+        let prices = await PricingService.shared.prices(for: Array(models))
+        let summary = Self.aggregateCosts(files: snapshot, prices: prices, now: Date())
+        log.info("costSummary: \(summary.dailyCosts.count) days, today=$\(String(format: "%.2f", summary.todayCost))")
+        return summary
+    }
+
+    /// Shared derived aggregation: no filesystem or pricing service access.
+    static func aggregateCosts(files: [String: CachedFileV2], prices: [String: LiteLLMModelPricing?], now: Date) -> CostSummary {
         // Sort files by earliest timestamp. Secondary sort by path string for
         // deterministic ordering when timestamps tie (or are
         // .greatestFiniteMagnitude for files with no parseable timestamps,
@@ -179,21 +184,8 @@ actor SessionParseCacheV2 {
             }
 
         // (date, model) → running totals; cost is summed per-row.
-        struct Acc {
-            var input = 0, output = 0, cw = 0, cr = 0
-            var cost: Double = 0
-        }
-        var bucket: [String: [String: Acc]] = [:]
+        var bucket: [String: [String: ModelCost]] = [:]
         var sessionsByDate: [String: Set<String>] = [:]
-        // Resolve every model's price in a single actor hop up front. Doing
-        // this atomically — rather than awaiting `pricing(for:)` per row —
-        // means a concurrent `reloadIfFreshChanged()` can't swap the pricing
-        // table mid-summary and leave one result mixing old and new prices.
-        var distinctModels: Set<String> = []
-        for (_, file) in sortedFiles {
-            for e in file.entries { distinctModels.insert(e.model) }
-        }
-        let priceCache = await PricingService.shared.prices(for: Array(distinctModels))
 
         // Global max-output-wins dedup across files. A message written more than
         // once (partial stream snapshot + final copy) shares a hash; input/cache
@@ -227,23 +219,24 @@ actor SessionParseCacheV2 {
             if e.model == "<synthetic>" { continue }
             sessionsByDate[e.date, default: []].insert(w.sessionKey)
 
-            // priceCache holds every model seen above; `?? nil` flattens
+            // The price snapshot holds every model seen above; `?? nil` flattens
             // the optional-of-optional for a model with no pricing entry.
-            let price = priceCache[e.model] ?? nil
+            let price = prices[e.model] ?? nil
             let rowCost = price?.cost(
                 input: e.input, output: e.output,
                 cacheCreate: e.cw, cacheCreate1h: e.cw1h, cacheRead: e.cr,
                 isFast: e.speed == "fast"
-            ) ?? 0
+            )
 
             var byModel = bucket[e.date] ?? [:]
-            var acc = byModel[e.model] ?? Acc()
-            acc.input += e.input
-            acc.output += e.output
-            acc.cw += e.cw
-            acc.cr += e.cr
-            acc.cost += rowCost
-            byModel[e.model] = acc
+            let row = ModelCost(modelID: e.model, inputTokens: e.input, outputTokens: e.output,
+                                cacheWriteTokens: e.cw, cacheReadTokens: e.cr, requestCount: 1, cost: rowCost)
+            if var acc = byModel[e.model] {
+                acc.add(row)
+                byModel[e.model] = acc
+            } else {
+                byModel[e.model] = row
+            }
             bucket[e.date] = byModel
         }
 
@@ -253,11 +246,12 @@ actor SessionParseCacheV2 {
             var modelBreakdown: [String: Double] = [:]
             var sumIn = 0, sumOut = 0, sumCW = 0, sumCR = 0
             for (model, acc) in byModel {
-                totalCost += acc.cost
-                let short = CostParser.shortModelName(model)
-                modelBreakdown[short, default: 0] += acc.cost
-                sumIn += acc.input; sumOut += acc.output
-                sumCW += acc.cw; sumCR += acc.cr
+                if let cost = acc.cost {
+                    totalCost += cost
+                    modelBreakdown[model] = cost
+                }
+                sumIn += acc.inputTokens; sumOut += acc.outputTokens
+                sumCW += acc.cacheWriteTokens; sumCR += acc.cacheReadTokens
             }
             dailyCosts.append(DailyCost(
                 date: date,
@@ -267,14 +261,14 @@ actor SessionParseCacheV2 {
                 inputTokens: sumIn,
                 outputTokens: sumOut,
                 cacheWriteTokens: sumCW,
-                cacheReadTokens: sumCR
+                cacheReadTokens: sumCR,
+                models: byModel.values.sorted { $0.modelID < $1.modelID }
             ))
         }
         dailyCosts.sort { $0.date > $1.date }
 
-        let todayStr = Self.localDateString(Date())
+        let todayStr = Self.localDateString(now)
         let todayCost = dailyCosts.first(where: { $0.date == todayStr })?.totalCost ?? 0
-        log.info("costSummary: \(dailyCosts.count) days, today=$\(String(format: "%.2f", todayCost))")
         return CostSummary(todayCost: todayCost, dailyCosts: dailyCosts)
     }
 

@@ -17,26 +17,17 @@ private struct StripWidthKey: PreferenceKey {
 /// keeps a stale (too-narrow) width and clips the leading icon / trailing
 /// module once real data widens the content.
 struct MenuBarStripView: View {
-    // Not @ObservedObject: in the NSStatusItem hosting context, ObservableObject
-    // change delivery is unreliable (only @State / timer re-render the hosted
-    // view). We poll on a short interval instead.
+    // StatusItemController rebuilds the hosted view when app state or config changes.
     let appState: AppState
     let config: MenuBarConfig
     let onWidth: (CGFloat) -> Void
     @AppStorage("showFullEmail") private var showFullEmail = false
 
-    @State private var tick = Date()
-    @State private var iconFilled = false
-    // Polled refresh. ObservableObject change delivery is unreliable for a
-    // SwiftUI view hosted in an NSStatusItem, so we re-read AppState/config on
-    // a short interval (the pattern menu-bar monitors like iStats/Stats use).
-    // This also keeps the reset countdowns current.
-    private let tickTimer = Timer.publish(every: 3, on: .main, in: .common).autoconnect()
-
     var body: some View {
+        let tick = Date()
         HStack(spacing: 8) {
             if config.showsHeadIcon {
-                Image(systemName: iconFilled ? "brain.head.profile.fill" : "brain.head.profile")
+                Image(systemName: DoubleUsagePromo.isActive(at: tick) ? "brain.head.profile.fill" : "brain.head.profile")
                     .font(.system(size: 14))
             }
 
@@ -61,10 +52,5 @@ struct MenuBarStripView: View {
         .onPreferenceChange(StripWidthKey.self) { width in
             if width > 0 { onWidth(width) }
         }
-        .onReceive(tickTimer) { date in
-            tick = date
-            iconFilled = DoubleUsagePromo.isActive(at: date)
-        }
-        .onAppear { iconFilled = DoubleUsagePromo.isActive(at: Date()) }
     }
 }
