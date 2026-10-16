@@ -46,6 +46,11 @@ final class AppState: ObservableObject {
     private let activityParser = ActivityParser.shared
     private let keychain = KeychainService.shared
 
+    /// Ties the live keychain credential to the account that owns it, so
+    /// neither usage attribution nor a backup has to trust `~/.claude.json`'s
+    /// identity block — which any running Claude Code session can rewrite.
+    private let credentialAnchor = CredentialAnchorStore()
+
     private let accountsKey = "com.ccswitcher.accounts"
     private var refreshTimer: Timer?
 
@@ -199,6 +204,44 @@ final class AppState: ObservableObject {
         refreshTimer = nil
     }
 
+    // MARK: - Credential ownership
+
+    /// Who the credential currently in the keychain belongs to.
+    ///
+    /// Every read of the live credential goes through this: `~/.claude.json`
+    /// naming an account is not evidence that the token beside it is that
+    /// account's, and acting as though it were is what filed one account's
+    /// usage on another's card and overwrote its stored token.
+    private func liveCredentialOwner() -> LiveCredentialOwner {
+        let accessToken = keychain.readClaudeToken().flatMap(ClaudeService.extractAccessToken(from:))
+        let claimedEmail = keychain.readOAuthAccount()?["emailAddress"]?.value as? String
+        let claimedId = claimedEmail.flatMap { email in accounts.first(where: { $0.email == email })?.id }
+        return credentialAnchor.resolveOwner(accessToken: accessToken, claimedAccountId: claimedId)
+    }
+
+    /// Record that the live credential is `accountId`'s. Only for the moments
+    /// CCSwitcher established that itself — a completed switch, login, re-auth
+    /// or capture — never on the identity block's say-so.
+    private func anchorLiveCredential(to accountId: UUID) {
+        guard let tokenJSON = keychain.readClaudeToken(),
+              let accessToken = ClaudeService.extractAccessToken(from: tokenJSON) else { return }
+        credentialAnchor.anchor(accountId: accountId, accessToken: accessToken)
+    }
+
+    /// Back up the live credential as `account`'s, but only when it really is.
+    /// Storing it otherwise overwrites one account's saved token with another's,
+    /// which survives every later switch and silently spends the wrong quota.
+    @discardableResult
+    private func captureLiveCredential(as account: Account) -> Bool {
+        guard liveCredentialOwner().credentialAccountId == account.id else {
+            log.warning("[capture] Live credential is not confirmed to be \(account.email)'s; skipping backup rather than storing it under the wrong account")
+            return false
+        }
+        let captured = claudeService.captureCurrentCredentials(forAccountId: account.id.uuidString)
+        if captured { anchorLiveCredential(to: account.id) }
+        return captured
+    }
+
     // MARK: - Account Management
 
     func addAccount() async {
@@ -229,6 +272,16 @@ final class AppState: ObservableObject {
                 return
             }
 
+            // The CLI reports the identity block, which can name an account the
+            // live token does not belong to. Adding on that word would file
+            // another account's credential under a brand-new entry.
+            if let ownerId = liveCredentialOwner().credentialAccountId,
+               let owner = accounts.first(where: { $0.id == ownerId }), owner.email != email {
+                errorMessage = String(localized: "Claude reports \(email), but the stored sign-in still belongs to \(owner.email). Switch accounts once, then add.", bundle: L10n.bundle)
+                log.error("[addAccount] Aborted: live credential belongs to \(owner.email), not \(email)")
+                return
+            }
+
             var account = Account(
                 email: email,
                 displayName: status.orgName ?? email,
@@ -247,6 +300,7 @@ final class AppState: ObservableObject {
                 return
             }
             log.info("[addAccount] Token captured successfully")
+            anchorLiveCredential(to: account.id)
 
             if accounts.isEmpty {
                 account.isActive = true
@@ -286,7 +340,7 @@ final class AppState: ObservableObject {
             // 1. Back up current account (token + oauthAccount) before login overwrites them
             if let current = activeAccount {
                 log.info("[loginNewAccount] Step 1: Backing up current account (\(current.email))...")
-                let backed = claudeService.captureCurrentCredentials(forAccountId: current.id.uuidString)
+                let backed = captureLiveCredential(as: current)
                 log.info("[loginNewAccount] Step 1: Backup result: \(backed)")
             } else {
                 log.info("[loginNewAccount] Step 1: No active account, skipping backup")
@@ -323,7 +377,11 @@ final class AppState: ObservableObject {
             // would leave a stale backup behind an explicit success message.
             if let existing = accounts.firstIndex(where: { $0.email == email }) {
                 log.info("[loginNewAccount] Step 4: Account already exists, refreshing backup and marking it active")
+                // A just-completed login is itself the proof of ownership — the
+                // CLI minted this credential for this account — so capture and
+                // re-anchor directly instead of asking the (now superseded) anchor.
                 let captured = claudeService.captureCurrentCredentials(forAccountId: accounts[existing].id.uuidString)
+                if captured { anchorLiveCredential(to: accounts[existing].id) }
                 for i in accounts.indices {
                     accounts[i].isActive = (i == existing)
                 }
@@ -361,6 +419,7 @@ final class AppState: ObservableObject {
                 isLoggingIn = false
                 return
             }
+            anchorLiveCredential(to: account.id)
 
             // 6. Mark new account as active
             for i in accounts.indices {
@@ -399,6 +458,7 @@ final class AppState: ObservableObject {
     func removeAccount(_ account: Account) {
         log.info("[removeAccount] Removing account \(account.id)")
         keychain.removeAccountBackup(forAccountId: account.id.uuidString)
+        credentialAnchor.forget(accountId: account.id)
         accounts.removeAll { $0.id == account.id }
         // Drop every per-account cache too, or a re-added account inherits the
         // removed one's readings, error banner and rate-limit park.
@@ -459,9 +519,19 @@ final class AppState: ObservableObject {
         // auto-switched away from it seconds later by the refresh that follows.
         lastAutoSwitchAt = Date()
 
+        // Whether the credential about to be backed up really is the outgoing
+        // account's. Resolved here, where the account list lives, and handed
+        // down for the same reason `targetBackup` is: the switch must not
+        // re-derive it from the identity block one layer lower.
+        let liveCredentialIsSource = liveCredentialOwner().credentialAccountId == currentActive.id
+
         isLoading = true
         do {
-            let outcome = try await claudeService.switchAccount(from: currentActive, to: account, targetBackup: targetBackup)
+            let outcome = try await claudeService.switchAccount(from: currentActive, to: account, targetBackup: targetBackup, liveCredentialIsSource: liveCredentialIsSource)
+
+            // CCSwitcher just wrote this credential for this account — the one
+            // moment the pairing is known first-hand rather than inferred.
+            anchorLiveCredential(to: account.id)
 
             for i in accounts.indices {
                 accounts[i].isActive = (accounts[i].id == account.id)
@@ -593,6 +663,14 @@ final class AppState: ObservableObject {
             return nil
         }
 
+        // Same rule as the polling loop: the live credential may only stand in
+        // for the account it actually belongs to. Auto-switch verifies against
+        // this reading, so a misattributed one would swap on the wrong quota.
+        if account.isActive, liveCredentialOwner().credentialAccountId != account.id {
+            log.warning("[fetchUsageNow] Live credential is not confirmed to be \(account.email)'s; no reading available")
+            return nil
+        }
+
         let tokenJSON = account.isActive
             ? keychain.readClaudeToken()
             : keychain.getAccountBackup(forAccountId: account.id.uuidString)?.token
@@ -651,7 +729,7 @@ final class AppState: ObservableObject {
             // 1. Back up current active account before login overwrites it
             if let current = activeAccount, current.id != account.id {
                 log.info("[reauth] Backing up current account before login...")
-                _ = claudeService.captureCurrentCredentials(forAccountId: current.id.uuidString)
+                captureLiveCredential(as: current)
             }
 
             // 2. Run login
@@ -679,8 +757,11 @@ final class AppState: ObservableObject {
                 return
             }
 
-            // 4. Capture the fresh token
+            // 4. Capture the fresh token. The login just proved this credential
+            // is this account's, so it also re-anchors — this is the way out of
+            // a desync the user is told to take.
             let captured = claudeService.captureCurrentCredentials(forAccountId: account.id.uuidString)
+            if captured { anchorLiveCredential(to: account.id) }
             log.info("[reauth] Token capture result: \(captured)")
 
             // 5. Update account metadata. Done even when the capture failed —
@@ -860,6 +941,13 @@ final class AppState: ObservableObject {
 
         // For active account: use live keychain token (with delegated refresh on expiry)
         // For other accounts: use backup token (refreshed in place when expired)
+        //
+        // Resolved once per cycle: the live credential belongs to exactly one
+        // account, and only that account's card may be filled from it. Reading
+        // it for whoever the identity block currently names is what put one
+        // account's percentages on the other's card for hours.
+        let liveCredentialOwnerId = liveCredentialOwner().credentialAccountId
+
         var isFirstRequest = true
         for account in targets {
             // Stagger requests: a back-to-back burst (one request per account within
@@ -871,6 +959,11 @@ final class AppState: ObservableObject {
 
             let tokenJSON: String?
             if account.isActive {
+                guard liveCredentialOwnerId == account.id else {
+                    log.warning("[fetchUsage] Live credential is not confirmed to be \(account.email)'s; taking no reading rather than filing someone else's")
+                    accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: false, message: String(localized: "Can't tell which account the current sign-in belongs to. Switch accounts once to re-sync.", bundle: L10n.bundle))
+                    continue
+                }
                 tokenJSON = keychain.readClaudeToken()
             } else {
                 tokenJSON = keychain.getAccountBackup(forAccountId: account.id.uuidString)?.token
@@ -911,14 +1004,20 @@ final class AppState: ObservableObject {
                     do {
                         _ = try await claudeService.getAuthStatus()
                         log.info("[fetchUsage] Delegated refresh completed for active account.")
-                        // Re-read refreshed token and retry
+                        // Re-read refreshed token and retry. A refresh rotates the
+                        // credential in place without changing whose it is, so
+                        // re-anchor to the same account — otherwise the anchor
+                        // goes stale and the next cycle falls back to believing
+                        // the identity block again.
                         if let refreshedJSON = keychain.readClaudeToken(),
-                           let refreshedToken = ClaudeService.extractAccessToken(from: refreshedJSON),
-                           let usage = await usageRespectingParking(accessToken: refreshedToken, account: account) {
-                            accountUsage[account.id] = usage
-                            accountUsageSampledAt[account.id] = Date()
-                            accountUsageErrors[account.id] = nil
-                            log.info("[fetchUsage] Recovered \(account.email) via delegated refresh.")
+                           let refreshedToken = ClaudeService.extractAccessToken(from: refreshedJSON) {
+                            credentialAnchor.anchor(accountId: account.id, accessToken: refreshedToken)
+                            if let usage = await usageRespectingParking(accessToken: refreshedToken, account: account) {
+                                accountUsage[account.id] = usage
+                                accountUsageSampledAt[account.id] = Date()
+                                accountUsageErrors[account.id] = nil
+                                log.info("[fetchUsage] Recovered \(account.email) via delegated refresh.")
+                            }
                         }
                     } catch {
                         log.error("[fetchUsage] Delegated refresh failed for active account: \(error.localizedDescription)")
@@ -989,6 +1088,19 @@ final class AppState: ObservableObject {
             log.info("[diagnose] Live oauthAccount: \(liveEmail)")
         } else {
             log.warning("[diagnose] Live oauthAccount: MISSING")
+        }
+
+        // The identity block above says who is signed in; this says whose
+        // credential is actually sitting next to it. When they disagree, every
+        // number on the cards is suspect — say so here rather than leaving it
+        // to be reconstructed from percentages later.
+        switch liveCredentialOwner() {
+        case .owned(let id):
+            log.info("[diagnose] Live credential belongs to: \(self.accounts.first(where: { $0.id == id })?.email ?? id.uuidString)")
+        case .desynced(_, let credential):
+            log.warning("[diagnose] DESYNCED: identity block and live credential disagree; credential is \(self.accounts.first(where: { $0.id == credential })?.email ?? credential.uuidString)'s")
+        case .unknown:
+            log.warning("[diagnose] Live credential owner: UNKNOWN")
         }
 
         // Check each account has a backup
@@ -1065,6 +1177,23 @@ final class AppState: ObservableObject {
     private func updateActiveAccount(from status: AuthStatus) {
         guard status.loggedIn, let email = status.email else { return }
 
+        // The CLI reports the identity block, so when that block has been
+        // rewritten out from under the credential it names the wrong account.
+        // Every API call is billed against the credential, so the active badge
+        // belongs to its owner — following the block here is what made the app
+        // claim the other account was in use while its quota sat untouched.
+        if case .desynced(_, let credentialOwner) = liveCredentialOwner(),
+           let index = accounts.firstIndex(where: { $0.id == credentialOwner }) {
+            for i in accounts.indices {
+                accounts[i].isActive = (i == index)
+            }
+            activeAccount = accounts[index]
+            saveAccounts()
+            log.warning("[updateActiveAccount] Claude reports \(email) but the live credential is \(self.accounts[index].email)'s; keeping the credential's owner active")
+            errorMessage = String(localized: "Claude reports \(email), but the stored sign-in is still \(accounts[index].email)'s — another Claude Code session rewrote the identity. Switch accounts once to re-sync.", bundle: L10n.bundle)
+            return
+        }
+
         if let index = accounts.firstIndex(where: { $0.email == email }) {
             for i in accounts.indices {
                 accounts[i].isActive = (i == index)
@@ -1085,7 +1214,9 @@ final class AppState: ObservableObject {
             )
             accounts.append(account)
             activeAccount = account
-            _ = claudeService.captureCurrentCredentials(forAccountId: account.id.uuidString)
+            if claudeService.captureCurrentCredentials(forAccountId: account.id.uuidString) {
+                anchorLiveCredential(to: account.id)
+            }
             saveAccounts()
             log.info("[updateActiveAccount] Auto-created first account, id=\(account.id)")
         } else {

@@ -137,6 +137,9 @@
 "Token expired. Switch to this account to refresh." = "トークンが期限切れです。このアカウントに切り替えて更新してください。";
 "API Rate Limited. Try again later." = "API レート制限中。後でもう一度お試しください。";
 "Could not fetch usage: %@" = "使用量を取得できませんでした：%@";
+"Claude reports %@, but the stored sign-in still belongs to %@. Switch accounts once, then add." = "Claude は %1$@ と報告していますが、保存されているサインインは %2$@ のものです。一度アカウントを切り替えてから追加してください。";
+"Claude reports %@, but the stored sign-in is still %@'s — another Claude Code session rewrote the identity. Switch accounts once to re-sync." = "Claude は %1$@ と報告していますが、保存されているサインインは %2$@ のままです。別の Claude Code セッションが識別情報を書き換えました。一度アカウントを切り替えて再同期してください。";
+"Can't tell which account the current sign-in belongs to. Switch accounts once to re-sync." = "現在のサインインがどのアカウントのものか判別できません。一度アカウントを切り替えて再同期してください。";
 
 /* Promo */
 "%@ - %@ (Weekdays) & Weekends" = "%1$@ - %2$@（平日）& 週末";

@@ -137,6 +137,9 @@
 "Token expired. Switch to this account to refresh." = "Jeton expiré. Basculez vers ce compte pour actualiser.";
 "API Rate Limited. Try again later." = "Limite de l'API atteinte. Réessayez plus tard.";
 "Could not fetch usage: %@" = "Impossible de récupérer l'utilisation : %@";
+"Claude reports %@, but the stored sign-in still belongs to %@. Switch accounts once, then add." = "Claude indique %1$@, mais la connexion enregistrée appartient toujours à %2$@. Changez de compte une fois, puis ajoutez-le.";
+"Claude reports %@, but the stored sign-in is still %@'s — another Claude Code session rewrote the identity. Switch accounts once to re-sync." = "Claude indique %1$@, mais la connexion enregistrée est toujours celle de %2$@ : une autre session Claude Code a réécrit l'identité. Changez de compte une fois pour resynchroniser.";
+"Can't tell which account the current sign-in belongs to. Switch accounts once to re-sync." = "Impossible de déterminer à quel compte appartient la connexion actuelle. Changez de compte une fois pour resynchroniser.";
 
 /* Promo */
 "%@ - %@ (Weekdays) & Weekends" = "%1$@ - %2$@ (Jours ouvrables) & Week-ends";

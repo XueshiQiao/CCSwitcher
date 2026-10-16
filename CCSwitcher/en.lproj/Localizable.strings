@@ -137,6 +137,9 @@
 "Token expired. Switch to this account to refresh." = "Token expired. Switch to this account to refresh.";
 "API Rate Limited. Try again later." = "API Rate Limited. Try again later.";
 "Could not fetch usage: %@" = "Could not fetch usage: %@";
+"Claude reports %@, but the stored sign-in still belongs to %@. Switch accounts once, then add." = "Claude reports %1$@, but the stored sign-in still belongs to %2$@. Switch accounts once, then add.";
+"Claude reports %@, but the stored sign-in is still %@'s — another Claude Code session rewrote the identity. Switch accounts once to re-sync." = "Claude reports %1$@, but the stored sign-in is still %2$@'s — another Claude Code session rewrote the identity. Switch accounts once to re-sync.";
+"Can't tell which account the current sign-in belongs to. Switch accounts once to re-sync." = "Can't tell which account the current sign-in belongs to. Switch accounts once to re-sync.";
 
 /* Promo */
 "%@ - %@ (Weekdays) & Weekends" = "%@ - %@ (Weekdays) & Weekends";
