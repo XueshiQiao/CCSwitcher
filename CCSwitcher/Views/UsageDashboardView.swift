@@ -57,6 +57,9 @@ struct UsageDashboardView: View {
                     // Today's activity stats
                     todayActivityCard
 
+                    // Weekly consumption total across ALL accounts
+                    weeklyTotalCard
+
                     ForEach(appState.accounts) { account in
                         accountUsageCard(account: account, usage: appState.accountUsage[account.id])
                     }
@@ -109,6 +112,70 @@ struct UsageDashboardView: View {
     }
 
     private static let costDisclaimer: LocalizedStringKey = "Estimated API-equivalent cost of your Claude Code usage, for reference only."
+
+    // MARK: - Weekly Consumption Total (all accounts)
+
+    /// Sum of every account's 7-day utilization: "how much of my weekly quota
+    /// across all accounts has already been consumed?" The total can exceed 100%
+    /// because each account has its own independent weekly limit.
+    private var weeklyTotalCard: some View {
+        let summary = appState.weeklyConsumptionSummary
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "calendar.badge.clock")
+                    .font(.subheadline)
+                    .foregroundStyle(.brand)
+                Text("Weekly Consumption — All Accounts")
+                    .font(.subheadline.weight(.medium))
+                Spacer()
+                if summary.hasData {
+                    let accountsBadge = String(format: String(localized: "%lld/%lld accounts", bundle: L10n.bundle),
+                                                summary.sampledAccountCount, summary.accountCount)
+                    Badge(text: accountsBadge, color: .green)
+                }
+            }
+
+            if summary.hasData {
+                HStack(spacing: 0) {
+                    StatWithTooltip(tooltip: Self.weeklyTotalDisclaimer) {
+                        VStack(spacing: 3) {
+                            Text("\(Int(summary.totalUtilization))%")
+                                .font(.title.weight(.semibold).monospacedDigit())
+                                .foregroundStyle(.brand)
+                            Text("Total")
+                                .font(.caption2)
+                                .foregroundStyle(.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    StatWithTooltip(tooltip: Self.weeklyAverageDisclaimer) {
+                        VStack(spacing: 3) {
+                            Text("\(Int(summary.averageUtilization))%")
+                                .font(.title2.weight(.semibold).monospacedDigit())
+                            Text("Average")
+                                .font(.caption2)
+                                .foregroundStyle(.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+            } else {
+                HStack {
+                    Image(systemName: "hourglass")
+                        .foregroundStyle(.secondary)
+                    Text("Waiting for usage data...")
+                        .font(.caption)
+                        .foregroundStyle(.textSecondary)
+                    Spacer()
+                }
+            }
+        }
+        .cardStyle()
+        .sectionPadding()
+    }
+
+    private static let weeklyTotalDisclaimer: LocalizedStringKey = "Sum of every account's 7-day utilization. Each account has its own weekly quota, so the total can exceed 100%."
+    private static let weeklyAverageDisclaimer: LocalizedStringKey = "Average 7-day utilization across the accounts that reported data."
 
     // MARK: - Today Activity Card
 
