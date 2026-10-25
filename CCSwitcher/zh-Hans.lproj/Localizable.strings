@@ -188,3 +188,9 @@
 
 "Automatically check for updates" = "自动检查更新";
 "Automatically download updates" = "自动下载更新";
+
+/* Panel appearance */
+"Panel style" = "面板样式";
+"Warm" = "暖色";
+"Translucent" = "半透明";
+"Claude" = "Claude";

@@ -62,6 +62,7 @@ struct PopoverRoot: View {
     @ObservedObject var config: MenuBarConfig
     var model: PanelModel
     var locale: Locale
+    @AppStorage("panelStyle") private var style: PanelStyle = .warm
 
     /// Active account's session utilization (0…1), used to warm the bloom.
     private var load: Double {
@@ -78,12 +79,13 @@ struct PopoverRoot: View {
                 .environmentObject(appState)
                 .environmentObject(config)
                 .environment(\.locale, locale)
+                .environment(\.panelStyle, style)
                 .environment(\.panelShown, model.shown)
                 .frame(width: PanelMetrics.width)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .background(
-            PanelBackground(tint: UsageTint.at(load), intensity: 0.8 + load * 0.4)
+            PanelBackground(tint: UsageTint.at(load), intensity: 0.8 + load * 0.4, style: style)
                 .animation(Theme.gentle, value: load)
                 .clipShape(shape)
                 .shadow(color: .black.opacity(0.35), radius: 20, y: 10)

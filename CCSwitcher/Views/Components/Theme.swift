@@ -29,6 +29,12 @@ enum Theme {
     static let warning = Color(hexRGB: "#E3A23B")!
     static let danger = Color.adaptive(light: Color(hexRGB: "#C2463B")!, dark: Color(hexRGB: "#E5675B")!)
 
+    // Flat "Claude" panel style, after claude.ai's settings pages
+    static let claudeBackground = Color.adaptive(light: Color(hexRGB: "#FAF9F5")!, dark: Color(hexRGB: "#262624")!)
+    static let claudeCard = Color.adaptive(light: .white, dark: Color(hexRGB: "#30302E")!)
+    static let claudeTrack = Color.adaptive(light: Color(hexRGB: "#E8E6DC")!, dark: Color.white.opacity(0.12))
+    static let claudeBlue = Color.adaptive(light: Color(hexRGB: "#2C84DB")!, dark: Color(hexRGB: "#3B8FE8")!)
+
     // Shape
     static let corner: CGFloat = 14
     static let pad: CGFloat = 16
@@ -60,6 +66,37 @@ extension EnvironmentValues {
         get { self[PanelShownKey.self] }
         set { self[PanelShownKey.self] = newValue }
     }
+
+    /// How the panel is drawn; see `PanelStyle`.
+    var panelStyle: PanelStyle {
+        get { self[PanelStyleKey.self] }
+        set { self[PanelStyleKey.self] = newValue }
+    }
+}
+
+/// How the popover panel is drawn (Settings > General > Appearance).
+enum PanelStyle: String, CaseIterable, Identifiable {
+    /// Warm ivory / charcoal with the terracotta bloom. The default.
+    case warm
+    /// The system popover material: the desktop shows through.
+    case translucent
+    /// Flat and neutral like claude.ai: solid background, plain cards,
+    /// thin blue bars, no glow.
+    case claude
+
+    var id: String { rawValue }
+
+    var title: LocalizedStringKey {
+        switch self {
+        case .warm: "Warm"
+        case .translucent: "Translucent"
+        case .claude: "Claude"
+        }
+    }
+}
+
+private struct PanelStyleKey: EnvironmentKey {
+    static let defaultValue = PanelStyle.warm
 }
 
 // MARK: - Button style
@@ -80,7 +117,26 @@ struct Surface: ViewModifier {
     var radius: CGFloat = Theme.corner
     var fill: Color = Theme.card
 
+    @Environment(\.panelStyle) private var style
+
     func body(content: Content) -> some View {
+        if style == .claude {
+            // Flat: solid card, hairline border, no highlight or shadow.
+            content
+                .background(
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .fill(fill == Theme.card ? Theme.claudeCard : fill)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                                .strokeBorder(Theme.hairline, lineWidth: 0.5)
+                        )
+                )
+        } else {
+            styledSurface(content)
+        }
+    }
+
+    private func styledSurface(_ content: Content) -> some View {
         content
             .background(
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
@@ -139,16 +195,32 @@ extension View {
 
 /// Warm ivory / charcoal panel with a soft terracotta bloom from the top.
 /// The bloom warms toward red as the active session nears its limit.
+/// `.translucent` swaps the solid base for the system popover material, so
+/// the desktop shows through as it did with the old `NSPopover`; `.claude`
+/// is a flat background with no bloom.
 struct PanelBackground: View {
     var tint: Color = Theme.glow
     var intensity: Double = 1
+    var style: PanelStyle = .warm
 
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
+        if style == .claude {
+            Theme.claudeBackground
+        } else {
+            bloom
+        }
+    }
+
+    private var bloom: some View {
         let k = (scheme == .dark ? 1.0 : 0.7) * intensity
-        ZStack {
-            LinearGradient(colors: [Theme.bgTop, Theme.bgBottom], startPoint: .top, endPoint: .bottom)
+        return ZStack {
+            if style == .translucent {
+                VisualEffectBackground(material: .popover)
+            } else {
+                LinearGradient(colors: [Theme.bgTop, Theme.bgBottom], startPoint: .top, endPoint: .bottom)
+            }
             LinearGradient(colors: [tint.opacity(0.14 * k), tint.opacity(0.04 * k), .clear],
                            startPoint: .top, endPoint: .bottom)
             RadialGradient(colors: [tint.opacity(0.22 * k), tint.opacity(0.07 * k), .clear],
@@ -157,6 +229,24 @@ struct PanelBackground: View {
             RadialGradient(colors: [tint.opacity(0.06 * k), .clear],
                            center: .init(x: 0.5, y: 1.0), startRadius: 0, endRadius: 260)
         }
+    }
+}
+
+/// Behind-window blur in the given system material.
+struct VisualEffectBackground: NSViewRepresentable {
+    var material: NSVisualEffectView.Material
+
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = material
+        view.blendingMode = .behindWindow
+        // The panel never becomes the main window; keep the blur on anyway.
+        view.state = .active
+        return view
+    }
+
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {
+        view.material = material
     }
 }
 
@@ -329,19 +419,23 @@ struct GlowBar: View {
     var marker: Double?
 
     @State private var grown = false
+    @Environment(\.panelStyle) private var style
 
     var body: some View {
         GeometryReader { geo in
             let f = grown ? min(max(fraction, 0), 1) : 0
             let w = geo.size.width * f
             ZStack(alignment: .leading) {
+                let flat = style == .claude
                 Capsule()
-                    .fill(Theme.well)
-                    .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 0.5))
+                    .fill(flat ? Theme.claudeTrack : Theme.well)
+                    .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: flat ? 0 : 0.5))
                 Capsule()
-                    .fill(LinearGradient(colors: [color.opacity(0.75), color], startPoint: .leading, endPoint: .trailing))
+                    .fill(flat
+                          ? AnyShapeStyle(color)
+                          : AnyShapeStyle(LinearGradient(colors: [color.opacity(0.75), color], startPoint: .leading, endPoint: .trailing)))
                     .frame(width: f > 0 ? max(w, height) : 0)
-                    .shadow(color: color.opacity(0.45), radius: 5)
+                    .shadow(color: flat ? .clear : color.opacity(0.45), radius: 5)
                 if let marker {
                     Capsule()
                         .fill(Theme.text.opacity(0.55))

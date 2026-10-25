@@ -8,6 +8,7 @@ struct SettingsView: View {
     @EnvironmentObject private var menuBarConfig: MenuBarConfig
     @AppStorage("refreshInterval") private var refreshInterval: Double = 300
     @AppStorage("showFullEmail") private var showFullEmail = false
+    @AppStorage("panelStyle") private var panelStyle: PanelStyle = .warm
     @AppStorage("showInDock") private var showInDock = false
     @AppStorage("appLanguage") private var appLanguage = "auto"
     @AppStorage("autoSwitchEnabled") private var autoSwitchEnabled = false
@@ -92,6 +93,11 @@ struct SettingsView: View {
                 }
 
                 Toggle("Show full email address", isOn: $showFullEmail)
+                Picker("Panel style", selection: $panelStyle) {
+                    ForEach(PanelStyle.allCases) { style in
+                        Text(style.title).tag(style)
+                    }
+                }
             }
 
             Section("System") {

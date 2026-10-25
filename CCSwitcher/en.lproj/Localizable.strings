@@ -193,3 +193,9 @@
 
 "Automatically check for updates" = "Automatically check for updates";
 "Automatically download updates" = "Automatically download updates";
+
+/* Panel appearance */
+"Panel style" = "Panel style";
+"Warm" = "Warm";
+"Translucent" = "Translucent";
+"Claude" = "Claude";

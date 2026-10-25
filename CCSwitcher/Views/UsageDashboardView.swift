@@ -18,6 +18,7 @@ private struct StatWithTooltip<Content: View>: View {
 struct UsageDashboardView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var menuBarConfig: MenuBarConfig
+    @Environment(\.panelStyle) private var panelStyle
     @AppStorage("showFullEmail") private var showFullEmail = false
 
     var body: some View {
@@ -362,7 +363,13 @@ struct UsageDashboardView: View {
     // MARK: - Usage Row
 
     private func usageRow(label: Text, resetText: String?, utilization: Double, elapsed: Double?, kind: LimitBarKind) -> some View {
-        let fillColor = menuBarConfig.limitBarColor(for: kind, utilization: utilization, context: .dashboard)
+        // The flat style reads like claude.ai: blue bars and a quiet
+        // percentage, red only near the limit. Custom bar colors still win.
+        let flat = panelStyle == .claude && !menuBarConfig.customizesLimitBarColors
+        let fillColor = flat
+            ? (utilization >= 90 ? Theme.danger : Theme.claudeBlue)
+            : menuBarConfig.limitBarColor(for: kind, utilization: utilization, context: .dashboard)
+        let percentColor = flat && utilization < 90 ? Theme.dim : fillColor
 
         return VStack(spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
@@ -378,7 +385,7 @@ struct UsageDashboardView: View {
                 }
                 Text("\(Int(utilization))%")
                     .font(.system(size: 13, weight: .semibold, design: .rounded).monospacedDigit())
-                    .foregroundStyle(fillColor)
+                    .foregroundStyle(percentColor)
                     .contentTransition(.numericText(value: utilization))
                     .animation(Theme.spring, value: utilization)
                     .frame(minWidth: 36, alignment: .trailing)

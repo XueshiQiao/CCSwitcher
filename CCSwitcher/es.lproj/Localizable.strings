@@ -185,3 +185,9 @@
 
 "Automatically check for updates" = "Buscar actualizaciones automáticamente";
 "Automatically download updates" = "Descargar actualizaciones automáticamente";
+
+/* Panel appearance */
+"Panel style" = "Estilo del panel";
+"Warm" = "Cálido";
+"Translucent" = "Transparente";
+"Claude" = "Claude";

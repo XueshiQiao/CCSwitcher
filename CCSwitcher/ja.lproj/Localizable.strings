@@ -188,3 +188,9 @@
 
 "Automatically check for updates" = "アップデートを自動的に確認";
 "Automatically download updates" = "アップデートを自動的にダウンロード";
+
+/* Panel appearance */
+"Panel style" = "パネルのスタイル";
+"Warm" = "ウォーム";
+"Translucent" = "半透明";
+"Claude" = "Claude";
