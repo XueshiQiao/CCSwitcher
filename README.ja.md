@@ -4,6 +4,7 @@
   <a href="README.ja.md"><img src="https://img.shields.io/badge/日本語%20✓-blue" alt="日本語"></a>
   <a href="README.de.md"><img src="https://img.shields.io/badge/Deutsch-gray" alt="Deutsch"></a>
   <a href="README.fr.md"><img src="https://img.shields.io/badge/Français-gray" alt="Français"></a>
+  <a href="README.es.md"><img src="https://img.shields.io/badge/Español-gray" alt="Español"></a>
 </p>
 
 # CCSwitcher
@@ -18,7 +19,7 @@ CCSwitcherは、開発者が複数のClaude Codeアカウントを**マルチア
 - **デスクトップウィジェット**: macOSネイティブのデスクトップウィジェットで、小・中・大の3サイズに対応。アカウントの使用状況、コスト、アクティビティ統計を表示します。一目で使用状況を把握できるサークルリングバリアントも含まれています。
 - **アプリ内自動更新**: [Sparkle 2.x](https://sparkle-project.org/) によって駆動。新しいバージョンはサイレントかつ原子的にインストール——DMGのドラッグもFinderダイアログも不要です。
 - **ダークモード**：ライトモードとダークモードに完全対応。システムの外観設定に合わせてカラーが自動的に切り替わります。
-- **多言語対応**：English、简体中文、日本語、Deutsch、Français の5言語に対応しています。
+- **多言語対応**：English、简体中文、日本語、Deutsch、Français、Español の6言語に対応しています。
 - **プライバシー重視のUI**: スクリーンショットや画面収録時に、メールアドレスやアカウント名を自動的に難読化して個人情報を保護します。
 - **ゼロインタラクショントークン更新**: ClaudeのOAuthトークンの期限切れを検知し、バックグラウンドで公式CLIに更新処理を委譲してインテリジェントに処理します。
 - **シームレスなログインフロー**: ターミナルを一切開くことなく新しいアカウントを追加できます。アプリがバックグラウンドでCLIを起動し、ブラウザのOAuthループを自動処理します。

@@ -4,6 +4,7 @@
   <a href="README.ja.md"><img src="https://img.shields.io/badge/日本語-gray" alt="日本語"></a>
   <a href="README.de.md"><img src="https://img.shields.io/badge/Deutsch%20✓-blue" alt="Deutsch"></a>
   <a href="README.fr.md"><img src="https://img.shields.io/badge/Français-gray" alt="Français"></a>
+  <a href="README.es.md"><img src="https://img.shields.io/badge/Español-gray" alt="Español"></a>
 </p>
 
 # CCSwitcher
@@ -18,7 +19,7 @@ CCSwitcher ist eine leichtgewichtige, reine Menüleisten-Anwendung für macOS, d
 - **Desktop-Widgets**: Native macOS Desktop-Widgets in kleiner, mittlerer und großer Größe, die Kontonutzung, Kosten und Aktivitätsstatistiken anzeigen. Enthält eine Ringdiagramm-Variante zur schnellen Nutzungsübersicht.
 - **In-App-Auto-Update**: Powered by [Sparkle 2.x](https://sparkle-project.org/). Neue Versionen installieren sich still und atomar – kein DMG-Ziehen, keine Finder-Dialoge.
 - **Dunkelmodus**: Vollständige Unterstützung für hellen und dunklen Modus mit adaptiven Farben, die sich automatisch an das Systemerscheinungsbild anpassen.
-- **Internationalisierung**: Verfügbar in English, 简体中文 (Chinesisch), 日本語 (Japanisch), Deutsch und Français (Französisch).
+- **Internationalisierung**: Verfügbar in English, 简体中文 (Chinesisch), 日本語 (Japanisch), Deutsch, Français (Französisch) und Español (Spanisch).
 - **Datenschutzorientierte Oberfläche**: Verschleiert automatisch E-Mail-Adressen und Kontonamen in Screenshots oder Bildschirmaufnahmen, um Ihre Identität zu schützen.
 - **Token-Aktualisierung ohne Interaktion**: Handhabt intelligent den Ablauf von Claudes OAuth-Token, indem der Aktualisierungsprozess im Hintergrund an die offizielle CLI delegiert wird.
 - **Nahtloser Anmeldevorgang**: Fügen Sie neue Konten hinzu, ohne jemals ein Terminal öffnen zu müssen. Die App ruft die CLI im Hintergrund auf und übernimmt den Browser-OAuth-Ablauf für Sie.
