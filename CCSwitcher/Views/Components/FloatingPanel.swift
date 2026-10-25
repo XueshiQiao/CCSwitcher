@@ -84,12 +84,23 @@ struct PopoverRoot: View {
                 .frame(width: PanelMetrics.width)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .background(
-            PanelBackground(tint: UsageTint.at(load), intensity: 0.8 + load * 0.4, style: style)
-                .animation(Theme.gentle, value: load)
-                .clipShape(shape)
-                .shadow(color: .black.opacity(0.35), radius: 20, y: 10)
-        )
+        .background {
+            if style == .translucent {
+                if #available(macOS 26.0, *) {
+                    // Liquid Glass, as the system popover draws itself on
+                    // macOS 26+: the desktop shows through.
+                    Color.clear.glassEffect(.regular, in: shape)
+                } else {
+                    VisualEffectBackground(material: .popover)
+                        .clipShape(shape)
+                }
+            } else {
+                PanelBackground(tint: UsageTint.at(load), intensity: 0.8 + load * 0.4, style: style)
+                    .animation(Theme.gentle, value: load)
+                    .clipShape(shape)
+                    .shadow(color: .black.opacity(0.35), radius: 20, y: 10)
+            }
+        }
         .overlay(shape.stroke(Theme.hairline, lineWidth: 0.5))
         .clipShape(shape)
         .padding(PanelMetrics.margin)

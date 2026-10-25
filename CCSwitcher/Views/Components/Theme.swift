@@ -34,6 +34,13 @@ enum Theme {
     static let claudeCard = Color.adaptive(light: .white, dark: Color(hexRGB: "#30302E")!)
     static let claudeTrack = Color.adaptive(light: Color(hexRGB: "#E8E6DC")!, dark: Color.white.opacity(0.12))
     static let claudeBlue = Color.adaptive(light: Color(hexRGB: "#2C84DB")!, dark: Color(hexRGB: "#3B8FE8")!)
+    static let claudeSelected = Color.adaptive(light: Color.black.opacity(0.06), dark: Color.white.opacity(0.10))
+    static let claudePrimary = Color.adaptive(light: Color(hexRGB: "#141413")!, dark: Color(hexRGB: "#FAF9F5")!)
+    static let claudeOnPrimary = Color.adaptive(light: Color(hexRGB: "#FAF9F5")!, dark: Color(hexRGB: "#141413")!)
+
+    // Translucent panel style: lighter fills so the glass shows through
+    static let glassCard = Color.adaptive(light: Color.white.opacity(0.35), dark: Color.white.opacity(0.06))
+    static let glassWell = Color.adaptive(light: Color.black.opacity(0.08), dark: Color.black.opacity(0.25))
 
     // Shape
     static let corner: CGFloat = 14
@@ -86,6 +93,9 @@ enum PanelStyle: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    /// Big numbers are rounded in the warm styles and plain in the flat one.
+    var numberDesign: Font.Design { self == .claude ? .default : .rounded }
+
     var title: LocalizedStringKey {
         switch self {
         case .warm: "Warm"
@@ -120,7 +130,8 @@ struct Surface: ViewModifier {
     @Environment(\.panelStyle) private var style
 
     func body(content: Content) -> some View {
-        if style == .claude {
+        switch style {
+        case .claude:
             // Flat: solid card, hairline border, no highlight or shadow.
             content
                 .background(
@@ -131,7 +142,21 @@ struct Surface: ViewModifier {
                                 .strokeBorder(Theme.hairline, lineWidth: 0.5)
                         )
                 )
-        } else {
+        case .translucent:
+            // A light veil over the glass; a shadow would muddy it.
+            content
+                .background(
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .fill(fill == Theme.card ? Theme.glassCard : fill)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                                .strokeBorder(
+                                    LinearGradient(colors: [Theme.highlight, Theme.hairline],
+                                                   startPoint: .top, endPoint: .bottom),
+                                    lineWidth: 0.5)
+                        )
+                )
+        case .warm:
             styledSurface(content)
         }
     }
@@ -277,24 +302,34 @@ struct Avatar: View {
     var active = true
     var size: CGFloat = 36
 
+    @Environment(\.panelStyle) private var style
+
     private var initial: String? {
         name.trimmingCharacters(in: .whitespaces).first.map { String($0).uppercased() }
     }
 
     var body: some View {
+        let flat = style == .claude
+        let ink: Color = flat ? Theme.text : (active ? .white : Theme.dim)
         ZStack {
-            Circle()
-                .fill(active ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.well))
-                .overlay(Circle().strokeBorder(Theme.highlight, lineWidth: 0.5))
-                .shadow(color: Theme.glow.opacity(active ? 0.35 : 0), radius: size * 0.3, y: 2)
+            if flat {
+                // Plain grey disc with the initial, like claude.ai's avatar.
+                Circle()
+                    .fill(Theme.claudeSelected)
+            } else {
+                Circle()
+                    .fill(active ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.well))
+                    .overlay(Circle().strokeBorder(Theme.highlight, lineWidth: 0.5))
+                    .shadow(color: Theme.glow.opacity(active ? 0.35 : 0), radius: size * 0.3, y: 2)
+            }
             if let initial {
                 Text(initial)
-                    .font(.system(size: size * 0.42, weight: .semibold, design: .rounded))
-                    .foregroundStyle(active ? .white : Theme.dim)
+                    .font(.system(size: size * 0.42, weight: .semibold, design: flat ? .default : .rounded))
+                    .foregroundStyle(ink)
             } else {
                 Image(systemName: icon)
                     .font(.system(size: size * 0.42, weight: .medium))
-                    .foregroundStyle(active ? .white : Theme.dim)
+                    .foregroundStyle(ink)
             }
         }
         .frame(width: size, height: size)
@@ -307,6 +342,7 @@ struct StatusDot: View {
     enum State { case connected, syncing, idle, error }
     var state: State
     @SwiftUI.State private var pulse = false
+    @Environment(\.panelStyle) private var style
 
     private var color: Color {
         switch state {
@@ -321,7 +357,7 @@ struct StatusDot: View {
         Circle()
             .fill(color)
             .frame(width: 7, height: 7)
-            .shadow(color: color.opacity(state == .idle ? 0 : 0.7), radius: 3)
+            .shadow(color: color.opacity(state == .idle || style == .claude ? 0 : 0.7), radius: 3)
             .scaleEffect(state == .syncing && pulse ? 1.5 : 1)
             .opacity(state == .syncing && pulse ? 0.45 : 1)
             .animation(state == .syncing
@@ -372,7 +408,28 @@ struct CircleIconButton: View {
 struct PrimaryButtonStyle: ButtonStyle {
     var height: CGFloat = 36
 
+    @Environment(\.panelStyle) private var style
+
     func makeBody(configuration: Configuration) -> some View {
+        if style == .claude {
+            // claude.ai's primary button: solid ink, no gradient or glow.
+            configuration.label
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.claudeOnPrimary)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .padding(.horizontal, 14)
+                .frame(minHeight: height)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Theme.claudePrimary.opacity(configuration.isPressed ? 0.8 : 1))
+                )
+        } else {
+            warmBody(configuration)
+        }
+    }
+
+    private func warmBody(_ configuration: Configuration) -> some View {
         configuration.label
             .font(.system(.subheadline, design: .rounded).weight(.semibold))
             .foregroundStyle(.white)
@@ -398,9 +455,11 @@ struct PrimaryButtonStyle: ButtonStyle {
 struct SecondaryButtonStyle: ButtonStyle {
     var height: CGFloat = 32
 
+    @Environment(\.panelStyle) private var style
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(.caption, design: .rounded).weight(.medium))
+            .font(.system(.caption, design: style == .claude ? .default : .rounded).weight(.medium))
             .foregroundStyle(Theme.dim)
             .padding(.horizontal, 12)
             .frame(minHeight: height)
@@ -428,7 +487,7 @@ struct GlowBar: View {
             ZStack(alignment: .leading) {
                 let flat = style == .claude
                 Capsule()
-                    .fill(flat ? Theme.claudeTrack : Theme.well)
+                    .fill(flat ? Theme.claudeTrack : (style == .translucent ? Theme.glassWell : Theme.well))
                     .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: flat ? 0 : 0.5))
                 Capsule()
                     .fill(flat
@@ -458,17 +517,27 @@ struct SectionLabel: View {
     var title: LocalizedStringKey
     var trailing: String?
 
+    @Environment(\.panelStyle) private var style
+
     var body: some View {
         HStack {
-            Text(title)
-                .font(.system(size: 10.5, weight: .semibold, design: .rounded))
-                .textCase(.uppercase)
-                .kerning(0.6)
-                .foregroundStyle(Theme.dim)
+            if style == .claude {
+                // Sentence-case heading, like claude.ai's settings sections.
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.text)
+            } else {
+                Text(title)
+                    .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                    .textCase(.uppercase)
+                    .kerning(0.6)
+                    .foregroundStyle(Theme.dim)
+            }
             Spacer()
             if let trailing {
                 Text(trailing)
-                    .font(.system(size: 10.5, weight: .medium, design: .rounded).monospacedDigit())
+                    .font(.system(size: style == .claude ? 12 : 10.5, weight: .medium,
+                                  design: style == .claude ? .default : .rounded).monospacedDigit())
                     .foregroundStyle(Theme.dim)
             }
         }

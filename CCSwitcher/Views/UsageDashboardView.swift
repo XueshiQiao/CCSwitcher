@@ -82,20 +82,24 @@ struct UsageDashboardView: View {
                         .foregroundStyle(Theme.dim)
                         .lineLimit(1)
                     Text(cost >= 1 ? String(format: "$%.2f", cost) : String(format: "$%.4f", cost))
-                        .font(.system(size: 32, weight: .semibold, design: .rounded).monospacedDigit())
+                        .font(.system(size: 32, weight: .semibold, design: panelStyle.numberDesign).monospacedDigit())
                         .contentTransition(.numericText(value: cost))
                         .animation(Theme.spring, value: cost)
                 }
                 Spacer(minLength: 0)
                 Image(systemName: "dollarsign")
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(panelStyle == .claude ? Theme.text : .white)
                     .frame(width: 40, height: 40)
-                    .background(
-                        Circle()
-                            .fill(Theme.accentGradient)
-                            .shadow(color: Theme.glow.opacity(0.4), radius: 10, y: 3)
-                    )
+                    .background {
+                        if panelStyle == .claude {
+                            Circle().fill(Theme.claudeSelected)
+                        } else {
+                            Circle()
+                                .fill(Theme.accentGradient)
+                                .shadow(color: Theme.glow.opacity(0.4), radius: 10, y: 3)
+                        }
+                    }
             }
             .card(padding: 14)
         }
@@ -132,7 +136,7 @@ struct UsageDashboardView: View {
                     .foregroundStyle(Theme.glow)
                 Spacer(minLength: 8)
                 Text(value)
-                    .font(.system(size: 17, weight: .semibold, design: .rounded).monospacedDigit())
+                    .font(.system(size: 17, weight: .semibold, design: panelStyle.numberDesign).monospacedDigit())
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                     .contentTransition(.numericText())
@@ -193,7 +197,7 @@ struct UsageDashboardView: View {
         StatWithTooltip(tooltip: tooltip) {
             VStack(spacing: 3) {
                 Text("\(count)")
-                    .font(.system(size: 14, weight: .semibold, design: .rounded).monospacedDigit())
+                    .font(.system(size: 14, weight: .semibold, design: panelStyle.numberDesign).monospacedDigit())
                     .foregroundStyle(count > 0 ? Theme.text : Theme.faint)
                     .contentTransition(.numericText(value: Double(count)))
                     .animation(Theme.spring, value: count)
@@ -384,7 +388,7 @@ struct UsageDashboardView: View {
                         .foregroundStyle(Theme.dim)
                 }
                 Text("\(Int(utilization))%")
-                    .font(.system(size: 13, weight: .semibold, design: .rounded).monospacedDigit())
+                    .font(.system(size: 13, weight: .semibold, design: panelStyle.numberDesign).monospacedDigit())
                     .foregroundStyle(percentColor)
                     .contentTransition(.numericText(value: utilization))
                     .animation(Theme.spring, value: utilization)
