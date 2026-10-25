@@ -113,7 +113,7 @@ struct UsageDashboardView: View {
             HStack(spacing: 8) {
                 activityStat(icon: "bubble.left.and.bubble.right", value: "\(stats.conversationTurns)", label: "Turns",
                              tooltip: "Messages you sent to Claude Code today")
-                activityStat(icon: "clock", value: stats.activeCodingTimeString, label: "Active",
+                activityStat(icon: "clock", value: stats.activeCodingTimeString, label: "Active time",
                              tooltip: "Estimated total time Claude worked for you today. Parallel sessions stack. Idle gaps >10 min excluded. This is an approximation based on message timestamps, not exact.")
                 activityStat(icon: "doc.text", value: "\(stats.linesWritten)", label: "Lines",
                              tooltip: "Estimated lines of code written by Claude via Edit/Write tools")

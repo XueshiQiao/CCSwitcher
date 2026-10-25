@@ -70,14 +70,14 @@ struct ClaudeCLITabView: View {
                 HStack {
                     Text("Installed")
                     Spacer()
-                    Text(installedVersion ?? (isLoading ? "Checking…" : "—"))
+                    Text(installedVersion ?? (isLoading ? String(localized: "Checking…", bundle: L10n.bundle) : "—"))
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                 }
                 HStack {
                     Text("Latest")
                     Spacer()
-                    Text(latestVersion ?? (isLoading ? "Checking…" : "—"))
+                    Text(latestVersion ?? (isLoading ? String(localized: "Checking…", bundle: L10n.bundle) : "—"))
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                     if let installed = installedVersion, let latest = latestVersion, installed != latest {
@@ -193,15 +193,15 @@ struct ClaudeCLITabView: View {
     private func commitCustomPath() {
         let trimmed = customInput.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
-            customError = "Path is empty."
+            customError = String(localized: "Path is empty.", bundle: L10n.bundle)
             return
         }
         guard trimmed.hasPrefix("/") else {
-            customError = "Path must be absolute (start with /)."
+            customError = String(localized: "Path must be absolute (start with /).", bundle: L10n.bundle)
             return
         }
         guard FileManager.default.isExecutableFile(atPath: trimmed) else {
-            customError = "Not found or not executable."
+            customError = String(localized: "Not found or not executable.", bundle: L10n.bundle)
             return
         }
         customError = nil

@@ -118,19 +118,22 @@ struct UsageWindow: Codable {
     var resetTimeString: String? {
         guard let date = resetsAtDate else { return nil }
         let remaining = date.timeIntervalSinceNow
-        guard remaining > 0 else { return "now" }
+        guard remaining > 0 else { return String(localized: "now", bundle: L10n.bundle) }
 
         let hours = Int(remaining) / 3600
         let minutes = (Int(remaining) % 3600) / 60
 
         if hours > 24 {
+            // Weekday + time in the app language's own order and 12/24-hour
+            // clock ("Mon 3:45 PM" in English).
             let formatter = DateFormatter()
-            formatter.dateFormat = "EEE h:mm a"
+            formatter.locale = L10n.locale
+            formatter.setLocalizedDateFormatFromTemplate("EEEjmm")
             return formatter.string(from: date)
         } else if hours > 0 {
-            return "\(hours) hr \(minutes) min"
+            return String(localized: "\(hours) hr \(minutes) min", bundle: L10n.bundle)
         } else {
-            return "\(minutes) min"
+            return String(localized: "\(minutes) min", bundle: L10n.bundle)
         }
     }
 
@@ -140,7 +143,7 @@ struct UsageWindow: Codable {
     var compactResetString: String? {
         guard let date = resetsAtDate else { return nil }
         let remaining = Int(date.timeIntervalSinceNow)
-        guard remaining > 0 else { return "now" }
+        guard remaining > 0 else { return String(localized: "now", bundle: L10n.bundle) }
 
         let days = remaining / 86_400
         let hours = (remaining % 86_400) / 3600
