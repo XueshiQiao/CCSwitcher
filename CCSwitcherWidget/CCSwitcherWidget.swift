@@ -233,7 +233,7 @@ private struct SmallWidgetView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 Spacer()
-                Text("\(Int(pct))%")
+                Text(Formatted.percent(pct, locale: .current))
                     .font(.caption2.weight(.medium).monospacedDigit())
                     .foregroundStyle(colorForUtilization(pct))
             }
@@ -385,7 +385,7 @@ private struct MediumWidgetView: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                 }
-                Text("\(Int(pct))%")
+                Text(Formatted.percent(pct, locale: .current))
                     .font(.caption2.weight(.medium).monospacedDigit())
                     .foregroundStyle(colorForUtilization(pct))
             }
@@ -618,7 +618,7 @@ private struct LargeWidgetView: View {
                 }
             }
             .frame(height: 5)
-            Text("\(Int(pct))%")
+            Text(Formatted.percent(pct, locale: .current))
                 .font(.caption2.weight(.medium).monospacedDigit())
                 .foregroundStyle(colorForUtilization(pct))
                 .frame(width: 32, alignment: .trailing)
@@ -729,7 +729,7 @@ private struct CircleWidgetView: View {
                     .trim(from: 0, to: min(pct / 100.0, 1.0))
                     .stroke(accent, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                     .rotationEffect(.degrees(-90))
-                Text("\(Int(pct))%")
+                Text(Formatted.percent(pct, locale: .current))
                     .font(.caption.weight(.semibold).monospacedDigit())
                     .minimumScaleFactor(0.7)
                     .lineLimit(1)
@@ -786,7 +786,7 @@ private func colorForUtilization(_ pct: Double) -> Color {
 }
 
 private func formatCost(_ cost: Double) -> String {
-    cost >= 1 ? String(format: "$%.2f", cost) : String(format: "$%.4f", cost)
+    Formatted.cost(cost, locale: .current)
 }
 
 // MARK: - Widget Definition

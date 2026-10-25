@@ -64,7 +64,7 @@ struct SettingsView: View {
                         HStack {
                             Text("Switch at")
                             Spacer()
-                            Text("\(Int(autoSwitchThreshold))%")
+                            Text(Formatted.percent(autoSwitchThreshold, locale: L10n.locale))
                                 .monospacedDigit()
                                 .foregroundStyle(.secondary)
                         }
@@ -131,7 +131,7 @@ struct SettingsView: View {
                         HStack {
                             Text("Low remaining threshold")
                             Spacer()
-                            Text("\(Int(menuBarConfig.lowRemainingWarningThreshold))%")
+                            Text(Formatted.percent(menuBarConfig.lowRemainingWarningThreshold, locale: L10n.locale))
                                 .foregroundStyle(.secondary)
                                 .monospacedDigit()
                         }
