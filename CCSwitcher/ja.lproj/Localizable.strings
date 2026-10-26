@@ -65,7 +65,7 @@
 "Today" = "今日";
 "Last 7 Days" = "過去 7 日間";
 "Last 30 Days" = "過去 30 日間";
-"Daily History" = "日別履歴";
+"Daily History (%@)" = "日別履歴（%@）";
 "Total: %@" = "合計：%@";
 "No cost data available" = "コストデータがありません";
 "How We Calculate" = "計算方法";

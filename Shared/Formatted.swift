@@ -4,11 +4,32 @@ import Foundation
 /// percentages read the way the user's language writes them.
 enum Formatted {
     /// A US-dollar cost. Cents from $1 up; four decimals below that, so small
-    /// amounts don't all collapse to "$0.00".
+    /// amounts don't all collapse to "$0.00". Zero stays "$0.00".
     static func cost(_ cost: Double, locale: Locale) -> String {
         cost.formatted(.currency(code: "USD")
-            .precision(.fractionLength(cost >= 1 ? 2 : 4))
+            .precision(.fractionLength(fractionDigits(cost)))
             .locale(locale))
+    }
+
+    /// The same amount as `cost` without the currency symbol, for lists whose
+    /// heading already names the unit ("12.35", "12,35").
+    static func amount(_ cost: Double, locale: Locale) -> String {
+        cost.formatted(.number
+            .precision(.fractionLength(fractionDigits(cost)))
+            .locale(locale))
+    }
+
+    private static func fractionDigits(_ cost: Double) -> Int {
+        cost == 0 || cost >= 1 ? 2 : 4
+    }
+
+    /// How `cost` writes the US-dollar symbol in this locale ("$", "US$").
+    static func usdSymbol(locale: Locale) -> String {
+        let f = NumberFormatter()
+        f.numberStyle = .currency
+        f.locale = locale
+        f.currencyCode = "USD"
+        return f.currencySymbol
     }
 
     /// A 0–100 value as a whole percentage, truncated like the bars are

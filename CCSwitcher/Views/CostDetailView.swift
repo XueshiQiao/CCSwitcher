@@ -133,7 +133,9 @@ struct CostDetailView: View {
         let maxCost = costs.map(\.totalCost).max() ?? 1
 
         return VStack(alignment: .leading, spacing: 8) {
-            SectionLabel(title: "Daily History", trailing: String(localized: "Total: \(formatCost(appState.costSummary.totalCost))", bundle: L10n.bundle))
+            // The unit is named once in the heading; the total and each row show bare amounts.
+            SectionLabel(title: "Daily History (\(Formatted.usdSymbol(locale: L10n.locale)))",
+                         trailing: String(localized: "Total: \(Formatted.amount(appState.costSummary.totalCost, locale: L10n.locale))", bundle: L10n.bundle))
                 .padding(.top, 4)
 
             if costs.isEmpty {
@@ -170,9 +172,11 @@ struct CostDetailView: View {
                 .foregroundStyle(isToday ? Theme.glow : Theme.dim)
                 .frame(width: 36, alignment: .leading)
 
-            Text(formatCost(day.totalCost))
+            Text(Formatted.amount(day.totalCost, locale: L10n.locale))
                 .font(.caption2.weight(.semibold).monospacedDigit())
                 .foregroundStyle(isToday ? Theme.glow : Theme.text)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
                 .frame(width: 56, alignment: .trailing)
 
             GlowBar(fraction: barRatio, color: isToday ? Theme.glow : Theme.glow.opacity(0.55), height: 6)

@@ -65,7 +65,7 @@
 "Today" = "Hoy";
 "Last 7 Days" = "Últimos 7 días";
 "Last 30 Days" = "Últimos 30 días";
-"Daily History" = "Historial diario";
+"Daily History (%@)" = "Historial diario (%@)";
 "Total: %@" = "Total: %@";
 "No cost data available" = "No hay datos de costo disponibles";
 "How We Calculate" = "Cómo calculamos";

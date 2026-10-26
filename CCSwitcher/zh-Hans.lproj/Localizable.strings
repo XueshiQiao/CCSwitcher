@@ -65,7 +65,7 @@
 "Today" = "今日";
 "Last 7 Days" = "近 7 天";
 "Last 30 Days" = "近 30 天";
-"Daily History" = "每日历史";
+"Daily History (%@)" = "每日历史（%@）";
 "Total: %@" = "合计：%@";
 "No cost data available" = "暂无费用数据";
 "How We Calculate" = "计算方式";
