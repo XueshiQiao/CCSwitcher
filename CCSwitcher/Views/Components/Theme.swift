@@ -418,8 +418,9 @@ struct PrimaryButtonStyle: ButtonStyle {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Theme.claudeOnPrimary)
                 .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: false)
+                .fixedSize(horizontal: !fillsWidth, vertical: false)
                 .padding(.horizontal, 14)
+                .frame(maxWidth: fillsWidth ? .infinity : nil)
                 .frame(minHeight: height)
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
