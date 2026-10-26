@@ -72,6 +72,6 @@ struct CCSwitcherApp: App {
     }
 
     private var currentLocale: Locale {
-        appLanguage == "auto" ? .autoupdatingCurrent : Locale(identifier: appLanguage)
+        L10n.locale(for: appLanguage)
     }
 }

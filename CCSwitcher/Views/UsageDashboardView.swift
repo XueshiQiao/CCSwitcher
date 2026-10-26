@@ -80,7 +80,7 @@ struct UsageDashboardView: View {
                         .font(.caption.weight(.medium))
                         .foregroundStyle(Theme.dim)
                         .lineLimit(1)
-                    Text(cost >= 1 ? String(format: "$%.2f", cost) : String(format: "$%.4f", cost))
+                    Text(Formatted.cost(cost, locale: L10n.locale))
                         .font(.system(size: 32, weight: .semibold, design: .rounded).monospacedDigit())
                         .contentTransition(.numericText(value: cost))
                         .animation(Theme.spring, value: cost)
@@ -390,7 +390,7 @@ struct UsageDashboardView: View {
                         .font(.caption2)
                         .foregroundStyle(Theme.dim)
                 }
-                Text("\(Int(utilization))%")
+                Text(Formatted.percent(utilization, locale: L10n.locale))
                     .font(.system(size: 13, weight: .semibold, design: .rounded).monospacedDigit())
                     .foregroundStyle(fillColor)
                     .contentTransition(.numericText(value: utilization))

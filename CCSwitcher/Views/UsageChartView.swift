@@ -47,14 +47,8 @@ struct UsageChartView: View {
     }
 
     private func shortDate(_ dateStr: String) -> String {
-        // "2026-03-21" -> "3/21"
-        let parts = dateStr.split(separator: "-")
-        guard parts.count == 3,
-              let month = Int(parts[1]),
-              let day = Int(parts[2]) else {
-            return dateStr
-        }
-        return "\(month)/\(day)"
+        // "2026-03-21" -> "3/21", "21/3", "3月21日"
+        Formatted.shortDay(dateStr, locale: L10n.locale)
     }
 
     private func todayString() -> String {

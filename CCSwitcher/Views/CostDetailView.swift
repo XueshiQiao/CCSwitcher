@@ -224,20 +224,12 @@ struct CostDetailView: View {
     // MARK: - Helpers
 
     private func formatCost(_ cost: Double) -> String {
-        if cost >= 1 {
-            return String(format: "$%.2f", cost)
-        } else {
-            return String(format: "$%.4f", cost)
-        }
+        Formatted.cost(cost, locale: L10n.locale)
     }
 
+    /// "1.2M" / "1,2 M" / "120万" — the language's own short form.
     private func formatTokenCount(_ count: Int) -> String {
-        if count >= 1_000_000 {
-            return String(format: "%.1fM", Double(count) / 1_000_000)
-        } else if count >= 1_000 {
-            return String(format: "%.1fK", Double(count) / 1_000)
-        }
-        return "\(count)"
+        count.formatted(.number.notation(.compactName).precision(.fractionLength(0...1)).locale(L10n.locale))
     }
 
     private func todayString() -> String {
@@ -251,19 +243,17 @@ struct CostDetailView: View {
 
     private func todayDisplayDate() -> String {
         let f = DateFormatter()
+        // Locale first: assigning it resets the calendar.
+        f.locale = L10n.locale
         f.timeZone = appState.usageReportingTimezone
         f.calendar = Calendar(identifier: .gregorian)
-        f.dateFormat = "MMM d"
+        f.setLocalizedDateFormatFromTemplate("MMMd")
         let date = f.string(from: Date())
         guard appState.usageReportingTimezone.identifier != TimeZone.current.identifier else { return date }
         return date + " · " + (appState.usageReportingTimezone.abbreviation(for: Date()) ?? appState.usageReportingTimezone.identifier)
     }
 
     private func shortDate(_ dateStr: String) -> String {
-        let parts = dateStr.split(separator: "-")
-        guard parts.count == 3,
-              let month = Int(parts[1]),
-              let day = Int(parts[2]) else { return dateStr }
-        return "\(month)/\(day)"
+        Formatted.shortDay(dateStr, locale: L10n.locale)
     }
 }

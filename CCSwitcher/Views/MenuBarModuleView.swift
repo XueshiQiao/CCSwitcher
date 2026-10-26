@@ -171,7 +171,7 @@ struct MenuBarModuleView: View {
     private var dailyCostText: String {
         let cost = appState.costSummary.todayCost
         guard cost > 0 else { return "—" }
-        return String(format: "$%.2f", cost)
+        return cost.formatted(.currency(code: "USD").precision(.fractionLength(2)).locale(L10n.locale))
     }
 
     private var sessionResetText: String {
