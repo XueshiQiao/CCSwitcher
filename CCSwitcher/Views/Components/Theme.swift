@@ -29,6 +29,19 @@ enum Theme {
     static let warning = Color(hexRGB: "#E3A23B")!
     static let danger = Color.adaptive(light: Color(hexRGB: "#C2463B")!, dark: Color(hexRGB: "#E5675B")!)
 
+    // Flat "Claude" panel style, after claude.ai's settings pages
+    static let claudeBackground = Color.adaptive(light: Color(hexRGB: "#FAF9F5")!, dark: Color(hexRGB: "#262624")!)
+    static let claudeCard = Color.adaptive(light: .white, dark: Color(hexRGB: "#30302E")!)
+    static let claudeTrack = Color.adaptive(light: Color(hexRGB: "#E8E6DC")!, dark: Color.white.opacity(0.12))
+    static let claudeBlue = Color.adaptive(light: Color(hexRGB: "#2C84DB")!, dark: Color(hexRGB: "#3B8FE8")!)
+    static let claudeSelected = Color.adaptive(light: Color.black.opacity(0.06), dark: Color.white.opacity(0.10))
+    static let claudePrimary = Color.adaptive(light: Color(hexRGB: "#141413")!, dark: Color(hexRGB: "#FAF9F5")!)
+    static let claudeOnPrimary = Color.adaptive(light: Color(hexRGB: "#FAF9F5")!, dark: Color(hexRGB: "#141413")!)
+
+    // Translucent panel style: lighter fills so the glass shows through
+    static let glassCard = Color.adaptive(light: Color.white.opacity(0.35), dark: Color.white.opacity(0.06))
+    static let glassWell = Color.adaptive(light: Color.black.opacity(0.08), dark: Color.black.opacity(0.25))
+
     // Shape
     static let corner: CGFloat = 14
     static let pad: CGFloat = 16
@@ -60,6 +73,40 @@ extension EnvironmentValues {
         get { self[PanelShownKey.self] }
         set { self[PanelShownKey.self] = newValue }
     }
+
+    /// How the panel is drawn; see `PanelStyle`.
+    var panelStyle: PanelStyle {
+        get { self[PanelStyleKey.self] }
+        set { self[PanelStyleKey.self] = newValue }
+    }
+}
+
+/// How the popover panel is drawn (Settings > General > Appearance).
+enum PanelStyle: String, CaseIterable, Identifiable {
+    /// Warm ivory / charcoal with the terracotta bloom. The default.
+    case warm
+    /// The system popover material: the desktop shows through.
+    case translucent
+    /// Flat and neutral like claude.ai: solid background, plain cards,
+    /// thin blue bars, no glow.
+    case claude
+
+    var id: String { rawValue }
+
+    /// Big numbers are rounded in the warm styles and plain in the flat one.
+    var numberDesign: Font.Design { self == .claude ? .default : .rounded }
+
+    var title: LocalizedStringKey {
+        switch self {
+        case .warm: "Warm"
+        case .translucent: "Translucent"
+        case .claude: "Claude"
+        }
+    }
+}
+
+private struct PanelStyleKey: EnvironmentKey {
+    static let defaultValue = PanelStyle.warm
 }
 
 // MARK: - Button style
@@ -80,7 +127,41 @@ struct Surface: ViewModifier {
     var radius: CGFloat = Theme.corner
     var fill: Color = Theme.card
 
+    @Environment(\.panelStyle) private var style
+
     func body(content: Content) -> some View {
+        switch style {
+        case .claude:
+            // Flat: solid card, hairline border, no highlight or shadow.
+            content
+                .background(
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .fill(fill == Theme.card ? Theme.claudeCard : fill)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                                .strokeBorder(Theme.hairline, lineWidth: 0.5)
+                        )
+                )
+        case .translucent:
+            // A light veil over the glass; a shadow would muddy it.
+            content
+                .background(
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .fill(fill == Theme.card ? Theme.glassCard : fill)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                                .strokeBorder(
+                                    LinearGradient(colors: [Theme.highlight, Theme.hairline],
+                                                   startPoint: .top, endPoint: .bottom),
+                                    lineWidth: 0.5)
+                        )
+                )
+        case .warm:
+            styledSurface(content)
+        }
+    }
+
+    private func styledSurface(_ content: Content) -> some View {
         content
             .background(
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
@@ -139,16 +220,32 @@ extension View {
 
 /// Warm ivory / charcoal panel with a soft terracotta bloom from the top.
 /// The bloom warms toward red as the active session nears its limit.
+/// `.translucent` swaps the solid base for the system popover material, so
+/// the desktop shows through as it did with the old `NSPopover`; `.claude`
+/// is a flat background with no bloom.
 struct PanelBackground: View {
     var tint: Color = Theme.glow
     var intensity: Double = 1
+    var style: PanelStyle = .warm
 
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
+        if style == .claude {
+            Theme.claudeBackground
+        } else {
+            bloom
+        }
+    }
+
+    private var bloom: some View {
         let k = (scheme == .dark ? 1.0 : 0.7) * intensity
-        ZStack {
-            LinearGradient(colors: [Theme.bgTop, Theme.bgBottom], startPoint: .top, endPoint: .bottom)
+        return ZStack {
+            if style == .translucent {
+                VisualEffectBackground(material: .popover)
+            } else {
+                LinearGradient(colors: [Theme.bgTop, Theme.bgBottom], startPoint: .top, endPoint: .bottom)
+            }
             LinearGradient(colors: [tint.opacity(0.14 * k), tint.opacity(0.04 * k), .clear],
                            startPoint: .top, endPoint: .bottom)
             RadialGradient(colors: [tint.opacity(0.22 * k), tint.opacity(0.07 * k), .clear],
@@ -157,6 +254,24 @@ struct PanelBackground: View {
             RadialGradient(colors: [tint.opacity(0.06 * k), .clear],
                            center: .init(x: 0.5, y: 1.0), startRadius: 0, endRadius: 260)
         }
+    }
+}
+
+/// Behind-window blur in the given system material.
+struct VisualEffectBackground: NSViewRepresentable {
+    var material: NSVisualEffectView.Material
+
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = material
+        view.blendingMode = .behindWindow
+        // The panel never becomes the main window; keep the blur on anyway.
+        view.state = .active
+        return view
+    }
+
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {
+        view.material = material
     }
 }
 
@@ -187,24 +302,34 @@ struct Avatar: View {
     var active = true
     var size: CGFloat = 36
 
+    @Environment(\.panelStyle) private var style
+
     private var initial: String? {
         name.trimmingCharacters(in: .whitespaces).first.map { String($0).uppercased() }
     }
 
     var body: some View {
+        let flat = style == .claude
+        let ink: Color = flat ? Theme.text : (active ? .white : Theme.dim)
         ZStack {
-            Circle()
-                .fill(active ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.well))
-                .overlay(Circle().strokeBorder(Theme.highlight, lineWidth: 0.5))
-                .shadow(color: Theme.glow.opacity(active ? 0.35 : 0), radius: size * 0.3, y: 2)
+            if flat {
+                // Plain grey disc with the initial, like claude.ai's avatar.
+                Circle()
+                    .fill(Theme.claudeSelected)
+            } else {
+                Circle()
+                    .fill(active ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.well))
+                    .overlay(Circle().strokeBorder(Theme.highlight, lineWidth: 0.5))
+                    .shadow(color: Theme.glow.opacity(active ? 0.35 : 0), radius: size * 0.3, y: 2)
+            }
             if let initial {
                 Text(initial)
-                    .font(.system(size: size * 0.42, weight: .semibold, design: .rounded))
-                    .foregroundStyle(active ? .white : Theme.dim)
+                    .font(.system(size: size * 0.42, weight: .semibold, design: flat ? .default : .rounded))
+                    .foregroundStyle(ink)
             } else {
                 Image(systemName: icon)
                     .font(.system(size: size * 0.42, weight: .medium))
-                    .foregroundStyle(active ? .white : Theme.dim)
+                    .foregroundStyle(ink)
             }
         }
         .frame(width: size, height: size)
@@ -217,6 +342,7 @@ struct StatusDot: View {
     enum State { case connected, syncing, idle, error }
     var state: State
     @SwiftUI.State private var pulse = false
+    @Environment(\.panelStyle) private var style
 
     private var color: Color {
         switch state {
@@ -231,7 +357,7 @@ struct StatusDot: View {
         Circle()
             .fill(color)
             .frame(width: 7, height: 7)
-            .shadow(color: color.opacity(state == .idle ? 0 : 0.7), radius: 3)
+            .shadow(color: color.opacity(state == .idle || style == .claude ? 0 : 0.7), radius: 3)
             .scaleEffect(state == .syncing && pulse ? 1.5 : 1)
             .opacity(state == .syncing && pulse ? 0.45 : 1)
             .animation(state == .syncing
@@ -283,7 +409,28 @@ struct PrimaryButtonStyle: ButtonStyle {
     var height: CGFloat = 36
     var fillsWidth = false
 
+    @Environment(\.panelStyle) private var style
+
     func makeBody(configuration: Configuration) -> some View {
+        if style == .claude {
+            // claude.ai's primary button: solid ink, no gradient or glow.
+            configuration.label
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.claudeOnPrimary)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .padding(.horizontal, 14)
+                .frame(minHeight: height)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Theme.claudePrimary.opacity(configuration.isPressed ? 0.8 : 1))
+                )
+        } else {
+            warmBody(configuration)
+        }
+    }
+
+    private func warmBody(_ configuration: Configuration) -> some View {
         configuration.label
             .font(.system(.subheadline, design: .rounded).weight(.semibold))
             .foregroundStyle(.white)
@@ -310,9 +457,11 @@ struct PrimaryButtonStyle: ButtonStyle {
 struct SecondaryButtonStyle: ButtonStyle {
     var height: CGFloat = 32
 
+    @Environment(\.panelStyle) private var style
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(.caption, design: .rounded).weight(.medium))
+            .font(.system(.caption, design: style == .claude ? .default : .rounded).weight(.medium))
             .foregroundStyle(Theme.dim)
             .padding(.horizontal, 12)
             .frame(minHeight: height)
@@ -331,19 +480,23 @@ struct GlowBar: View {
     var marker: Double?
 
     @State private var grown = false
+    @Environment(\.panelStyle) private var style
 
     var body: some View {
         GeometryReader { geo in
             let f = grown ? min(max(fraction, 0), 1) : 0
             let w = geo.size.width * f
             ZStack(alignment: .leading) {
+                let flat = style == .claude
                 Capsule()
-                    .fill(Theme.well)
-                    .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 0.5))
+                    .fill(flat ? Theme.claudeTrack : (style == .translucent ? Theme.glassWell : Theme.well))
+                    .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: flat ? 0 : 0.5))
                 Capsule()
-                    .fill(LinearGradient(colors: [color.opacity(0.75), color], startPoint: .leading, endPoint: .trailing))
+                    .fill(flat
+                          ? AnyShapeStyle(color)
+                          : AnyShapeStyle(LinearGradient(colors: [color.opacity(0.75), color], startPoint: .leading, endPoint: .trailing)))
                     .frame(width: f > 0 ? max(w, height) : 0)
-                    .shadow(color: color.opacity(0.45), radius: 5)
+                    .shadow(color: flat ? .clear : color.opacity(0.45), radius: 5)
                 if let marker {
                     Capsule()
                         .fill(Theme.text.opacity(0.55))
@@ -366,17 +519,27 @@ struct SectionLabel: View {
     var title: LocalizedStringKey
     var trailing: String?
 
+    @Environment(\.panelStyle) private var style
+
     var body: some View {
         HStack {
-            Text(title)
-                .font(.system(size: 10.5, weight: .semibold, design: .rounded))
-                .textCase(.uppercase)
-                .kerning(0.6)
-                .foregroundStyle(Theme.dim)
+            if style == .claude {
+                // Sentence-case heading, like claude.ai's settings sections.
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.text)
+            } else {
+                Text(title)
+                    .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                    .textCase(.uppercase)
+                    .kerning(0.6)
+                    .foregroundStyle(Theme.dim)
+            }
             Spacer()
             if let trailing {
                 Text(trailing)
-                    .font(.system(size: 10.5, weight: .medium, design: .rounded).monospacedDigit())
+                    .font(.system(size: style == .claude ? 12 : 10.5, weight: .medium,
+                                  design: style == .claude ? .default : .rounded).monospacedDigit())
                     .foregroundStyle(Theme.dim)
             }
         }

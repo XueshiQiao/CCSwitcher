@@ -208,3 +208,9 @@
 "TODAY" = "今日";
 "MODEL" = "模型";
 "Active time" = "活跃";
+
+/* Panel appearance */
+"Panel style" = "面板样式";
+"Warm" = "暖色";
+"Translucent" = "半透明";
+"Claude" = "Claude";

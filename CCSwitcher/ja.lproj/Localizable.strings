@@ -208,3 +208,9 @@
 "TODAY" = "今日";
 "MODEL" = "モデル";
 "Active time" = "アクティブ";
+
+/* Panel appearance */
+"Panel style" = "パネルのスタイル";
+"Warm" = "ウォーム";
+"Translucent" = "半透明";
+"Claude" = "Claude";

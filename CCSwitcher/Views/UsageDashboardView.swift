@@ -18,6 +18,7 @@ private struct StatWithTooltip<Content: View>: View {
 struct UsageDashboardView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var menuBarConfig: MenuBarConfig
+    @Environment(\.panelStyle) private var panelStyle
     @AppStorage("showFullEmail") private var showFullEmail = false
 
     var body: some View {
@@ -81,20 +82,24 @@ struct UsageDashboardView: View {
                         .foregroundStyle(Theme.dim)
                         .lineLimit(1)
                     Text(Formatted.cost(cost, locale: L10n.locale))
-                        .font(.system(size: 32, weight: .semibold, design: .rounded).monospacedDigit())
+                        .font(.system(size: 32, weight: .semibold, design: panelStyle.numberDesign).monospacedDigit())
                         .contentTransition(.numericText(value: cost))
                         .animation(Theme.spring, value: cost)
                 }
                 Spacer(minLength: 0)
                 Image(systemName: "dollarsign")
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(panelStyle == .claude ? Theme.text : .white)
                     .frame(width: 40, height: 40)
-                    .background(
-                        Circle()
-                            .fill(Theme.accentGradient)
-                            .shadow(color: Theme.glow.opacity(0.4), radius: 10, y: 3)
-                    )
+                    .background {
+                        if panelStyle == .claude {
+                            Circle().fill(Theme.claudeSelected)
+                        } else {
+                            Circle()
+                                .fill(Theme.accentGradient)
+                                .shadow(color: Theme.glow.opacity(0.4), radius: 10, y: 3)
+                        }
+                    }
             }
             .card(padding: 14)
         }
@@ -131,7 +136,7 @@ struct UsageDashboardView: View {
                     .foregroundStyle(Theme.glow)
                 Spacer(minLength: 8)
                 Text(value)
-                    .font(.system(size: 17, weight: .semibold, design: .rounded).monospacedDigit())
+                    .font(.system(size: 17, weight: .semibold, design: panelStyle.numberDesign).monospacedDigit())
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                     .contentTransition(.numericText())
@@ -192,7 +197,7 @@ struct UsageDashboardView: View {
         StatWithTooltip(tooltip: tooltip) {
             VStack(spacing: 3) {
                 Text("\(count)")
-                    .font(.system(size: 14, weight: .semibold, design: .rounded).monospacedDigit())
+                    .font(.system(size: 14, weight: .semibold, design: panelStyle.numberDesign).monospacedDigit())
                     .foregroundStyle(count > 0 ? Theme.text : Theme.faint)
                     .contentTransition(.numericText(value: Double(count)))
                     .animation(Theme.spring, value: count)
@@ -376,7 +381,13 @@ struct UsageDashboardView: View {
     // MARK: - Usage Row
 
     private func usageRow(label: Text, resetText: String?, utilization: Double, elapsed: Double?, kind: LimitBarKind) -> some View {
-        let fillColor = menuBarConfig.limitBarColor(for: kind, utilization: utilization, context: .dashboard)
+        // The flat style reads like claude.ai: blue bars and a quiet
+        // percentage, red only near the limit. Custom bar colors still win.
+        let flat = panelStyle == .claude && !menuBarConfig.customizesLimitBarColors
+        let fillColor = flat
+            ? (utilization >= 90 ? Theme.danger : Theme.claudeBlue)
+            : menuBarConfig.limitBarColor(for: kind, utilization: utilization, context: .dashboard)
+        let percentColor = flat && utilization < 90 ? Theme.dim : fillColor
 
         return VStack(spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
@@ -391,8 +402,8 @@ struct UsageDashboardView: View {
                         .foregroundStyle(Theme.dim)
                 }
                 Text(Formatted.percent(utilization, locale: L10n.locale))
-                    .font(.system(size: 13, weight: .semibold, design: .rounded).monospacedDigit())
-                    .foregroundStyle(fillColor)
+                    .font(.system(size: 13, weight: .semibold, design: panelStyle.numberDesign).monospacedDigit())
+                    .foregroundStyle(percentColor)
                     .contentTransition(.numericText(value: utilization))
                     .animation(Theme.spring, value: utilization)
                     .frame(minWidth: 36, alignment: .trailing)

@@ -70,6 +70,7 @@ struct MainMenuView: View {
     @AppStorage("showFullEmail") private var showFullEmail = false
     @State private var selectedTab: Tab = .usage
     @Namespace private var tabIndicator
+    @Environment(\.panelStyle) private var panelStyle
 
     // Measured heights driving the popover frame.
     // Defaults are reasonable fallbacks for the first render pass, before
@@ -144,7 +145,7 @@ struct MainMenuView: View {
         .frame(width: 360, height: popoverHeight)
         .animation(Theme.spring, value: popoverHeight)
         .foregroundStyle(Theme.text)
-        .fontDesign(.rounded)
+        .fontDesign(panelStyle == .claude ? .default : .rounded)
         .background(
             // Probe: report the actual rendered size of the outer VStack
             // (after .frame is applied). If this doesn't match popoverHeight,
@@ -333,11 +334,23 @@ struct MainMenuView: View {
             }
         }
         .padding(3)
-        .background(
-            Capsule()
-                .fill(Theme.well)
-                .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 0.5))
-        )
+        .background {
+            switch panelStyle {
+            case .claude:
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Theme.claudeCard)
+                    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(Theme.hairline, lineWidth: 0.5))
+            case .translucent:
+                Capsule()
+                    .fill(Theme.glassWell)
+                    .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 0.5))
+            case .warm:
+                Capsule()
+                    .fill(Theme.well)
+                    .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 0.5))
+            }
+        }
         .padding(.horizontal, Theme.pad)
         .padding(.bottom, 6)
     }
@@ -392,26 +405,35 @@ private struct TabButton: View {
     var namespace: Namespace.ID
     var action: () -> Void
     @State private var hover = false
+    @Environment(\.panelStyle) private var style
 
     var body: some View {
+        let flat = style == .claude
         Button(action: action) {
             HStack(spacing: 5) {
                 Image(systemName: icon)
                     .font(.system(size: 11, weight: .semibold))
                 Text(title)
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .font(.system(size: 12, weight: flat ? .medium : .semibold, design: flat ? .default : .rounded))
                     .lineLimit(1)
             }
-            .foregroundStyle(selected ? .white : (hover ? Theme.text : Theme.dim))
+            .foregroundStyle(selected ? (flat ? Theme.text : .white) : (hover ? Theme.text : Theme.dim))
             .frame(maxWidth: .infinity)
             .frame(height: 28)
             .background {
                 if selected {
-                    Capsule()
-                        .fill(Theme.accentGradient)
-                        .overlay(Capsule().strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5))
-                        .shadow(color: Theme.glow.opacity(0.35), radius: 6, y: 2)
-                        .matchedGeometryEffect(id: "tab", in: namespace)
+                    if flat {
+                        // claude.ai's selected row: a plain grey fill.
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(Theme.claudeSelected)
+                            .matchedGeometryEffect(id: "tab", in: namespace)
+                    } else {
+                        Capsule()
+                            .fill(Theme.accentGradient)
+                            .overlay(Capsule().strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5))
+                            .shadow(color: Theme.glow.opacity(0.35), radius: 6, y: 2)
+                            .matchedGeometryEffect(id: "tab", in: namespace)
+                    }
                 }
             }
             .contentShape(Capsule())

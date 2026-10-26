@@ -210,3 +210,9 @@
 "TODAY" = "HOY";
 "MODEL" = "MODELO";
 "Active time" = "Activo";
+
+/* Panel appearance */
+"Panel style" = "Estilo del panel";
+"Warm" = "Cálido";
+"Translucent" = "Transparente";
+"Claude" = "Claude";

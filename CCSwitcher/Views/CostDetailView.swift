@@ -3,6 +3,7 @@ import SwiftUI
 /// Full cost breakdown tab with today's card and daily history.
 struct CostDetailView: View {
     @EnvironmentObject private var appState: AppState
+    @Environment(\.panelStyle) private var panelStyle
 
     var body: some View {
         ScrollView {
@@ -40,7 +41,7 @@ struct CostDetailView: View {
             }
 
             Text(formatCost(summary.todayCost))
-                .font(.system(size: 38, weight: .semibold, design: .rounded))
+                .font(.system(size: 38, weight: .semibold, design: panelStyle.numberDesign))
                 .monospacedDigit()
                 .contentTransition(.numericText(value: summary.todayCost))
                 .animation(Theme.spring, value: summary.todayCost)
@@ -102,7 +103,7 @@ struct CostDetailView: View {
                 .foregroundStyle(Theme.glow)
             Spacer(minLength: 8)
             Text(formatCost(cost))
-                .font(.system(size: 18, weight: .semibold, design: .rounded).monospacedDigit())
+                .font(.system(size: 18, weight: .semibold, design: panelStyle.numberDesign).monospacedDigit())
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .contentTransition(.numericText(value: cost))
