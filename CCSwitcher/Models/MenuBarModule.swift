@@ -35,7 +35,7 @@ enum MenuBarModule: String, Codable, CaseIterable, Identifiable {
         case .weeklyBarPlain:       return "7D"
         case .modelWeeklyBar:       return Self.modelLabel(modelName)
         case .modelWeeklyBarPlain:  return Self.modelLabel(modelName)
-        case .dailyCost:            return "TODAY"
+        case .dailyCost:            return String(localized: "TODAY", bundle: L10n.bundle)
         case .sessionReset:         return "5H↻"
         case .weeklyReset:          return "7D↻"
         case .modelWeeklyReset:     return Self.modelLabel(modelName) + "↻"
@@ -45,7 +45,7 @@ enum MenuBarModule: String, Codable, CaseIterable, Identifiable {
     /// Uppercased model name, capped so an unexpectedly long tier name can't
     /// stretch the menu bar. "MODEL" stands in until a sample arrives.
     private static func modelLabel(_ modelName: String?) -> String {
-        guard let modelName, !modelName.isEmpty else { return "MODEL" }
+        guard let modelName, !modelName.isEmpty else { return String(localized: "MODEL", bundle: L10n.bundle) }
         return String(modelName.prefix(6)).uppercased()
     }
 

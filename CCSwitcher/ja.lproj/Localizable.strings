@@ -21,7 +21,6 @@
 "1 minute" = "1 分";
 "5 minutes" = "5 分";
 "10 minutes" = "10 分";
-"Show account name in menu bar" = "メニューバーにアカウント名を表示";
 "Show head icon in menu bar" = "メニューバーにヘッドアイコンを表示";
 "Show full email address" = "メールアドレスを完全に表示";
 "Launch at login" = "ログイン時に起動";
@@ -55,7 +54,6 @@
 "Claude Sonnet 4 — balanced speed and capability" = "Claude Sonnet 4 — 速度と能力のバランス";
 "Claude Haiku 4 — fastest model, best for simple tasks" = "Claude Haiku 4 — 最速モデル、シンプルなタスクに最適";
 "Estimated API-equivalent cost of your Claude Code usage, for reference only." = "Claude Code 使用量の API 換算コスト（参考値）。";
-"Token expired. Switch to this account in Claude Code to refresh." = "トークンが期限切れです。Claude Code でこのアカウントに切り替えて更新してください。";
 "Session" = "セッション";
 "Weekly" = "週間";
 "Extra usage" = "追加使用量";
@@ -71,14 +69,9 @@
 "Total: %@" = "合計：%@";
 "No cost data available" = "コストデータがありません";
 "How We Calculate" = "計算方法";
-"Cost is computed from Claude Code session logs (~/.claude/projects/), deduplicated by request ID." = "コストは Claude Code セッションログ（~/.claude/projects/）からリクエスト ID で重複排除して計算されます。";
-"Cache write = 5-min tier (1.25× base input). Cache read = 0.1× base input." = "キャッシュ書込 = 5 分枠（1.25× 基本入力）。キャッシュ読取 = 0.1× 基本入力。";
-"Official Pricing — platform.claude.com" = "公式料金 — platform.claude.com";
 "Model" = "モデル";
 "Input" = "入力";
 "Output" = "出力";
-"Cache W" = "キャッシュ書";
-"Cache R" = "キャッシュ読";
 "%lld sessions" = "%lld セッション";
 "%@ tokens" = "%@ トークン";
 
@@ -103,25 +96,8 @@
 "Usage data will appear here" = "使用データがここに表示されます";
 
 /* Update Checker */
-"A new version of CCSwitcher is available!" = "CCSwitcher の新しいバージョンが利用可能です！";
-"Version %@ is available. You are currently running version %@.\n\nWould you like to download it now?" = "バージョン %1$@ が利用可能です。現在のバージョンは %2$@ です。\n\n今すぐダウンロードしますか？";
-"Download & Install" = "ダウンロードしてインストール";
-"View Release" = "リリースを表示";
 "Later" = "あとで";
-"Update Check Failed" = "アップデート確認失敗";
-"Could not connect to GitHub. Please try again later." = "GitHub に接続できませんでした。後でもう一度お試しください。";
-"Rate Limit Exceeded" = "レート制限超過";
-"GitHub API rate limit exceeded. Please try again later." = "GitHub API のレート制限を超過しました。後でもう一度お試しください。";
-"Up to date" = "最新版です";
-"No releases found on GitHub." = "GitHub にリリースが見つかりません。";
-"GitHub API returned status code %lld." = "GitHub API がステータスコード %lld を返しました。";
-"You are running the latest version of CCSwitcher (%@)." = "CCSwitcher の最新バージョン（%@）を使用中です。";
-"Downloading CCSwitcher.dmg..." = "CCSwitcher.dmg をダウンロード中...";
-"Downloading Update" = "アップデートをダウンロード中";
-"Download Complete" = "ダウンロード完了";
-"The update has been downloaded and opened. Please drag the new CCSwitcher to your Applications folder to replace the old one.\n\nDo you want to quit the current app now?" = "アップデートがダウンロードされ開かれました。新しい CCSwitcher をアプリケーションフォルダにドラッグして古いバージョンと置き換えてください。\n\n現在のアプリを終了しますか？";
 "Quit CCSwitcher" = "CCSwitcher を終了";
-"Download Failed" = "ダウンロード失敗";
 "OK" = "OK";
 
 /* AppState Errors */
@@ -133,11 +109,11 @@
 "Account already exists - credentials refreshed" = "アカウントは既に存在します - 認証情報を更新しました";
 "Could not capture credentials" = "認証情報を取得できませんでした";
 "No stored credentials for %@. Use re-authenticate to fix." = "%@ の保存済み認証情報がありません。再認証で修復してください。";
+"The stored credentials for %@ are empty. Use re-authenticate to sign in again." = "%@ の保存済み認証情報が空です。再認証して、もう一度サインインしてください。";
 "Logged in as %@, but expected %@. Credentials not updated." = "%1$@ としてログインしましたが、%2$@ が期待されていました。認証情報は更新されません。";
 "Claude CLI is authenticating via %@ instead of a stored claude.ai login, so it reports no account. Unset ANTHROPIC_AUTH_TOKEN / CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_PROFILE and remove any apiKeyHelper, then try again." = "Claude CLI は保存された claude.ai ログインではなく %@ で認証しているため、アカウントを報告しません。ANTHROPIC_AUTH_TOKEN / CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_PROFILE を解除し、apiKeyHelper があれば削除してから、もう一度お試しください。";
 "Switched to %@, but the Claude CLI is authenticating via %@ instead of the stored login, so it will not use this account." = "%1$@ に切り替えましたが、Claude CLI は保存されたログインではなく %2$@ で認証しているため、このアカウントは使用されません。";
 "Token expired. Switch to refresh." = "トークンが期限切れです。切り替えて更新してください。";
-"Token expired. Switch to this account to refresh." = "トークンが期限切れです。このアカウントに切り替えて更新してください。";
 "API Rate Limited. Try again later." = "API レート制限中。後でもう一度お試しください。";
 "Could not fetch usage: %@" = "使用量を取得できませんでした：%@";
 "Claude reports %@, but the stored sign-in still belongs to %@. Switch accounts once, then add." = "Claude は %1$@ と報告していますが、保存されているサインインは %2$@ のものです。一度アカウントを切り替えてから追加してください。";
@@ -147,6 +123,8 @@
 /* Promo */
 "%@ - %@ (Weekdays) & Weekends" = "%1$@ - %2$@（平日）& 週末";
 "Double limits: 2 PM - 8 AM ET & Weekends" = "ダブル制限：米国東部時間 午後 2 時〜午前 8 時 & 週末";
+"More apps at xueshi.dev" = "その他のアプリ: xueshi.dev";
+"© 2026 Xueshi Qiao" = "© 2026 Xueshi Qiao";
 
 /* Menu Bar */
 "Menu bar" = "メニューバー";
@@ -170,7 +148,6 @@
 "Weekly reset countdown" = "週間 リセット カウントダウン";
 "Model weekly reset countdown" = "モデル別週間 リセット カウントダウン";
 "Menu Bar" = "メニューバー";
-"Account display" = "アカウント表示";
 "Session — usage vs time (5h)" = "セッション — 使用量 vs 時間（5時間）";
 "Weekly — usage vs time (7d)" = "週間 — 使用量 vs 時間（7日）";
 "Model weekly — usage vs time (7d)" = "モデル別週間 — 使用量 vs 時間（7日）";
@@ -197,3 +174,37 @@
 "usage_storage_write_failed" = "使用履歴を保存できませんでした：%@。既存の履歴は保持されています。";
 "usage_storage_scan_failed" = "元の会話ファイルを同期できませんでした。保存済みの履歴は引き続き参照できます。%@";
 "usage_storage_sources_paused" = "使用履歴は保持されています。%d 個の元ファイルの更新を一時停止しました。詳細はアプリのログを確認してください。";
+
+/* Claude CLI settings */
+"Binary path" = "実行ファイルのパス";
+"Binary" = "実行ファイル";
+"Auto-detect" = "自動検出";
+"Custom path…" = "カスタムパス…";
+"Press Return to apply." = "Return キーで適用します。";
+"Currently using: %@" = "使用中: %@";
+"Version" = "バージョン";
+"Installed" = "インストール済み";
+"Latest" = "最新";
+"Update available" = "アップデートあり";
+"Checking…" = "確認中…";
+"Refreshing…" = "更新中…";
+"Refresh detected paths & versions" = "検出したパスとバージョンを再読み込み";
+"Path is empty." = "パスが空です。";
+"Path must be absolute (start with /)." = "パスは絶対パス（/ で始まる）である必要があります。";
+"Not found or not executable." = "見つからないか、実行できません。";
+"Cost is computed from your local Claude Code session logs (jsonl files) under ~/.claude/projects/." = "コストは ~/.claude/projects/ にあるローカルの Claude Code セッションログ（jsonl ファイル）から計算されます。";
+"Verified against ccusage %@ on %@ — %lld-day total matched to the cent." = "%2$@ に ccusage %1$@ と照合済み — %3$lld 日間の合計が 1 セント単位で一致しました。";
+"Invalid output from Claude CLI" = "Claude CLI の出力が無効です";
+"Claude CLI error: %@" = "Claude CLI エラー: %@";
+"Failed to launch Claude: %@" = "Claude を起動できませんでした: %@";
+"No stored backup for target account" = "切り替え先アカウントのバックアップがありません";
+"Failed to write token to keychain" = "トークンをキーチェーンに書き込めませんでした";
+"Failed to write oauthAccount to ~/.claude.json" = "~/.claude.json に oauthAccount を書き込めませんでした";
+"Account switch verification failed" = "アカウント切り替えの確認に失敗しました";
+"Switch failed: expected %@ but got %@. Try removing and re-adding the account." = "切り替えに失敗しました: %1$@ を想定していましたが %2$@ でした。アカウントを削除してから追加し直してください。";
+"now" = "今";
+"%lld hr %lld min" = "%1$lld時間%2$lld分";
+"%lld min" = "%lld分";
+"TODAY" = "今日";
+"MODEL" = "モデル";
+"Active time" = "アクティブ";

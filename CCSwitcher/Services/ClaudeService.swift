@@ -963,23 +963,23 @@ enum ClaudeServiceError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidOutput:
-            return "Invalid output from Claude CLI"
+            return String(localized: "Invalid output from Claude CLI", bundle: L10n.bundle)
         case .cliError(let msg):
-            return "Claude CLI error: \(msg)"
+            return String(localized: "Claude CLI error: \(msg)", bundle: L10n.bundle)
         case .processLaunchFailed(let error):
-            return "Failed to launch Claude: \(error.localizedDescription)"
+            return String(localized: "Failed to launch Claude: \(error.localizedDescription)", bundle: L10n.bundle)
         case .noTokenForAccount:
-            return "No stored backup for target account"
+            return String(localized: "No stored backup for target account", bundle: L10n.bundle)
         case .keychainWriteFailed:
-            return "Failed to write token to keychain"
+            return String(localized: "Failed to write token to keychain", bundle: L10n.bundle)
         case .oauthAccountWriteFailed:
-            return "Failed to write oauthAccount to ~/.claude.json"
+            return String(localized: "Failed to write oauthAccount to ~/.claude.json", bundle: L10n.bundle)
         case .switchVerificationFailed:
-            return "Account switch verification failed"
+            return String(localized: "Account switch verification failed", bundle: L10n.bundle)
         case .switchWrongAccount(let expected, let actual):
-            return "Switch failed: expected \(expected) but got \(actual). Try removing and re-adding the account."
+            return String(localized: "Switch failed: expected \(expected) but got \(actual). Try removing and re-adding the account.", bundle: L10n.bundle)
         case .backupCredentialsUnusable(let email):
-            return "The stored credentials for \(email) are empty. Use re-authenticate to sign in again."
+            return String(localized: "The stored credentials for \(email) are empty. Use re-authenticate to sign in again.", bundle: L10n.bundle)
         }
     }
 }

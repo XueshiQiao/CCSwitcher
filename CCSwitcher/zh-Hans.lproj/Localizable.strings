@@ -21,7 +21,6 @@
 "1 minute" = "1 分钟";
 "5 minutes" = "5 分钟";
 "10 minutes" = "10 分钟";
-"Show account name in menu bar" = "在菜单栏显示账户名称";
 "Show head icon in menu bar" = "在菜单栏显示头像图标";
 "Show full email address" = "显示完整邮箱地址";
 "Launch at login" = "登录时启动";
@@ -55,7 +54,6 @@
 "Claude Sonnet 4 — balanced speed and capability" = "Claude Sonnet 4 — 速度与能力的平衡";
 "Claude Haiku 4 — fastest model, best for simple tasks" = "Claude Haiku 4 — 最快速的模型，适合简单任务";
 "Estimated API-equivalent cost of your Claude Code usage, for reference only." = "预估 Claude Code 使用的 API 等效费用，仅供参考。";
-"Token expired. Switch to this account in Claude Code to refresh." = "令牌已过期。请在 Claude Code 中切换到此账户以刷新。";
 "Session" = "会话";
 "Weekly" = "每周";
 "Extra usage" = "额外用量";
@@ -71,14 +69,9 @@
 "Total: %@" = "合计：%@";
 "No cost data available" = "暂无费用数据";
 "How We Calculate" = "计算方式";
-"Cost is computed from Claude Code session logs (~/.claude/projects/), deduplicated by request ID." = "费用根据 Claude Code 会话日志（~/.claude/projects/）计算，按请求 ID 去重。";
-"Cache write = 5-min tier (1.25× base input). Cache read = 0.1× base input." = "缓存写入 = 5 分钟级（1.25× 基础输入）。缓存读取 = 0.1× 基础输入。";
-"Official Pricing — platform.claude.com" = "官方定价 — platform.claude.com";
 "Model" = "模型";
 "Input" = "输入";
 "Output" = "输出";
-"Cache W" = "缓存写";
-"Cache R" = "缓存读";
 "%lld sessions" = "%lld 个会话";
 "%@ tokens" = "%@ 词元";
 
@@ -103,25 +96,8 @@
 "Usage data will appear here" = "用量数据将在此显示";
 
 /* Update Checker */
-"A new version of CCSwitcher is available!" = "CCSwitcher 有新版本可用！";
-"Version %@ is available. You are currently running version %@.\n\nWould you like to download it now?" = "版本 %1$@ 可用。您当前运行的是版本 %2$@。\n\n是否立即下载？";
-"Download & Install" = "下载并安装";
-"View Release" = "查看发布";
 "Later" = "稍后";
-"Update Check Failed" = "检查更新失败";
-"Could not connect to GitHub. Please try again later." = "无法连接到 GitHub，请稍后重试。";
-"Rate Limit Exceeded" = "请求频率超限";
-"GitHub API rate limit exceeded. Please try again later." = "GitHub API 请求频率超限，请稍后重试。";
-"Up to date" = "已是最新";
-"No releases found on GitHub." = "GitHub 上未找到发布版本。";
-"GitHub API returned status code %lld." = "GitHub API 返回状态码 %lld。";
-"You are running the latest version of CCSwitcher (%@)." = "您正在运行最新版本的 CCSwitcher（%@）。";
-"Downloading CCSwitcher.dmg..." = "正在下载 CCSwitcher.dmg...";
-"Downloading Update" = "正在下载更新";
-"Download Complete" = "下载完成";
-"The update has been downloaded and opened. Please drag the new CCSwitcher to your Applications folder to replace the old one.\n\nDo you want to quit the current app now?" = "更新已下载并打开。请将新的 CCSwitcher 拖入应用程序文件夹以替换旧版本。\n\n是否立即退出当前应用？";
 "Quit CCSwitcher" = "退出 CCSwitcher";
-"Download Failed" = "下载失败";
 "OK" = "好";
 
 /* AppState Errors */
@@ -133,11 +109,11 @@
 "Account already exists - credentials refreshed" = "账户已存在 - 凭据已刷新";
 "Could not capture credentials" = "无法获取凭据";
 "No stored credentials for %@. Use re-authenticate to fix." = "没有 %@ 的存储凭据。请使用重新认证来修复。";
+"The stored credentials for %@ are empty. Use re-authenticate to sign in again." = "%@ 的已保存凭据为空。请重新认证以再次登录。";
 "Logged in as %@, but expected %@. Credentials not updated." = "登录账户为 %1$@，但预期为 %2$@。凭据未更新。";
 "Claude CLI is authenticating via %@ instead of a stored claude.ai login, so it reports no account. Unset ANTHROPIC_AUTH_TOKEN / CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_PROFILE and remove any apiKeyHelper, then try again." = "Claude CLI 正在通过 %@ 进行认证，而不是使用已保存的 claude.ai 登录，因此不会报告账号。请取消 ANTHROPIC_AUTH_TOKEN / CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_PROFILE，并移除所有 apiKeyHelper，然后重试。";
 "Switched to %@, but the Claude CLI is authenticating via %@ instead of the stored login, so it will not use this account." = "已切换到 %1$@，但 Claude CLI 正在通过 %2$@ 认证，而不是使用已保存的登录，因此不会使用此账号。";
 "Token expired. Switch to refresh." = "令牌已过期。切换以刷新。";
-"Token expired. Switch to this account to refresh." = "令牌已过期。切换到此账户以刷新。";
 "API Rate Limited. Try again later." = "API 请求频率受限。请稍后重试。";
 "Could not fetch usage: %@" = "无法获取用量：%@";
 "Claude reports %@, but the stored sign-in still belongs to %@. Switch accounts once, then add." = "Claude 报告的账号是 %1$@，但保存的登录凭据仍属于 %2$@。请先切换一次账号，再添加。";
@@ -147,6 +123,8 @@
 /* Promo */
 "%@ - %@ (Weekdays) & Weekends" = "%1$@ - %2$@（工作日）及周末";
 "Double limits: 2 PM - 8 AM ET & Weekends" = "双倍额度：美东时间下午 2 点 - 上午 8 点及周末";
+"More apps at xueshi.dev" = "更多应用：xueshi.dev";
+"© 2026 Xueshi Qiao" = "© 2026 Xueshi Qiao";
 
 /* Menu Bar */
 "Menu bar" = "菜单栏";
@@ -170,7 +148,6 @@
 "Weekly reset countdown" = "每周重置倒计时";
 "Model weekly reset countdown" = "模型每周重置倒计时";
 "Menu Bar" = "菜单栏";
-"Account display" = "账户显示";
 "Session — usage vs time (5h)" = "会话 — 用量 vs 时间（5小时）";
 "Weekly — usage vs time (7d)" = "每周 — 用量 vs 时间（7天）";
 "Model weekly — usage vs time (7d)" = "模型每周 — 用量 vs 时间（7天）";
@@ -197,3 +174,37 @@
 "usage_storage_write_failed" = "无法保存用量历史：%@。已有历史已保留。";
 "usage_storage_scan_failed" = "无法同步原始会话文件，仍可查看已保存的历史。%@";
 "usage_storage_sources_paused" = "用量历史已保留，%d 个源文件的更新已暂停；请查看应用日志了解详情。";
+
+/* Claude CLI settings */
+"Binary path" = "可执行文件路径";
+"Binary" = "可执行文件";
+"Auto-detect" = "自动检测";
+"Custom path…" = "自定义路径…";
+"Press Return to apply." = "按回车键应用。";
+"Currently using: %@" = "当前使用：%@";
+"Version" = "版本";
+"Installed" = "已安装";
+"Latest" = "最新";
+"Update available" = "有可用更新";
+"Checking…" = "检查中…";
+"Refreshing…" = "刷新中…";
+"Refresh detected paths & versions" = "刷新检测到的路径和版本";
+"Path is empty." = "路径为空。";
+"Path must be absolute (start with /)." = "路径必须是绝对路径（以 / 开头）。";
+"Not found or not executable." = "未找到或不可执行。";
+"Cost is computed from your local Claude Code session logs (jsonl files) under ~/.claude/projects/." = "费用根据 ~/.claude/projects/ 下的本地 Claude Code 会话日志（jsonl 文件）计算。";
+"Verified against ccusage %@ on %@ — %lld-day total matched to the cent." = "已于 %2$@ 与 ccusage %1$@ 核对 — %3$lld 天合计精确到美分。";
+"Invalid output from Claude CLI" = "Claude CLI 输出无效";
+"Claude CLI error: %@" = "Claude CLI 错误：%@";
+"Failed to launch Claude: %@" = "无法启动 Claude：%@";
+"No stored backup for target account" = "目标账户没有已保存的备份";
+"Failed to write token to keychain" = "无法将令牌写入钥匙串";
+"Failed to write oauthAccount to ~/.claude.json" = "无法将 oauthAccount 写入 ~/.claude.json";
+"Account switch verification failed" = "账户切换验证失败";
+"Switch failed: expected %@ but got %@. Try removing and re-adding the account." = "切换失败：预期为 %1$@，实际为 %2$@。请移除该账户后重新添加。";
+"now" = "现在";
+"%lld hr %lld min" = "%1$lld 小时 %2$lld 分钟";
+"%lld min" = "%lld 分钟";
+"TODAY" = "今日";
+"MODEL" = "模型";
+"Active time" = "活跃";

@@ -21,7 +21,6 @@
 "1 minute" = "1 minute";
 "5 minutes" = "5 minutes";
 "10 minutes" = "10 minutes";
-"Show account name in menu bar" = "Afficher le nom du compte dans la barre des menus";
 "Show head icon in menu bar" = "Afficher l'icône de tête dans la barre des menus";
 "Show full email address" = "Afficher l'adresse e-mail complète";
 "Launch at login" = "Lancer au démarrage";
@@ -55,7 +54,6 @@
 "Claude Sonnet 4 — balanced speed and capability" = "Claude Sonnet 4 — équilibre entre vitesse et capacité";
 "Claude Haiku 4 — fastest model, best for simple tasks" = "Claude Haiku 4 — modèle le plus rapide, idéal pour les tâches simples";
 "Estimated API-equivalent cost of your Claude Code usage, for reference only." = "Coût équivalent API estimé de votre utilisation de Claude Code, à titre indicatif uniquement.";
-"Token expired. Switch to this account in Claude Code to refresh." = "Jeton expiré. Basculez vers ce compte dans Claude Code pour actualiser.";
 "Session" = "Session";
 "Weekly" = "Hebdomadaire";
 "Extra usage" = "Utilisation supplémentaire";
@@ -71,14 +69,9 @@
 "Total: %@" = "Total : %@";
 "No cost data available" = "Aucune donnée de coût disponible";
 "How We Calculate" = "Méthode de calcul";
-"Cost is computed from Claude Code session logs (~/.claude/projects/), deduplicated by request ID." = "Le coût est calculé à partir des journaux de session Claude Code (~/.claude/projects/), dédupliqué par ID de requête.";
-"Cache write = 5-min tier (1.25× base input). Cache read = 0.1× base input." = "Écriture cache = palier 5 min (1,25× entrée de base). Lecture cache = 0,1× entrée de base.";
-"Official Pricing — platform.claude.com" = "Tarifs officiels — platform.claude.com";
 "Model" = "Modèle";
 "Input" = "Entrée";
 "Output" = "Sortie";
-"Cache W" = "Cache É";
-"Cache R" = "Cache L";
 "%lld sessions" = "%lld sessions";
 "%@ tokens" = "%@ jetons";
 
@@ -103,25 +96,8 @@
 "Usage data will appear here" = "Les données d'utilisation apparaîtront ici";
 
 /* Update Checker */
-"A new version of CCSwitcher is available!" = "Une nouvelle version de CCSwitcher est disponible !";
-"Version %@ is available. You are currently running version %@.\n\nWould you like to download it now?" = "La version %1$@ est disponible. Vous utilisez actuellement la version %2$@.\n\nVoulez-vous la télécharger maintenant ?";
-"Download & Install" = "Télécharger et installer";
-"View Release" = "Voir la version";
 "Later" = "Plus tard";
-"Update Check Failed" = "Échec de la vérification";
-"Could not connect to GitHub. Please try again later." = "Impossible de se connecter à GitHub. Veuillez réessayer plus tard.";
-"Rate Limit Exceeded" = "Limite de requêtes dépassée";
-"GitHub API rate limit exceeded. Please try again later." = "Limite de requêtes de l'API GitHub dépassée. Veuillez réessayer plus tard.";
-"Up to date" = "À jour";
-"No releases found on GitHub." = "Aucune version trouvée sur GitHub.";
-"GitHub API returned status code %lld." = "L'API GitHub a retourné le code d'état %lld.";
-"You are running the latest version of CCSwitcher (%@)." = "Vous utilisez la dernière version de CCSwitcher (%@).";
-"Downloading CCSwitcher.dmg..." = "Téléchargement de CCSwitcher.dmg...";
-"Downloading Update" = "Téléchargement de la mise à jour";
-"Download Complete" = "Téléchargement terminé";
-"The update has been downloaded and opened. Please drag the new CCSwitcher to your Applications folder to replace the old one.\n\nDo you want to quit the current app now?" = "La mise à jour a été téléchargée et ouverte. Veuillez glisser le nouveau CCSwitcher dans votre dossier Applications pour remplacer l'ancien.\n\nVoulez-vous quitter l'application maintenant ?";
 "Quit CCSwitcher" = "Quitter CCSwitcher";
-"Download Failed" = "Échec du téléchargement";
 "OK" = "OK";
 
 /* AppState Errors */
@@ -133,11 +109,11 @@
 "Account already exists - credentials refreshed" = "Le compte existe déjà – identifiants actualisés";
 "Could not capture credentials" = "Impossible de récupérer les identifiants";
 "No stored credentials for %@. Use re-authenticate to fix." = "Aucun identifiant enregistré pour %@. Utilisez la réauthentification pour corriger.";
+"The stored credentials for %@ are empty. Use re-authenticate to sign in again." = "Les identifiants enregistrés pour %@ sont vides. Réauthentifiez-vous pour vous reconnecter.";
 "Logged in as %@, but expected %@. Credentials not updated." = "Connecté en tant que %1$@, mais %2$@ était attendu. Identifiants non mis à jour.";
 "Claude CLI is authenticating via %@ instead of a stored claude.ai login, so it reports no account. Unset ANTHROPIC_AUTH_TOKEN / CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_PROFILE and remove any apiKeyHelper, then try again." = "Claude CLI s'authentifie via %@ au lieu d'une connexion claude.ai enregistrée et ne signale donc aucun compte. Supprimez ANTHROPIC_AUTH_TOKEN / CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_PROFILE ainsi que tout apiKeyHelper, puis réessayez.";
 "Switched to %@, but the Claude CLI is authenticating via %@ instead of the stored login, so it will not use this account." = "Basculé vers %1$@, mais Claude CLI s'authentifie via %2$@ au lieu de la connexion enregistrée et n'utilisera donc pas ce compte.";
 "Token expired. Switch to refresh." = "Jeton expiré. Basculez pour actualiser.";
-"Token expired. Switch to this account to refresh." = "Jeton expiré. Basculez vers ce compte pour actualiser.";
 "API Rate Limited. Try again later." = "Limite de l'API atteinte. Réessayez plus tard.";
 "Could not fetch usage: %@" = "Impossible de récupérer l'utilisation : %@";
 "Claude reports %@, but the stored sign-in still belongs to %@. Switch accounts once, then add." = "Claude indique %1$@, mais la connexion enregistrée appartient toujours à %2$@. Changez de compte une fois, puis ajoutez-le.";
@@ -147,6 +123,8 @@
 /* Promo */
 "%@ - %@ (Weekdays) & Weekends" = "%1$@ - %2$@ (Jours ouvrables) & Week-ends";
 "Double limits: 2 PM - 8 AM ET & Weekends" = "Limites doublées : 14h - 8h ET & week-ends";
+"More apps at xueshi.dev" = "Plus d’apps sur xueshi.dev";
+"© 2026 Xueshi Qiao" = "© 2026 Xueshi Qiao";
 
 /* Menu Bar */
 "Menu bar" = "Barre de menus";
@@ -170,7 +148,6 @@
 "Weekly reset countdown" = "Compte à rebours réinitialisation semaine";
 "Model weekly reset countdown" = "Compte à rebours réinitialisation hebdo par modèle";
 "Menu Bar" = "Barre de menus";
-"Account display" = "Affichage du compte";
 "Session — usage vs time (5h)" = "Session — usage vs temps (5 h)";
 "Weekly — usage vs time (7d)" = "Hebdomadaire — usage vs temps (7 j)";
 "Model weekly — usage vs time (7d)" = "Hebdomadaire par modèle — usage vs temps (7 j)";
@@ -197,3 +174,37 @@
 "usage_storage_write_failed" = "Impossible d’enregistrer l’historique : %@. L’historique existant a été conservé.";
 "usage_storage_scan_failed" = "Impossible de synchroniser les fichiers sources. L’historique enregistré reste disponible. %@";
 "usage_storage_sources_paused" = "L’historique est conservé. La mise à jour de %d fichiers sources est suspendue ; consultez le journal de l’application.";
+
+/* Claude CLI settings */
+"Binary path" = "Chemin de l’exécutable";
+"Binary" = "Exécutable";
+"Auto-detect" = "Détection automatique";
+"Custom path…" = "Chemin personnalisé…";
+"Press Return to apply." = "Appuyez sur Retour pour appliquer.";
+"Currently using: %@" = "Utilisé actuellement : %@";
+"Version" = "Version";
+"Installed" = "Installée";
+"Latest" = "Dernière";
+"Update available" = "Mise à jour disponible";
+"Checking…" = "Vérification…";
+"Refreshing…" = "Actualisation…";
+"Refresh detected paths & versions" = "Actualiser les chemins et versions détectés";
+"Path is empty." = "Le chemin est vide.";
+"Path must be absolute (start with /)." = "Le chemin doit être absolu (commencer par /).";
+"Not found or not executable." = "Introuvable ou non exécutable.";
+"Cost is computed from your local Claude Code session logs (jsonl files) under ~/.claude/projects/." = "Le coût est calculé à partir de vos journaux de session Claude Code locaux (fichiers jsonl) dans ~/.claude/projects/.";
+"Verified against ccusage %@ on %@ — %lld-day total matched to the cent." = "Vérifié avec ccusage %1$@ le %2$@ — total sur %3$lld jours identique au centime près.";
+"Invalid output from Claude CLI" = "Sortie invalide de Claude CLI";
+"Claude CLI error: %@" = "Erreur de Claude CLI : %@";
+"Failed to launch Claude: %@" = "Impossible de lancer Claude : %@";
+"No stored backup for target account" = "Aucune sauvegarde enregistrée pour le compte cible";
+"Failed to write token to keychain" = "Impossible d’écrire le jeton dans le trousseau";
+"Failed to write oauthAccount to ~/.claude.json" = "Impossible d’écrire oauthAccount dans ~/.claude.json";
+"Account switch verification failed" = "La vérification du changement de compte a échoué";
+"Switch failed: expected %@ but got %@. Try removing and re-adding the account." = "Échec du changement : %1$@ attendu, mais %2$@ obtenu. Supprimez le compte puis ajoutez-le à nouveau.";
+"now" = "maintenant";
+"%lld hr %lld min" = "%1$lld h %2$lld min";
+"%lld min" = "%lld min";
+"TODAY" = "AUJ.";
+"MODEL" = "MODÈLE";
+"Active time" = "Actif";

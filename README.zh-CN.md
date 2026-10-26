@@ -4,6 +4,7 @@
   <a href="README.ja.md"><img src="https://img.shields.io/badge/日本語-gray" alt="日本語"></a>
   <a href="README.de.md"><img src="https://img.shields.io/badge/Deutsch-gray" alt="Deutsch"></a>
   <a href="README.fr.md"><img src="https://img.shields.io/badge/Français-gray" alt="Français"></a>
+  <a href="README.es.md"><img src="https://img.shields.io/badge/Español-gray" alt="Español"></a>
 </p>
 
 # CCSwitcher
@@ -18,7 +19,7 @@ CCSwitcher 是一款轻量级的纯 macOS 菜单栏应用程序，旨在帮助�
 - **桌面小组件**：原生 macOS 桌面小组件，支持小、中、大三种尺寸，展示账户用量、费用和活动统计。还包含环形变体，方便一目了然地监控使用情况。
 - **应用内自动更新**：基于 [Sparkle 2.x](https://sparkle-project.org/)。新版本静默原子安装——无需拖拽 DMG，无需 Finder 对话框。
 - **深色模式**：完整支持亮色和深色模式，自适应颜色随系统外观自动切换。
-- **国际化**：支持 English、简体中文、日本語、Deutsch 和 Français 五种语言。
+- **国际化**：支持 English、简体中文、日本語、Deutsch、Français 和 Español 六种语言。
 - **隐私保护界面**：在截图或屏幕录制中自动模糊处理邮箱地址和账户名称，保护您的身份信息。
 - **零交互 Token 刷新**：通过将刷新过程委托给后台运行的官方 CLI，智能处理 Claude 的 OAuth token 过期问题。
 - **无缝登录流程**：无需打开终端即可添加新账户。应用在后台静默调用 CLI 并为您处理浏览器 OAuth 流程。
