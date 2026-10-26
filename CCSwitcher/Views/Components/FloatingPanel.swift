@@ -165,7 +165,24 @@ final class PopoverController {
         hosting.rootView = PopoverRoot(appState: appState, config: config, model: model, locale: locale)
     }
 
-    func toggle() { model.shown ? hide() : show() }
+    /// When a press on the status item itself closed the panel. That press
+    /// closes it on mouse-down (the panel resigns key, or — with the menu bar
+    /// drawn by another process — the outside-click monitor sees it), and the
+    /// button's action follows on mouse-up: it must not reopen what this same
+    /// click just closed, or a second click on the icon never closes the panel.
+    private var closedByStatusItemPressAt: Date?
+
+    func toggle() {
+        if model.shown {
+            hide()
+            return
+        }
+        if let closedAt = closedByStatusItemPressAt, Date().timeIntervalSince(closedAt) < 1 {
+            closedByStatusItemPressAt = nil
+            return
+        }
+        show()
+    }
 
     func show() {
         reposition(force: true)
@@ -191,12 +208,20 @@ final class PopoverController {
             globalMonitor = nil
         }
         guard model.shown else { return }
+        closedByStatusItemPressAt = isPressingStatusItem() ? Date() : nil
         model.shown = false
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(180))
             guard let self, !self.model.shown else { return }
             self.panel.orderOut(nil)
         }
+    }
+
+    /// True while a mouse button is held down over the status item.
+    private func isPressingStatusItem() -> Bool {
+        guard NSEvent.pressedMouseButtons != 0,
+              let button = statusItem?.button, let window = button.window else { return false }
+        return window.convertToScreen(button.convert(button.bounds, to: nil)).contains(NSEvent.mouseLocation)
     }
 
     /// Anchor under the status item with the arrow pointing at it; keep the top edge fixed on resize.
