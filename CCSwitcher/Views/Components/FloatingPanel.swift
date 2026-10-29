@@ -254,11 +254,16 @@ final class PopoverController {
         }
     }
 
-    /// True while a mouse button is held down over the status item.
+    /// True while a mouse button is held down over the status item, anywhere
+    /// in its slot of the menu bar. The button's own bounds stop short of the
+    /// screen's top edge, and `contains` excludes a rect's max edge, so a
+    /// click with the pointer pushed against the top of the screen (where
+    /// menu bar clicks often land) didn't count and the panel reopened.
     private func isPressingStatusItem() -> Bool {
         guard NSEvent.pressedMouseButtons != 0,
-              let button = statusItem?.button, let window = button.window else { return false }
-        return window.convertToScreen(button.convert(button.bounds, to: nil)).contains(NSEvent.mouseLocation)
+              let slot = statusItem?.button?.window?.frame else { return false }
+        let p = NSEvent.mouseLocation
+        return p.x >= slot.minX && p.x <= slot.maxX && p.y >= slot.minY && p.y <= slot.maxY + 1
     }
 
     /// Anchor under the status item with the arrow pointing at it; keep the top edge fixed on resize.
