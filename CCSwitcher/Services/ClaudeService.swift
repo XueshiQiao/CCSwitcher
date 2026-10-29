@@ -706,7 +706,7 @@ final class ClaudeService: @unchecked Sendable {
     }
 
     /// True if the whole string is ASCII digits separated by dots (e.g. "1.0.42", "2.1.139").
-    private static func isPureSemver(_ s: String) -> Bool {
+    static func isPureSemver(_ s: String) -> Bool {
         guard !s.isEmpty, s.count <= 32 else { return false }
         let parts = s.split(separator: ".", omittingEmptySubsequences: false)
         guard parts.count >= 2 else { return false }
@@ -720,7 +720,7 @@ final class ClaudeService: @unchecked Sendable {
     }
 
     /// Extract the first dotted-ASCII-numeric token from a string (e.g. "1.0.42" out of "1.0.42 (Claude Code)").
-    private static func extractSemver(from text: String) -> String? {
+    static func extractSemver(from text: String) -> String? {
         let allowed: (Character) -> Bool = { $0.isASCII && ($0.isNumber || $0 == ".") }
         for token in text.split(whereSeparator: { !allowed($0) }) {
             let s = String(token)

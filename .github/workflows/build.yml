@@ -44,6 +44,16 @@ jobs:
       - name: Generate Xcode Project
         run: xcodegen generate
 
+      - name: Run Unit Tests
+        run: |
+          xcodebuild -project CCSwitcher.xcodeproj \
+            -scheme CCSwitcher \
+            -destination 'platform=macOS' \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            test
+
       - name: Install Apple Certificate
         if: ${{ env.HAS_APPLE_SECRETS == 'true' }}
         env:
