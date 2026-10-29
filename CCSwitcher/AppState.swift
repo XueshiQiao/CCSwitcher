@@ -130,6 +130,17 @@ final class AppState: ObservableObject {
 
     // MARK: - Refresh
 
+    /// Show a green success line in the panel footer, and take it down again
+    /// after a few seconds. Without the timeout the line would stay up until
+    /// the next refresh, which can be minutes away.
+    private func showInfoMessage(_ message: String) {
+        infoMessage = message
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(5))
+            if self?.infoMessage == message { self?.infoMessage = nil }
+        }
+    }
+
     /// Refresh everything, then decide whether to auto-switch.
     ///
     /// The two halves are deliberately separate: `refreshData()` holds the
@@ -496,7 +507,7 @@ final class AppState: ObservableObject {
                 lastAutoSwitchAt = Date()
                 saveAccounts()
                 if captured {
-                    infoMessage = String(localized: "Account already exists - credentials refreshed", bundle: L10n.bundle)
+                    showInfoMessage(String(localized: "Account already exists - credentials refreshed", bundle: L10n.bundle))
                 } else {
                     log.error("[loginNewAccount] Step 4: Backup capture FAILED for existing account")
                     errorMessage = String(localized: "Could not capture credentials", bundle: L10n.bundle)
@@ -851,6 +862,7 @@ final class AppState: ObservableObject {
         claudeService.beginLogin()
         loginAuthURL = nil
         errorMessage = nil
+        infoMessage = nil
         defer {
             loginAuthURL = nil
             loginTaskActive = false
