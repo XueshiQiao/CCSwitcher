@@ -32,6 +32,9 @@ final class AppState: ObservableObject {
     private var loginBusy: Bool { isLoggingIn || loginTaskActive }
     @Published var loginAuthURL: URL?
     @Published var errorMessage: String?
+    /// A non-error outcome worth reporting in the footer (shown with success
+    /// styling). Cleared on the next refresh, like `errorMessage`.
+    @Published var infoMessage: String?
     @Published var claudeAvailable = false
     @Published var lastUsageRefresh: Date?
     @Published var usageReportingTimezone: TimeZone = UserDefaults.standard.string(forKey: SessionUsageStore.timezonePreference).flatMap(TimeZone.init(identifier:)) ?? .current
@@ -158,6 +161,7 @@ final class AppState: ObservableObject {
         lastCycleStart = Date()
         isLoading = true
         errorMessage = nil
+        infoMessage = nil
 
         claudeAvailable = await claudeService.isClaudeAvailable()
         log.info("[refresh] Claude available: \(self.claudeAvailable)")
@@ -420,6 +424,7 @@ final class AppState: ObservableObject {
         claudeService.beginLogin()
         loginAuthURL = nil
         errorMessage = nil
+        infoMessage = nil
         defer {
             loginAuthURL = nil
             loginTaskActive = false
@@ -491,7 +496,7 @@ final class AppState: ObservableObject {
                 lastAutoSwitchAt = Date()
                 saveAccounts()
                 if captured {
-                    errorMessage = String(localized: "Account already exists - credentials refreshed", bundle: L10n.bundle)
+                    infoMessage = String(localized: "Account already exists - credentials refreshed", bundle: L10n.bundle)
                 } else {
                     log.error("[loginNewAccount] Step 4: Backup capture FAILED for existing account")
                     errorMessage = String(localized: "Could not capture credentials", bundle: L10n.bundle)

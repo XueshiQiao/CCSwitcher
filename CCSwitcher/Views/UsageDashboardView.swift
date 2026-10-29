@@ -35,18 +35,25 @@ struct UsageDashboardView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 40)
                 } else if appState.accounts.isEmpty {
+                    // Same copy as the Accounts tab's empty state. The
+                    // padding is trimmed so the popover keeps its height.
                     VStack(spacing: 12) {
                         Image(systemName: "chart.bar.xaxis")
                             .font(.system(size: 30, weight: .light))
                             .foregroundStyle(Theme.glow)
                             .frame(width: 64, height: 64)
                             .surface(radius: 32)
-                        Text("Usage data unavailable")
-                            .font(.subheadline)
-                            .foregroundStyle(Theme.dim)
+                        VStack(spacing: 4) {
+                            Text("No Accounts")
+                                .font(.headline)
+                            Text("Add your current Claude Code account to get started.")
+                                .font(.caption)
+                                .foregroundStyle(Theme.dim)
+                                .multilineTextAlignment(.center)
+                        }
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 36)
+                    .padding(.vertical, 26)
                 } else {
                     // Today's cost (local parsing, no API needed)
                     todayCostBanner
@@ -198,7 +205,7 @@ struct UsageDashboardView: View {
             VStack(spacing: 3) {
                 Text("\(count)")
                     .font(.system(size: 14, weight: .semibold, design: panelStyle.numberDesign).monospacedDigit())
-                    .foregroundStyle(count > 0 ? Theme.text : Theme.faint)
+                    .foregroundStyle(count > 0 ? Theme.text : Theme.dim)
                     .contentTransition(.numericText(value: Double(count)))
                     .animation(Theme.spring, value: count)
                 HStack(spacing: 4) {
@@ -208,7 +215,7 @@ struct UsageDashboardView: View {
                         .opacity(count > 0 ? 1 : 0.4)
                     Text(name)
                         .font(.caption2)
-                        .foregroundStyle(count > 0 ? Theme.dim : Theme.faint)
+                        .foregroundStyle(Theme.dim)
                 }
             }
             .frame(maxWidth: .infinity)
@@ -373,7 +380,7 @@ struct UsageDashboardView: View {
                 Spacer()
                 Text(LocalizedStringKey(enabled ? "On" : "Off"))
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(enabled ? Theme.warning : Theme.faint)
+                    .foregroundStyle(enabled ? Theme.warning : Theme.dim)
             }
         }
     }

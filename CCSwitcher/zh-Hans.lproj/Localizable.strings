@@ -219,3 +219,7 @@
 /* Login in progress */
 "Copy Login URL" = "复制登录链接";
 "Copied!" = "已复制";
+
+/* Accessibility and small UX fixes */
+"Remove" = "移除";
+"Save" = "保存";

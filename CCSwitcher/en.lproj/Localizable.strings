@@ -231,3 +231,7 @@
 /* Login in progress */
 "Copy Login URL" = "Copy Login URL";
 "Copied!" = "Copied!";
+
+/* Accessibility and small UX fixes */
+"Remove" = "Remove";
+"Save" = "Save";

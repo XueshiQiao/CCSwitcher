@@ -219,3 +219,7 @@
 /* Login in progress */
 "Copy Login URL" = "ログイン URL をコピー";
 "Copied!" = "コピーしました";
+
+/* Accessibility and small UX fixes */
+"Remove" = "削除";
+"Save" = "保存";

@@ -219,3 +219,7 @@
 /* Login in progress */
 "Copy Login URL" = "Copier l’URL de connexion";
 "Copied!" = "Copié !";
+
+/* Accessibility and small UX fixes */
+"Remove" = "Supprimer";
+"Save" = "Enregistrer";

@@ -24,7 +24,8 @@ struct MenuBarModulesSettingsView: View {
             List {
                 ForEach($rows) { $row in
                     HStack(spacing: 10) {
-                        Toggle("", isOn: $row.isEnabled)
+                        // Named for VoiceOver; the visible name is the Text below.
+                        Toggle(row.module.localizedDisplayName, isOn: $row.isEnabled)
                             .labelsHidden()
                             .toggleStyle(.checkbox)
                         Image(systemName: "line.3.horizontal")

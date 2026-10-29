@@ -40,16 +40,23 @@ struct ClassicUsageDashboardView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 40)
                 } else if appState.accounts.isEmpty {
+                    // Same copy as the Accounts tab's empty state. The
+                    // padding is trimmed so the panel keeps its height.
                     VStack(spacing: 12) {
                         Image(systemName: "chart.bar.xaxis")
                             .font(.system(size: 32))
                             .foregroundStyle(.textSecondary)
-                        Text("Usage data unavailable")
-                            .font(.subheadline)
-                            .foregroundStyle(.textSecondary)
+                        VStack(spacing: 4) {
+                            Text("No Accounts")
+                                .font(.headline)
+                            Text("Add your current Claude Code account to get started.")
+                                .font(.caption)
+                                .foregroundStyle(.textSecondary)
+                                .multilineTextAlignment(.center)
+                        }
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 40)
+                    .padding(.vertical, 30)
                 } else {
                     todayCostBanner
                     todayActivityCard

@@ -71,6 +71,7 @@ struct SettingsView: View {
                                 .foregroundStyle(.secondary)
                         }
                         Slider(value: $autoSwitchThreshold, in: 50...99, step: 1)
+                            .accessibilityLabel("Switch at")
                     }
                     Text("When the active account's 5-hour or weekly usage reaches this level, CCSwitcher switches to the account with the most quota left. Checked on every refresh; a 5-minute cooldown prevents rapid flip-flopping.")
                         .font(.caption)
@@ -143,6 +144,7 @@ struct SettingsView: View {
                                 .monospacedDigit()
                         }
                         Slider(value: $menuBarConfig.lowRemainingWarningThreshold, in: 0...100, step: 5)
+                            .accessibilityLabel("Low remaining threshold")
                         Text("Warns when this much quota or less is left. At 30%, bars turn at 70% used.")
                             .font(.caption)
                             .foregroundStyle(.secondary)

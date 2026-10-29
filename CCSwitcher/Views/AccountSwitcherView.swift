@@ -195,7 +195,9 @@ private struct AccountRow: View {
     let onRemove: () -> Void
 
     @State private var hover = false
+    @State private var confirmingRemove = false
     @FocusState private var fieldFocused: Bool
+    @Environment(\.panelShown) private var panelShown
 
     var body: some View {
         HStack(spacing: 12) {
@@ -219,6 +221,7 @@ private struct AccountRow: View {
                         .buttonStyle(PressStyle())
                         .opacity(hover ? 1 : 0)
                         .help("Edit label")
+                        .accessibilityLabel("Edit label")
 
                         if account.isActive {
                             Badge(text: String(localized: "Active", bundle: L10n.bundle), color: Theme.success)
@@ -231,31 +234,58 @@ private struct AccountRow: View {
                     .foregroundStyle(Theme.dim)
                     .lineLimit(1)
 
+                // One line: with the row's buttons beside it the plan name used
+                // to wrap mid-word ("Tea" / "m"). The plan keeps its width and
+                // the provider name truncates instead.
                 HStack(spacing: 8) {
                     if let sub = account.displaySubscriptionType {
                         Label(sub, systemImage: "creditcard")
+                            .fixedSize()
                     }
                     Text(account.provider.rawValue)
                 }
+                .lineLimit(1)
                 .font(.caption2)
-                .foregroundStyle(Theme.faint)
+                .foregroundStyle(Theme.dim)
             }
 
             Spacer(minLength: 4)
 
             // Actions
             HStack(spacing: 6) {
-                if !account.isActive {
-                    Button("Switch", action: onSwitch)
-                        .buttonStyle(PrimaryButtonStyle(height: 28))
-                        .focusable(false)
-                }
+                if confirmingRemove {
+                    // Confirm in place, in the same space as the regular
+                    // actions: an alert or sheet would take key status from
+                    // the panel and close it.
+                    Button("Cancel") {
+                        withAnimation(Theme.ease) { confirmingRemove = false }
+                    }
+                    .buttonStyle(SecondaryButtonStyle(height: 28))
+                    .fixedSize()
+                    .focusable(false)
 
-                CircleIconButton(icon: "arrow.triangle.2.circlepath", size: 26, tint: Theme.warning, action: onReauth)
-                    .help("Re-authenticate (fix stale token)")
-
-                CircleIconButton(icon: "trash", size: 26, tint: Theme.danger, action: onRemove)
+                    Button("Remove") {
+                        confirmingRemove = false
+                        onRemove()
+                    }
+                    .buttonStyle(SecondaryButtonStyle(height: 28, tint: Theme.danger))
+                    .fixedSize()
+                    .focusable(false)
                     .help("Remove account")
+                } else {
+                    if !account.isActive {
+                        Button("Switch", action: onSwitch)
+                            .buttonStyle(PrimaryButtonStyle(height: 28))
+                            .focusable(false)
+                    }
+
+                    CircleIconButton(icon: "arrow.triangle.2.circlepath", label: "Re-authenticate (fix stale token)",
+                                     size: 26, tint: Theme.warning, action: onReauth)
+
+                    CircleIconButton(icon: "trash", label: "Remove account", size: 26, tint: Theme.danger) {
+                        withAnimation(Theme.ease) { confirmingRemove = true }
+                    }
+                }
             }
         }
         .padding(12)
@@ -268,6 +298,10 @@ private struct AccountRow: View {
         .onHover { hover = $0 }
         .animation(.easeOut(duration: 0.15), value: hover)
         .animation(Theme.ease, value: account.isActive)
+        // Don't greet the next opening of the panel with a pending removal.
+        .onChange(of: panelShown) { _, shown in
+            if !shown { confirmingRemove = false }
+        }
     }
 
     private var labelEditor: some View {
@@ -294,12 +328,14 @@ private struct AccountRow: View {
                     .foregroundStyle(Theme.success)
             }
             .buttonStyle(PressStyle())
+            .accessibilityLabel("Save")
 
             Button(action: onCancelEdit) {
                 Image(systemName: "xmark.circle.fill")
                     .foregroundStyle(Theme.dim)
             }
             .buttonStyle(PressStyle())
+            .accessibilityLabel("Cancel")
         }
     }
 }

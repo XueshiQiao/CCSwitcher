@@ -20,7 +20,10 @@ enum Theme {
 
     static let text = Color.adaptive(light: Color(hexRGB: "#141413")!, dark: Color(hexRGB: "#FAF9F5")!)
     static let dim = Color.adaptive(light: Color(hexRGB: "#73726C")!, dark: Color(hexRGB: "#A6A39A")!)
-    static let faint = Color.adaptive(light: Color(hexRGB: "#B0AEA5")!, dark: Color(hexRGB: "#5E5D59")!)
+    /// For icons and status marks, not text: at least 3:1 against the panel
+    /// and cards (WCAG non-text contrast). A tone that reaches 4.5:1 for small
+    /// text is indistinguishable from `dim`, so quiet text uses `dim` instead.
+    static let faint = Color.adaptive(light: Color(hexRGB: "#8A8880")!, dark: Color(hexRGB: "#8A8984")!)
     static let hairline = Color.adaptive(light: Color.black.opacity(0.07), dark: Color.white.opacity(0.08))
     static let highlight = Color.adaptive(light: Color.white.opacity(0.9), dark: Color.white.opacity(0.10))
     static let shadow = Color.adaptive(light: Color(hexRGB: "#5C4A3D")!.opacity(0.10), dark: Color.black.opacity(0.35))
@@ -346,12 +349,13 @@ struct Avatar: View {
     }
 }
 
-/// Small glowing status light; pulses while syncing.
+/// Small glowing status light; pulses while syncing (unless Reduce Motion is on).
 struct StatusDot: View {
     enum State { case connected, syncing, idle, error }
     var state: State
     @SwiftUI.State private var pulse = false
     @Environment(\.panelStyle) private var style
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var color: Color {
         switch state {
@@ -363,13 +367,14 @@ struct StatusDot: View {
     }
 
     var body: some View {
+        let pulsing = state == .syncing && !reduceMotion
         Circle()
             .fill(color)
             .frame(width: 7, height: 7)
             .shadow(color: color.opacity(state == .idle || style == .claude ? 0 : 0.7), radius: 3)
-            .scaleEffect(state == .syncing && pulse ? 1.5 : 1)
-            .opacity(state == .syncing && pulse ? 0.45 : 1)
-            .animation(state == .syncing
+            .scaleEffect(pulsing && pulse ? 1.5 : 1)
+            .opacity(pulsing && pulse ? 0.45 : 1)
+            .animation(pulsing
                        ? .easeInOut(duration: 0.7).repeatForever(autoreverses: true)
                        : Theme.ease, value: pulse)
             .onAppear { pulse = state == .syncing }
@@ -378,8 +383,10 @@ struct StatusDot: View {
 }
 
 /// Circular icon button on a surface, with hover lift. Shows a spinner while `busy`.
+/// `label` names the button for VoiceOver and is its tooltip.
 struct CircleIconButton: View {
     var icon: String
+    var label: LocalizedStringKey
     var size: CGFloat = 30
     var tint: Color = Theme.dim
     var busy = false
@@ -408,6 +415,8 @@ struct CircleIconButton: View {
         }
         .buttonStyle(PressStyle())
         .focusable(false)
+        .help(label)
+        .accessibilityLabel(label)
         .onHover { hover = $0 }
         .animation(.easeOut(duration: 0.15), value: hover)
     }
@@ -466,13 +475,14 @@ struct PrimaryButtonStyle: ButtonStyle {
 /// Secondary action: quiet surface pill.
 struct SecondaryButtonStyle: ButtonStyle {
     var height: CGFloat = 32
+    var tint: Color = Theme.dim
 
     @Environment(\.panelStyle) private var style
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(.caption, design: style == .claude ? .default : .rounded).weight(.medium))
-            .foregroundStyle(Theme.dim)
+            .foregroundStyle(tint)
             .padding(.horizontal, 12)
             .frame(minHeight: height)
             .surface(radius: height / 2.6)
@@ -491,6 +501,7 @@ struct GlowBar: View {
 
     @State private var grown = false
     @Environment(\.panelStyle) private var style
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         GeometryReader { geo in
@@ -519,7 +530,7 @@ struct GlowBar: View {
         }
         .frame(height: height + 4)
         .animation(Theme.spring, value: fraction)
-        .animation(.spring(duration: 0.9, bounce: 0).delay(0.15), value: grown)
+        .animation(reduceMotion ? nil : .spring(duration: 0.9, bounce: 0).delay(0.15), value: grown)
         .onAppear { grown = true }
     }
 }

@@ -222,3 +222,9 @@
 /* Login in progress */
 "Copy Login URL" = "Copiar URL de inicio de sesión";
 "Copied!" = "¡Copiado!";
+
+"usage_storage_sources_paused" = "Se ha conservado el historial. Las actualizaciones de %d archivos de origen están pausadas; consulta el registro de la aplicación.";
+
+/* Accessibility and small UX fixes */
+"Remove" = "Eliminar";
+"Save" = "Guardar";

@@ -63,6 +63,7 @@ struct PopoverRoot: View {
     var model: PanelModel
     var locale: Locale
     @AppStorage("panelStyle") private var style: PanelStyle = .default
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Active account's session utilization (0…1), used to warm the bloom.
     private var load: Double {
@@ -119,8 +120,9 @@ struct PopoverRoot: View {
                 radius: style == .classic ? 12 : 0, y: style == .classic ? 4 : 0)
         .padding(PanelMetrics.margin)
         // Classic appears and disappears at once, like the 1.x popover
-        // (`NSPopover.animates = false`); the others scale in from the arrow.
-        .scaleEffect(model.shown || style == .classic ? 1 : 0.95,
+        // (`NSPopover.animates = false`); the others scale in from the arrow,
+        // or only fade with Reduce Motion on.
+        .scaleEffect(model.shown || style == .classic || reduceMotion ? 1 : 0.95,
                      anchor: UnitPoint(x: model.arrowX / (PanelMetrics.width + PanelMetrics.margin * 2), y: 0))
         .opacity(model.shown ? 1 : 0)
         .animation(style == .classic ? nil
