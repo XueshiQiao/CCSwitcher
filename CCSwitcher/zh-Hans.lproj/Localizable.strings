@@ -219,3 +219,7 @@
 /* Login in progress */
 "Copy Login URL" = "复制登录链接";
 "Copied!" = "已复制";
+
+/* Account switch safety */
+"Could not save %@'s current sign-in, so the switch was stopped before changing anything. Try again." = "无法保存 %@ 当前的登录凭据，因此在更改任何内容之前已停止切换。请重试。";
+"Claude CLI did not respond in time." = "Claude CLI 未能及时响应。";

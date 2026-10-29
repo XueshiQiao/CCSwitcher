@@ -23,7 +23,9 @@ final class AppState: ObservableObject {
     @Published var recentActivity: [DailyActivity] = []
     @Published var activeSessions: [SessionInfo] = []
     @Published var isLoading = false
-    @Published var isLoggingIn = false
+    @Published var isLoggingIn = false {
+        didSet { credentialEpoch += 1 }
+    }
     /// True from the start of a login flow until its task returns. Cancel
     /// clears isLoggingIn at once for the UI, but the cancelled task still
     /// unwinds afterwards; nothing else may start a login or touch credentials
@@ -92,7 +94,21 @@ final class AppState: ObservableObject {
     /// responsive, so without this a second switch — a user click during an
     /// auto-switch verification, or vice versa — could interleave keychain and
     /// ~/.claude.json writes with the first.
-    private var isSwitching = false
+    private var isSwitching = false {
+        didSet { CredentialWriteGate.isBusy = isSwitching }
+    }
+
+    /// Bumped whenever a switch or login starts and ends. A refresh that
+    /// began under an older value read the CLI's auth status from before
+    /// (or during) that change, and must not apply it: doing so put the
+    /// previous account back on screen right after a switch.
+    private var credentialEpoch = 0
+
+    /// Accounts whose stored credential is being refreshed via the OAuth
+    /// endpoint right now. A switch to one of them waits for it: writing the
+    /// pre-refresh copy into the keychain while the refresh rotates its
+    /// refresh token would hand Claude Code an already-dead grant.
+    private var backupRefreshesInFlight: Set<UUID> = []
 
     // MARK: - Auto-switch
 
@@ -123,6 +139,36 @@ final class AppState: ObservableObject {
         log.info("[init] Loading accounts from UserDefaults...")
         loadAccounts()
         log.info("[init] Loaded \(self.accounts.count) accounts, active: \(self.activeAccount?.id.uuidString ?? "none")")
+        recoverInterruptedSwitch()
+    }
+
+    /// Finishes a switch the app died in the middle of (see `PendingSwitch`).
+    /// Acts only when the live keychain token is provably the target's — the
+    /// first write landed — and then completes the second one. Anything else
+    /// means the switch never touched the credential, or someone else has
+    /// since, and is left alone.
+    private func recoverInterruptedSwitch() {
+        guard let pending = PendingSwitch.load() else { return }
+        PendingSwitch.clear()
+        guard Date().timeIntervalSince(pending.startedAt) < PendingSwitch.maxAge,
+              let target = accounts.first(where: { $0.id == pending.to }),
+              let backup = keychain.getAccountBackup(forAccountId: target.id.uuidString),
+              let expected = ClaudeService.extractAccessToken(from: backup.token),
+              let live = keychain.readClaudeToken().flatMap(ClaudeService.extractAccessToken(from:)),
+              live == expected else {
+            log.info("[recover] Interrupted switch found; the live credential is not the target's, leaving it alone")
+            return
+        }
+        if (keychain.readOAuthAccount()?["emailAddress"]?.value as? String) != target.email {
+            let written = keychain.writeOAuthAccount(backup.oauthAccount)
+            log.warning("[recover] Finished an interrupted switch to \(target.id): identity written=\(written)")
+        }
+        anchorLiveCredential(to: target.id)
+        for i in accounts.indices {
+            accounts[i].isActive = (accounts[i].id == target.id)
+        }
+        activeAccount = accounts.first(where: { $0.id == target.id })
+        saveAccounts()
     }
 
     // MARK: - Refresh
@@ -140,8 +186,18 @@ final class AppState: ObservableObject {
     /// on samples a concurrent refresh is rewriting.
     func refresh() async {
         guard await refreshData() else { return }
+        if rerunRefresh {
+            // A switch or login landed mid-cycle (its own refresh was turned
+            // away by the re-entrancy guard), so this cycle's readings
+            // predate it. Take a fresh one instead of acting on them.
+            rerunRefresh = false
+            await refresh()
+            return
+        }
         await evaluateAutoSwitch()
     }
+
+    private var rerunRefresh = false
 
     /// Returns true only when a full refresh actually ran.
     private func refreshData() async -> Bool {
@@ -155,6 +211,7 @@ final class AppState: ObservableObject {
         }
         isRefreshing = true
         defer { isRefreshing = false }
+        let epoch = credentialEpoch
         lastCycleStart = Date()
         isLoading = true
         errorMessage = nil
@@ -165,7 +222,11 @@ final class AppState: ObservableObject {
         if claudeAvailable {
             do {
                 let status = try await claudeService.getAuthStatus()
-                updateActiveAccount(from: status)
+                if epoch == credentialEpoch {
+                    updateActiveAccount(from: status)
+                } else {
+                    log.info("[refresh] Accounts changed while reading auth status; not applying the stale reading")
+                }
             } catch {
                 log.error("[refresh] getAuthStatus failed: \(error.localizedDescription)")
                 errorMessage = error.localizedDescription
@@ -210,6 +271,7 @@ final class AppState: ObservableObject {
 
         updateWidgetData()
         isLoading = false
+        rerunRefresh = epoch != credentialEpoch
         return true
     }
 
@@ -538,6 +600,7 @@ final class AppState: ObservableObject {
         }
     }
 
+
     func updateAccountLabel(_ account: Account, label: String?) {
         guard let index = accounts.firstIndex(where: { $0.id == account.id }) else { return }
         let trimmed = label?.trimmingCharacters(in: .whitespaces)
@@ -551,6 +614,23 @@ final class AppState: ObservableObject {
     }
 
     func removeAccount(_ account: Account) {
+        // Removing the account the CLI is signed in to must move the CLI too.
+        // Switch first, while `account` is still the active one: setting the
+        // next account active in the model beforehand made `switchTo` see
+        // "already active" and return without touching the credentials,
+        // leaving Claude Code on the removed account.
+        if account.isActive, let next = accounts.first(where: { $0.id != account.id }) {
+            log.info("[removeAccount] Removing the active account; switching to \(next.id) first")
+            Task {
+                await switchTo(next)
+                dropAccount(account)
+            }
+            return
+        }
+        dropAccount(account)
+    }
+
+    private func dropAccount(_ account: Account) {
         log.info("[removeAccount] Removing account \(account.id)")
         keychain.removeAccountBackup(forAccountId: account.id.uuidString)
         credentialAnchor.forget(accountId: account.id)
@@ -561,11 +641,15 @@ final class AppState: ObservableObject {
         accountUsageSampledAt[account.id] = nil
         accountUsageErrors[account.id] = nil
         usageRetryNotBefore[account.id] = nil
-        if account.isActive, let first = accounts.first {
-            accounts[accounts.startIndex].isActive = true
+        if activeAccount?.id == account.id {
+            // The switch away failed (its error is on screen) or there was no
+            // other account. Keep the model consistent; the CLI itself stays
+            // signed in as it was.
+            if !accounts.isEmpty {
+                accounts[accounts.startIndex].isActive = true
+            }
             activeAccount = accounts.first
-            log.info("[removeAccount] Removed active account, switching to first remaining")
-            Task { await switchTo(first) }
+            log.info("[removeAccount] Removed the active account without switching the CLI")
         }
         saveAccounts()
         log.info("[removeAccount] Done. Remaining accounts: \(self.accounts.count)")
@@ -587,7 +671,26 @@ final class AppState: ObservableObject {
             return
         }
         isSwitching = true
-        defer { isSwitching = false }
+        credentialEpoch += 1
+        defer {
+            isSwitching = false
+            credentialEpoch += 1
+        }
+
+        // An OAuth refresh of the target's stored credential may be mid-flight
+        // (started before this switch). Reading the backup now would write
+        // its pre-rotation copy into the keychain; wait for the result.
+        // `isSwitching` keeps new refreshes from starting meanwhile.
+        var waits = 0
+        while backupRefreshesInFlight.contains(account.id), waits < 100 {
+            try? await Task.sleep(for: .milliseconds(100))
+            waits += 1
+        }
+        guard !backupRefreshesInFlight.contains(account.id) else {
+            log.error("[switchTo] ABORT: the target's stored credential is still being refreshed")
+            errorMessage = String(localized: "Credential storage is temporarily unavailable. Try again shortly.", bundle: L10n.bundle)
+            return
+        }
 
         // Pre-switch: resolve the target's backup ONCE and hand it down.
         // "The store is briefly unreadable" and "no backup exists" are
@@ -1011,6 +1114,16 @@ final class AppState: ObservableObject {
     /// sessions.
     private func refreshBackupInPlace(for account: Account) async -> BackupRefreshOutcome {
         let accountId = account.id.uuidString
+
+        // A switch in flight may already have read this backup and be about
+        // to write it into the keychain; rotating it now would make that copy
+        // dead on arrival. Nothing is spent by waiting for the next cycle.
+        guard !isSwitching else {
+            log.info("[refreshBackup] A switch is in progress; leaving \(account.id) for the next cycle")
+            return .storeUnavailable
+        }
+        backupRefreshesInFlight.insert(account.id)
+        defer { backupRefreshesInFlight.remove(account.id) }
 
         let backup: AccountBackup
         switch keychain.lookupAccountBackup(forAccountId: accountId) {

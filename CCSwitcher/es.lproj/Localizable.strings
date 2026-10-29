@@ -222,3 +222,9 @@
 /* Login in progress */
 "Copy Login URL" = "Copiar URL de inicio de sesión";
 "Copied!" = "¡Copiado!";
+
+"usage_storage_sources_paused" = "Se ha conservado el historial. Las actualizaciones de %d archivos de origen están pausadas; consulta el registro de la aplicación.";
+
+/* Account switch safety */
+"Could not save %@'s current sign-in, so the switch was stopped before changing anything. Try again." = "No se pudo guardar el inicio de sesión actual de %@, así que el cambio se detuvo antes de modificar nada. Inténtalo de nuevo.";
+"Claude CLI did not respond in time." = "Claude CLI no respondió a tiempo.";

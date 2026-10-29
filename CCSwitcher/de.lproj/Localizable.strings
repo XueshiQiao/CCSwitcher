@@ -219,3 +219,7 @@
 /* Login in progress */
 "Copy Login URL" = "Anmelde-URL kopieren";
 "Copied!" = "Kopiert!";
+
+/* Account switch safety */
+"Could not save %@'s current sign-in, so the switch was stopped before changing anything. Try again." = "Die aktuelle Anmeldung von %@ konnte nicht gesichert werden, daher wurde der Wechsel abgebrochen, bevor etwas geändert wurde. Versuchen Sie es erneut.";
+"Claude CLI did not respond in time." = "Die Claude CLI hat nicht rechtzeitig geantwortet.";

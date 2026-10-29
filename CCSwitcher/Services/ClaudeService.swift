@@ -423,14 +423,21 @@ final class ClaudeService: @unchecked Sendable {
         // previous account's token up as this one's, which no later switch
         // undoes.
         log.info("[switchAccount] Step 1: Backing up current account...")
-        let previousToken = keychain.readClaudeToken()
+        var previousToken = keychain.readClaudeToken()
         let previousOAuthAccount = keychain.readOAuthAccount()
         if !liveCredentialIsSource {
             log.warning("[switchAccount] Step 1: Live credential is not confirmed to be \(currentAccount.email)'s; skipping backup rather than storing it under the wrong account")
         } else if let currentToken = previousToken,
                   let currentOAuth = previousOAuthAccount {
-            let saved = keychain.saveAccountBackup(token: currentToken, oauthAccount: currentOAuth, forAccountId: currentAccount.id.uuidString)
-            log.info("[switchAccount] Step 1: Backup saved: \(saved)")
+            // The live credential is the newest copy of this account's grant:
+            // Claude Code rotates the refresh token as it works, so the stored
+            // backup may already be dead. Overwriting the live one without
+            // saving it first would strand the account until a browser login.
+            guard keychain.saveAccountBackup(token: currentToken, oauthAccount: currentOAuth, forAccountId: currentAccount.id.uuidString) else {
+                log.error("[switchAccount] Step 1: ABORT: could not back up the current account; nothing was changed")
+                throw ClaudeServiceError.sourceBackupFailed(email: currentAccount.email)
+            }
+            log.info("[switchAccount] Step 1: Backup saved")
         } else {
             log.warning("[switchAccount] Step 1: Could not read current token or oauthAccount")
         }
@@ -455,10 +462,29 @@ final class ClaudeService: @unchecked Sendable {
         // 2. Target backup was resolved and validated by the caller.
         log.info("[switchAccount] Step 2: Using caller-resolved backup for target account")
 
+        // A running Claude Code session may have refreshed (and so rotated)
+        // the live credential while Step 1 was saving it. Re-read right before
+        // overwriting, and keep the newer copy if it changed.
+        if liveCredentialIsSource, let currentOAuth = previousOAuthAccount,
+           let latest = keychain.readClaudeToken(), latest != previousToken {
+            log.info("[switchAccount] Live credential changed during Step 1; backing up the newer copy")
+            guard keychain.saveAccountBackup(token: latest, oauthAccount: currentOAuth, forAccountId: currentAccount.id.uuidString) else {
+                throw ClaudeServiceError.sourceBackupFailed(email: currentAccount.email)
+            }
+            previousToken = latest
+        }
+
         // 3. Write target token to keychain + target oauthAccount to ~/.claude.json
+        //
+        // The two writes are not atomic together. The marker lets the next
+        // launch finish the job if the app dies between them (crash, force
+        // quit, power loss); it is cleared once the switch has an outcome.
         log.info("[switchAccount] Step 3: Writing target credentials...")
+        PendingSwitch(from: currentAccount.id, to: targetAccount.id).save()
+        defer { PendingSwitch.clear() }
         guard keychain.writeClaudeToken(targetBackup.token) else {
             log.error("[switchAccount] Step 3: Failed to write token to keychain!")
+            rollback(after: "the keychain write failed")
             throw ClaudeServiceError.keychainWriteFailed
         }
         guard keychain.writeOAuthAccount(targetBackup.oauthAccount) else {
@@ -887,18 +913,25 @@ final class ClaudeService: @unchecked Sendable {
         }
     }
 
-    private func runClaude(args: [String]) async throws -> String {
+    /// Runs the CLI and returns its stdout.
+    ///
+    /// stderr is kept apart: the CLI prints warnings there (deprecations,
+    /// update notices), and mixed into stdout they break the JSON that
+    /// `auth status` returns. The process is killed after `timeout`, so a
+    /// hung CLI can't wedge the switch or refresh waiting on it.
+    private func runClaude(args: [String], timeout: TimeInterval = 30) async throws -> String {
         let claudePath = self.claudePath
         log.debug("[runClaude] Running: \(claudePath) \(args.joined(separator: " "))")
         return try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async { [claudePath] in
                 let process = Process()
                 let pipe = Pipe()
+                let errPipe = Pipe()
 
                 process.executableURL = URL(fileURLWithPath: claudePath)
                 process.arguments = args
                 process.standardOutput = pipe
-                process.standardError = pipe
+                process.standardError = errPipe
 
                 var env = ProcessInfo.processInfo.environment
                 let homeDir = NSHomeDirectory()
@@ -925,17 +958,31 @@ final class ClaudeService: @unchecked Sendable {
 
                 do {
                     try process.run()
-                    // Drain pipe before waitUntilExit() to prevent >64KB pipe buffer deadlock.
+
+                    let watchdog = ProcessWatchdog(process)
+                    DispatchQueue.global().asyncAfter(deadline: .now() + timeout) { watchdog.fire() }
+
+                    // Drain both pipes before waitUntilExit(): either one filling
+                    // its 64 KB buffer would block the child forever. stderr is
+                    // read on its own thread so neither read waits on the other.
+                    let errData = PipeDrain(errPipe)
                     let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                    let stderr = errData.wait()
                     process.waitUntilExit()
+                    watchdog.disarm()
 
                     let output = String(data: data, encoding: .utf8) ?? ""
 
-                    if process.terminationStatus == 0 {
+                    if watchdog.didFire {
+                        log.error("[runClaude] Timed out after \(Int(timeout))s: \(args.joined(separator: " "))")
+                        continuation.resume(throwing: ClaudeServiceError.cliTimedOut)
+                    } else if process.terminationStatus == 0 {
                         log.debug("[runClaude] Success (exit 0), output length: \(output.count)")
                         continuation.resume(returning: output)
                     } else {
-                        log.error("[runClaude] Failed (exit \(process.terminationStatus))")
+                        let firstLine = String(data: stderr, encoding: .utf8)?
+                            .split(whereSeparator: \.isNewline).first.map { String($0.prefix(200)) } ?? ""
+                        log.error("[runClaude] Failed (exit \(process.terminationStatus)) \(firstLine)")
                         continuation.resume(throwing: ClaudeServiceError.cliError("exit \(process.terminationStatus)"))
                     }
                 } catch {
@@ -959,6 +1006,10 @@ enum ClaudeServiceError: LocalizedError {
     case switchVerificationFailed
     case switchWrongAccount(expected: String, actual: String)
     case backupCredentialsUnusable(email: String)
+    /// The outgoing account's live credential could not be saved, so the
+    /// switch stopped before overwriting it.
+    case sourceBackupFailed(email: String)
+    case cliTimedOut
 
     var errorDescription: String? {
         switch self {
@@ -980,6 +1031,70 @@ enum ClaudeServiceError: LocalizedError {
             return String(localized: "Switch failed: expected \(expected) but got \(actual). Try removing and re-adding the account.", bundle: L10n.bundle)
         case .backupCredentialsUnusable(let email):
             return String(localized: "The stored credentials for \(email) are empty. Use re-authenticate to sign in again.", bundle: L10n.bundle)
+        case .sourceBackupFailed(let email):
+            return String(localized: "Could not save \(email)'s current sign-in, so the switch was stopped before changing anything. Try again.", bundle: L10n.bundle)
+        case .cliTimedOut:
+            return String(localized: "Claude CLI did not respond in time.", bundle: L10n.bundle)
         }
+    }
+}
+
+/// Kills a child process that outlives its deadline. A class (and Sendable)
+/// so the timer closure and the waiting thread share one flag.
+private final class ProcessWatchdog: @unchecked Sendable {
+    private let lock = NSLock()
+    fileprivate let process: Process
+    private var armed = true
+    private var fired = false
+
+    init(_ process: Process) { self.process = process }
+
+    var didFire: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return fired
+    }
+
+    func fire() {
+        lock.lock()
+        guard armed, process.isRunning else { lock.unlock(); return }
+        fired = true
+        lock.unlock()
+        Self.stop(process)
+    }
+
+    func disarm() {
+        lock.lock(); armed = false; lock.unlock()
+    }
+
+    /// SIGTERM, then SIGKILL if the process is still alive two seconds later
+    /// (a wedged node runtime can ignore the first).
+    static func stop(_ process: Process) {
+        process.terminate()
+        // Ask the Process, not the pid: once it has been reaped the pid can
+        // belong to something else.
+        let holder = ProcessWatchdog(process)
+        DispatchQueue.global().asyncAfter(deadline: .now() + 2) {
+            if holder.process.isRunning { kill(holder.process.processIdentifier, SIGKILL) }
+        }
+    }
+}
+
+/// Reads a pipe to EOF on a background thread.
+private final class PipeDrain: @unchecked Sendable {
+    private let pipe: Pipe
+    private let done = DispatchSemaphore(value: 0)
+    private var data = Data()
+
+    init(_ pipe: Pipe) {
+        self.pipe = pipe
+        DispatchQueue.global(qos: .utility).async {
+            self.data = self.pipe.fileHandleForReading.readDataToEndOfFile()
+            self.done.signal()
+        }
+    }
+
+    func wait() -> Data {
+        done.wait()
+        return data
     }
 }

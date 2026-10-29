@@ -219,3 +219,7 @@
 /* Login in progress */
 "Copy Login URL" = "ログイン URL をコピー";
 "Copied!" = "コピーしました";
+
+/* Account switch safety */
+"Could not save %@'s current sign-in, so the switch was stopped before changing anything. Try again." = "%@ の現在のサインインを保存できなかったため、何も変更せずに切り替えを中止しました。もう一度お試しください。";
+"Claude CLI did not respond in time." = "Claude CLI が時間内に応答しませんでした。";
