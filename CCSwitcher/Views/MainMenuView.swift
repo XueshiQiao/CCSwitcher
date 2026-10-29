@@ -68,15 +68,11 @@ struct MainMenuView: View {
     @EnvironmentObject private var appState: AppState
     @AppStorage("refreshInterval") private var refreshInterval: Double = 300
     @AppStorage("showFullEmail") private var showFullEmail = false
-    @State private var selectedTab: Tab = .usage
     @Namespace private var tabIndicator
     @Environment(\.panelStyle) private var panelStyle
-
-    // Measured heights driving the popover frame.
-    // Defaults are reasonable fallbacks for the first render pass, before
-    // the GeometryReader-based measurements fire.
-    @State private var usageContentHeight: CGFloat = 420
-    @State private var chromeHeight: CGFloat = 180
+    /// Holds the selected tab and the measured heights, which outlive this
+    /// view: the panel unmounts it while hidden.
+    let panel: PanelModel
 
     enum Tab: String, CaseIterable {
         case usage, costs, accounts
@@ -118,7 +114,7 @@ struct MainMenuView: View {
 
             // Content
             Group {
-                switch selectedTab {
+                switch panel.selectedTab {
                 case .usage:
                     UsageDashboardView()
                 case .costs:
@@ -127,7 +123,7 @@ struct MainMenuView: View {
                     AccountSwitcherView()
                 }
             }
-            .id(selectedTab)
+            .id(panel.selectedTab)
             .transition(.opacity.combined(with: .offset(y: 6)))
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .enter(2)
@@ -162,18 +158,18 @@ struct MainMenuView: View {
             }
         )
         .onAppear {
-            popoverLog.info("[appear] tab=\(self.selectedTab.rawValue) chrome=\(self.chromeHeight) usage=\(self.usageContentHeight) popover=\(self.popoverHeight)")
+            popoverLog.info("[appear] tab=\(self.panel.selectedTab.rawValue) chrome=\(self.panel.chromeHeight) usage=\(self.panel.usageContentHeight) popover=\(self.popoverHeight)")
         }
         .onPreferenceChange(UsageContentHeightKey.self) { value in
-            if value > 0 { usageContentHeight = value }
+            if value > 0 { panel.usageContentHeight = value }
         }
         .onPreferenceChange(ChromeHeightKey.self) { value in
-            if value > 0 { chromeHeight = value }
+            if value > 0 { panel.chromeHeight = value }
         }
         // Explicitly observe popoverHeight so SwiftUI tracks the computed
         // value as a dependency of the .frame modifier above. Without this,
         // some Release builds appear to skip the frame update when only the
-        // underlying @State (chromeHeight / usageContentHeight) changes —
+        // underlying heights (chromeHeight / usageContentHeight) change —
         // the panel locks at the initial-render height and shows the
         // visible empty bands users reported in 1.5.3.
         .onChange(of: popoverHeight) { _, new in
@@ -183,21 +179,8 @@ struct MainMenuView: View {
 
     // MARK: - Dynamic Popover Height
 
-    /// Popover height is driven by measured Usage tab content + measured chrome.
-    /// The Usage tab is chosen as the height reference because it's the
-    /// content-heaviest tab; sizing for it gives other tabs enough headroom.
-    /// Capped only by available screen space; no artificial floor — the popover
-    /// matches its content exactly, so there is no padding gap inside the
-    /// ScrollView when content is short.
-    private var popoverHeight: CGFloat {
-        let screenCap: CGFloat = (NSScreen.main?.visibleFrame.height ?? 900) - 100
-        let maxHeight: CGFloat = min(900, screenCap)
-
-        // +1 for the Divider between content and footer (not measured).
-        let desired = chromeHeight + usageContentHeight + 1
-
-        return min(maxHeight, desired)
-    }
+    /// See `PanelModel.popoverHeight`, which the hidden panel sizes itself by.
+    private var popoverHeight: CGFloat { panel.popoverHeight }
 
     // MARK: - Promo Banner
 
@@ -326,10 +309,10 @@ struct MainMenuView: View {
                 TabButton(
                     title: tab.localizedTitle,
                     icon: tab.iconName,
-                    selected: selectedTab == tab,
+                    selected: panel.selectedTab == tab,
                     namespace: tabIndicator
                 ) {
-                    withAnimation(Theme.spring) { selectedTab = tab }
+                    withAnimation(Theme.spring) { panel.selectedTab = tab }
                 }
             }
         }

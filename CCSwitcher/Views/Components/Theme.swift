@@ -491,6 +491,10 @@ struct GlowBar: View {
 
     @State private var grown = false
     @Environment(\.panelStyle) private var style
+    /// False while the panel content is mounting for an opening: the bar then
+    /// starts out grown, as it did when the content stayed mounted between
+    /// openings, and only grows in on a tab switch.
+    @Environment(\.panelShown) private var panelShown
 
     var body: some View {
         GeometryReader { geo in
@@ -520,7 +524,12 @@ struct GlowBar: View {
         .frame(height: height + 4)
         .animation(Theme.spring, value: fraction)
         .animation(.spring(duration: 0.9, bounce: 0).delay(0.15), value: grown)
-        .onAppear { grown = true }
+        .onAppear {
+            guard !panelShown else { grown = true; return }
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) { grown = true }
+        }
     }
 }
 

@@ -19,7 +19,7 @@ private struct StripWidthKey: PreferenceKey {
 struct MenuBarStripView: View {
     // Not @ObservedObject: in the NSStatusItem hosting context, ObservableObject
     // change delivery is unreliable (only @State / timer re-render the hosted
-    // view). We poll on a short interval instead.
+    // view). StatusItemController rebuilds this view on every change instead.
     let appState: AppState
     let config: MenuBarConfig
     let onWidth: (CGFloat) -> Void
@@ -27,11 +27,11 @@ struct MenuBarStripView: View {
 
     @State private var tick = Date()
     @State private var iconFilled = false
-    // Polled refresh. ObservableObject change delivery is unreliable for a
-    // SwiftUI view hosted in an NSStatusItem, so we re-read AppState/config on
-    // a short interval (the pattern menu-bar monitors like iStats/Stats use).
-    // This also keeps the reset countdowns current.
-    private let tickTimer = Timer.publish(every: 3, on: .main, in: .common).autoconnect()
+    // Keeps the reset countdowns and pace markers current. State changes no
+    // longer depend on it (StatusItemController rebuilds the view on each
+    // one), and the countdowns are minute-granular, so once a minute is
+    // enough; the tolerance lets the system coalesce the wake-up.
+    private let tickTimer = Timer.publish(every: 60, tolerance: 5, on: .main, in: .common).autoconnect()
 
     var body: some View {
         HStack(spacing: 8) {

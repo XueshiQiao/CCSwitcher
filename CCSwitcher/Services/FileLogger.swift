@@ -15,7 +15,14 @@ struct FileLog: Sendable {
     func info(_ message: String) { FileLog.shared.write("INFO", category, message) }
     func warning(_ message: String) { FileLog.shared.write("WARN", category, message) }
     func error(_ message: String) { FileLog.shared.write("ERROR", category, message) }
-    func debug(_ message: String) { FileLog.shared.write("DEBUG", category, message) }
+    /// Debug builds only. These are per-subprocess and per-keychain-read
+    /// lines, about a third of the log; in Release the message is not even
+    /// built.
+    func debug(_ message: @autoclosure () -> String) {
+        #if DEBUG
+        FileLog.shared.write("DEBUG", category, message())
+        #endif
+    }
 }
 
 private final class FileLogWriter: @unchecked Sendable {

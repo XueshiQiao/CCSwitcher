@@ -48,6 +48,37 @@ final class PanelModel {
     var shown = false
     /// Arrow x inside the window (window coordinates).
     var arrowX: CGFloat = 200
+    /// Whether the panel content (`MainMenuView` or `ClassicMainMenuView`) is
+    /// mounted: only while the panel is on screen or animating closed. Left
+    /// mounted while hidden, it kept re-rendering on every state change and
+    /// every second for its relative timestamps.
+    var contentMounted = false
+
+    // Content state that has to survive the content being unmounted between
+    // openings, so the panel reopens on the same tab and size.
+    var selectedTab: MainMenuView.Tab = .usage
+    var classicSelectedTab: ClassicMainMenuView.Tab = .usage
+    // Measured heights driving the popover frame, written by whichever
+    // content view is mounted. Defaults are reasonable fallbacks for the
+    // first render pass, before the GeometryReader-based measurements fire.
+    var usageContentHeight: CGFloat = 420
+    var chromeHeight: CGFloat = 180
+
+    /// Popover height is driven by measured Usage tab content + measured chrome.
+    /// The Usage tab is chosen as the height reference because it's the
+    /// content-heaviest tab; sizing for it gives other tabs enough headroom.
+    /// Capped only by available screen space; no artificial floor — the popover
+    /// matches its content exactly, so there is no padding gap inside the
+    /// ScrollView when content is short.
+    var popoverHeight: CGFloat {
+        let screenCap: CGFloat = (NSScreen.main?.visibleFrame.height ?? 900) - 100
+        let maxHeight: CGFloat = min(900, screenCap)
+
+        // +1 for the Divider between content and footer (not measured).
+        let desired = chromeHeight + usageContentHeight + 1
+
+        return min(maxHeight, desired)
+    }
 }
 
 private enum PanelMetrics {
@@ -80,10 +111,19 @@ struct PopoverRoot: View {
         VStack(spacing: 0) {
             Color.clear.frame(height: arrow)
             Group {
-                if style == .classic {
-                    ClassicMainMenuView()
+                if !model.contentMounted {
+                    // Same size as the content, so `show()` can position the
+                    // panel before the content has mounted.
+                    Color.clear.frame(height: model.popoverHeight)
+                } else if style == .classic {
+                    // A fresh mount starts hidden; reveal it once it is in
+                    // the hierarchy.
+                    ClassicMainMenuView(panel: model)
+                        .onAppear { model.shown = true }
                 } else {
-                    MainMenuView()
+                    // Likewise, so the staggered entrance animates.
+                    MainMenuView(panel: model)
+                        .onAppear { model.shown = true }
                 }
             }
             .environmentObject(appState)
@@ -219,7 +259,13 @@ final class PopoverController {
         NSApp.activate(ignoringOtherApps: true)
         panel.orderFrontRegardless()
         panel.makeKey()
-        Task { @MainActor [weak self] in self?.model.shown = true }
+        if model.contentMounted {
+            // Reopened before the close finished: the content is still there.
+            Task { @MainActor [weak self] in self?.model.shown = true }
+        } else {
+            // PopoverRoot sets `shown` once the content has mounted.
+            model.contentMounted = true
+        }
         if let m = globalMonitor {
             NSEvent.removeMonitor(m)
             globalMonitor = nil
@@ -245,12 +291,14 @@ final class PopoverController {
         let style = UserDefaults.standard.string(forKey: "panelStyle").flatMap(PanelStyle.init(rawValue:)) ?? .default
         if style == .classic {
             panel.orderOut(nil)
+            model.contentMounted = false
             return
         }
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(180))
             guard let self, !self.model.shown else { return }
             self.panel.orderOut(nil)
+            self.model.contentMounted = false
         }
     }
 

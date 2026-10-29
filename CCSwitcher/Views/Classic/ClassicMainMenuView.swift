@@ -10,12 +10,9 @@ private let popoverLog = FileLog("Popover")
 struct ClassicMainMenuView: View {
     @EnvironmentObject private var appState: AppState
     @AppStorage("showFullEmail") private var showFullEmail = false
-    @State private var selectedTab: Tab = .usage
-
-    // Measured heights driving the popover frame. Defaults are fallbacks for
-    // the first render pass, before the GeometryReader measurements fire.
-    @State private var usageContentHeight: CGFloat = 420
-    @State private var chromeHeight: CGFloat = 180
+    /// Holds the selected tab and the measured heights, which outlive this
+    /// view: the panel unmounts it while hidden.
+    let panel: PanelModel
 
     enum Tab: String, CaseIterable {
         case usage, costs, accounts
@@ -51,7 +48,7 @@ struct ClassicMainMenuView: View {
                 .measureChromeHeight()
 
             Group {
-                switch selectedTab {
+                switch panel.classicSelectedTab {
                 case .usage:
                     ClassicUsageDashboardView()
                 case .costs:
@@ -71,10 +68,10 @@ struct ClassicMainMenuView: View {
         .animation(.easeInOut(duration: 0.2), value: popoverHeight)
         .background(.ultraThinMaterial)
         .onPreferenceChange(UsageContentHeightKey.self) { value in
-            if value > 0 { usageContentHeight = value }
+            if value > 0 { panel.usageContentHeight = value }
         }
         .onPreferenceChange(ChromeHeightKey.self) { value in
-            if value > 0 { chromeHeight = value }
+            if value > 0 { panel.chromeHeight = value }
         }
         // Observe popoverHeight explicitly so SwiftUI tracks the computed value
         // as a dependency of the .frame above; some Release builds otherwise
@@ -86,14 +83,8 @@ struct ClassicMainMenuView: View {
 
     // MARK: - Dynamic Popover Height
 
-    /// Measured Usage tab content + measured chrome, capped by the screen.
-    /// The Usage tab is the reference because it is the tallest.
-    private var popoverHeight: CGFloat {
-        let screenCap: CGFloat = (NSScreen.main?.visibleFrame.height ?? 900) - 100
-        let maxHeight: CGFloat = min(900, screenCap)
-        // +1 for the Divider between content and footer (not measured).
-        return min(maxHeight, chromeHeight + usageContentHeight + 1)
-    }
+    /// See `PanelModel.popoverHeight`, which the hidden panel sizes itself by.
+    private var popoverHeight: CGFloat { panel.popoverHeight }
 
     // MARK: - Promo Banner
 
@@ -196,13 +187,13 @@ struct ClassicMainMenuView: View {
             GeometryReader { geo in
                 let count = CGFloat(Tab.allCases.count)
                 let tabWidth = geo.size.width / count
-                let index = CGFloat(Tab.allCases.firstIndex(of: selectedTab) ?? 0)
+                let index = CGFloat(Tab.allCases.firstIndex(of: panel.classicSelectedTab) ?? 0)
                 Capsule()
                     .fill(Classic.brand)
                     .padding(2)
                     .frame(width: tabWidth)
                     .offset(x: tabWidth * index)
-                    .animation(.easeInOut(duration: 0.15), value: selectedTab)
+                    .animation(.easeInOut(duration: 0.15), value: panel.classicSelectedTab)
             }
 
             HStack(spacing: 0) {
@@ -215,11 +206,11 @@ struct ClassicMainMenuView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 6)
-                    .foregroundStyle(selectedTab == tab ? .white : .textSecondary)
+                    .foregroundStyle(panel.classicSelectedTab == tab ? .white : .textSecondary)
                     .contentShape(Rectangle())
                     .onTapGesture {
                         withAnimation(.easeInOut(duration: 0.15)) {
-                            selectedTab = tab
+                            panel.classicSelectedTab = tab
                         }
                     }
                 }
