@@ -92,6 +92,17 @@ jobs:
             build \
             SYMROOT=$(PWD)/build
 
+      - name: Remove unused Sparkle XPC services
+        # Sparkle's Downloader.xpc and Installer.xpc are only used by sandboxed
+        # apps (https://sparkle-project.org/documentation/sandboxing/), and
+        # CCSwitcher is not sandboxed. The paths are written out in full on
+        # purpose: an rm whose path is built from variables can delete the
+        # wrong thing when a variable is empty. The Sign App step below signs
+        # whatever is left, and skips paths that no longer exist.
+        run: |
+          rm -rf build/Release/CCSwitcher.app/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices
+          rm -f build/Release/CCSwitcher.app/Contents/Frameworks/Sparkle.framework/XPCServices
+
       - name: Sign App
         if: ${{ env.HAS_APPLE_SECRETS == 'true' }}
         run: |

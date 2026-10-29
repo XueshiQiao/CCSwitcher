@@ -89,27 +89,6 @@ targets:
       - package: Sparkle
       - package: GRDB
       - package: Aptabase
-    postBuildScripts:
-      # Sparkle's Downloader/Installer XPC services are only used by sandboxed
-      # apps (https://sparkle-project.org/documentation/sandboxing/).
-      # CCSwitcher is not sandboxed, so leave them out of Release builds.
-      - name: Remove unused Sparkle XPC services
-        basedOnDependencyAnalysis: false
-        script: |
-          [ "$CONFIGURATION" = "Release" ] || exit 0
-          FW="$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH/Sparkle.framework"
-          if [ ! -e "$FW/Versions/B/XPCServices" ]; then
-            echo "Sparkle XPC services not present in $FW, nothing to remove"
-            exit 0
-          fi
-          rm -rf "$FW/Versions/B/XPCServices" "$FW/XPCServices"
-          echo "Removed Sparkle XPC services from $FW"
-          # The framework's signature sealed the removed files: re-sign it
-          # before Xcode signs the app around it.
-          if [ "$CODE_SIGNING_ALLOWED" = "YES" ] && [ -n "$EXPANDED_CODE_SIGN_IDENTITY" ]; then
-            codesign --force --sign "$EXPANDED_CODE_SIGN_IDENTITY" $OTHER_CODE_SIGN_FLAGS \
-              --preserve-metadata=identifier,entitlements,flags "$FW"
-          fi
 
   CCSwitcherWidgetExtension:
     type: extensionkit-extension
