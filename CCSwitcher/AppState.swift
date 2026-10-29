@@ -290,6 +290,15 @@ final class AppState: ObservableObject {
 
     // MARK: - Account Management
 
+    /// The plan to record for the login `status` describes. See `AuthStatus.plan(profile:)`.
+    private func currentPlan(_ status: AuthStatus) -> String? {
+        let plan = status.plan(profile: keychain.readOAuthAccount())
+        if plan != status.subscriptionType {
+            log.info("[currentPlan] Profile plan \(plan ?? "nil") overrides credential plan \(status.subscriptionType ?? "nil")")
+        }
+        return plan
+    }
+
     /// Locate an account by (email, orgId). The same email can belong to
     /// multiple Teams/organizations, so matching by email alone would let a
     /// second organization silently take over the first one's entry.
@@ -360,7 +369,7 @@ final class AppState: ObservableObject {
                 provider: .claudeCode,
                 orgName: status.orgName,
                 orgId: status.orgId,
-                subscriptionType: status.subscriptionType,
+                subscriptionType: currentPlan(status),
                 isActive: accounts.isEmpty
             )
             log.info("[addAccount] Created account model, id=\(account.id)")
@@ -474,6 +483,7 @@ final class AppState: ObservableObject {
                 }
                 accounts[existing].orgId = status.orgId
                 accounts[existing].orgName = status.orgName
+                accounts[existing].subscriptionType = currentPlan(status)
                 accounts[existing].lastUsed = Date()
                 activeAccount = accounts[existing]
                 // A login is a deliberate account choice; grant it the same
@@ -497,7 +507,7 @@ final class AppState: ObservableObject {
                 provider: .claudeCode,
                 orgName: status.orgName,
                 orgId: status.orgId,
-                subscriptionType: status.subscriptionType,
+                subscriptionType: currentPlan(status),
                 isActive: true
             )
             log.info("[loginNewAccount] Step 5: Created account, id=\(account.id)")
@@ -905,7 +915,7 @@ final class AppState: ObservableObject {
             if let index = accounts.firstIndex(where: { $0.id == account.id }) {
                 accounts[index].orgName = status.orgName
                 accounts[index].orgId = status.orgId
-                accounts[index].subscriptionType = status.subscriptionType
+                accounts[index].subscriptionType = currentPlan(status)
 
                 // Mark this account as active (it's what the CLI is now using)
                 for i in accounts.indices {
@@ -1356,7 +1366,7 @@ final class AppState: ObservableObject {
             }
             accounts[index].orgName = status.orgName
             accounts[index].orgId = status.orgId
-            accounts[index].subscriptionType = status.subscriptionType
+            accounts[index].subscriptionType = currentPlan(status)
             activeAccount = accounts[index]
             saveAccounts()
             log.info("[updateActiveAccount] Matched existing account at index \(index)")
@@ -1367,7 +1377,7 @@ final class AppState: ObservableObject {
                 provider: .claudeCode,
                 orgName: status.orgName,
                 orgId: status.orgId,
-                subscriptionType: status.subscriptionType,
+                subscriptionType: currentPlan(status),
                 isActive: true
             )
             accounts.append(account)

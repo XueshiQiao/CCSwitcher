@@ -129,6 +129,7 @@ targets:
       - path: CCSwitcher/Services/L10n.swift
       - path: CCSwitcher/Models/CostData.swift
       - path: CCSwitcher/Models/ActivityData.swift
+      - path: CCSwitcher/Models/SubscriptionPlan.swift
     dependencies:
       - package: GRDB
     settings:

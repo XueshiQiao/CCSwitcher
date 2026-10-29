@@ -145,3 +145,17 @@ struct AuthStatus: Codable {
         reportsClaudeAiIdentity ? nil : (authMethod ?? "unknown")
     }
 }
+
+// MARK: - Plan from the account profile
+
+extension AuthStatus {
+    /// The plan to show for this login. See `SubscriptionPlan.resolve`.
+    func plan(profile oauthAccount: [String: AnyCodable]?) -> String? {
+        SubscriptionPlan.resolve(
+            email: email,
+            orgId: orgId,
+            subscriptionType: subscriptionType,
+            profile: oauthAccount?.mapValues(\.value)
+        )
+    }
+}
