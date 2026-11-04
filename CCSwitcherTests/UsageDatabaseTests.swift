@@ -130,6 +130,29 @@ final class UsageDatabaseTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: legacy.path))
     }
 
+    func testLegacyImportSurvivesDuplicateHashesAndAliasedPaths() throws {
+        func raw(_ file: CachedFileV2) throws -> Any { try JSONSerialization.jsonObject(with: JSONEncoder().encode(file)) }
+        // Same hash three times with the largest output in the middle: the largest must stay.
+        let first = try raw(file([entry(output: 5), entry(output: 50), entry(output: 20), entry("other:request", output: 7)]))
+        let unrelated = try raw(file([entry("unrelated:request", output: 9)], session: "other"))
+        // Sorts after b.jsonl and canonicalizes to a.jsonl, so it is skipped between real files.
+        let aliasContent = try raw(file([entry("alias:only", output: 99)]))
+        let legacy = directory.appendingPathComponent("old.json")
+        try JSONSerialization.data(withJSONObject: ["version": 3, "files": [
+            root.appendingPathComponent("a.jsonl").path: first,
+            root.appendingPathComponent("b.jsonl").path: unrelated,
+            root.appendingPathComponent("sub/../a.jsonl").path: aliasContent,
+        ]]).write(to: legacy)
+
+        let db = try database(legacy: legacy)
+        XCTAssertEqual(try scalar(db, "SELECT COUNT(*) FROM session_files"), 2)
+        XCTAssertEqual(try scalar(db, "SELECT COUNT(*) FROM usage_records"), 3)
+        XCTAssertEqual(try scalar(db, "SELECT output_tokens FROM usage_records WHERE record_key='id:message:request'"), 50)
+        // The first path wins; the aliased copy's records must not land in any file.
+        XCTAssertEqual(try scalar(db, "SELECT COUNT(*) FROM usage_records WHERE record_key='id:alias:only'"), 0)
+        XCTAssertEqual(try scalar(db, "SELECT COUNT(*) FROM usage_records u JOIN session_files f ON f.id=u.file_id WHERE f.relative_path='b.jsonl'"), 1)
+    }
+
     func testUnreadableLegacyIsTreatedAsMissing() throws {
         let legacy = directory.appendingPathComponent("old.json")
         // A directory at the legacy path makes the read itself fail.

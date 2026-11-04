@@ -593,7 +593,14 @@ private enum LegacyUsageImportV3 {
                     source_mtime_ns,source_size_bytes,earliest_timestamp_us,parser_version,statistics_timezone,
                     source_status,activity_by_date_json,extensions_json,created_at_us,updated_at_us)
                 VALUES ('claude',?,?,?,?,?,NULL,NULL,?,0,NULL,'present',?,?,?,?)
+                ON CONFLICT(provider,root_path,relative_path) DO NOTHING
                 """, arguments: [root.path,relative,file.project,file.sessionId,file.isSidechain,earliest,try encode(["_v":1,"days":days]),try encode(extras),stamp,stamp])
+            // Two cache paths can canonicalize to the same file. The first one wins;
+            // lastInsertedRowID would still point at an earlier file here.
+            guard db.changesCount > 0 else {
+                log.warning("Legacy import skipped duplicate source after canonicalization: \(path)")
+                continue
+            }
             let fileID = db.lastInsertedRowID
             let rawEntries = rawFile["entries"] as? [[String: Any]] ?? []
             var anonymous = 0
@@ -609,6 +616,13 @@ private enum LegacyUsageImportV3 {
                         model,speed,input_tokens,output_tokens,cache_creation_tokens,cache_creation_1h_tokens,
                         cache_read_tokens,extensions_json,created_at_us,updated_at_us)
                     VALUES (?,?,?,?,NULL,?,?,?,?,?,?,?,?,?,?,?)
+                    ON CONFLICT(file_id,record_key) DO UPDATE SET
+                        dedup_key=excluded.dedup_key,source_order=excluded.source_order,local_date=excluded.local_date,
+                        model=excluded.model,speed=excluded.speed,input_tokens=excluded.input_tokens,
+                        output_tokens=excluded.output_tokens,cache_creation_tokens=excluded.cache_creation_tokens,
+                        cache_creation_1h_tokens=excluded.cache_creation_1h_tokens,cache_read_tokens=excluded.cache_read_tokens,
+                        extensions_json=excluded.extensions_json
+                    WHERE excluded.output_tokens > usage_records.output_tokens
                     """, arguments: [fileID,key,entry.hash,order,entry.date,entry.model,entry.speed,entry.input,entry.output,entry.cw,entry.cw1h,entry.cr,try encode(extra),stamp,stamp])
             }
         }
