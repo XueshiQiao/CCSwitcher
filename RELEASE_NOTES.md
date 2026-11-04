@@ -1,3 +1,9 @@
+### Usage data no longer fails with "UNIQUE constraint failed"
+
+Some people saw a SQLite error at the bottom of the panel after switching accounts (`19 UNIQUE constraint failed`), and deleting `usage.sqlite` did not help. The cause was the one-time import of the old usage cache (`session-parse-cache-v2.json`): when that cache listed the same message twice, or the same file under two paths, the import stopped, and it stopped again every time the app opened the database. The import now keeps the larger of two duplicate messages and skips a file it already imported, so it finishes. Thanks to **[@pbakkerasfaudits](https://github.com/pbakkerasfaudits)** for reporting it ([#55](https://github.com/XueshiQiao/CCSwitcher/issues/55)).
+
+#### Included from v2.1.1
+
 ### Fixes and polish
 
 - **Removing an account now asks first.** The Cancel and Remove buttons appear right in the row, in both the Classic and the 2.0 styles.
@@ -50,6 +56,12 @@ Text that was still in English in every language is now translated, and German, 
 - **[@binjto-boop](https://github.com/binjto-boop)** — for asking for the classic interface back ([#50](https://github.com/XueshiQiao/CCSwitcher/issues/50)).
 
 ---
+
+### 用量数据不再因为「UNIQUE constraint failed」而失败
+
+有人切换账号之后，面板底部会出现 SQLite 错误（`19 UNIQUE constraint failed`），删掉 `usage.sqlite` 也没用。原因是 app 会把旧版的用量缓存（`session-parse-cache-v2.json`）导入一次：缓存里同一条消息出现了两次，或者同一个文件用两个路径各记了一次，导入就会中断，而且之后每次打开数据库都会再中断一次。现在遇到重复的消息，会保留 output 更大的那一条；遇到已经导入过的文件，会直接跳过，所以导入可以正常完成。感谢 **[@pbakkerasfaudits](https://github.com/pbakkerasfaudits)** 报告这个问题（[#55](https://github.com/XueshiQiao/CCSwitcher/issues/55)）。
+
+#### 包含 v2.1.1 的更新
 
 ### 缺陷修复与细节改进
 
@@ -104,4 +116,4 @@ Text that was still in English in every language is now translated, and German, 
 
 ---
 
-**Full Changelog**: https://github.com/XueshiQiao/CCSwitcher/compare/v2.1.0...v2.1.1
+**Full Changelog**: https://github.com/XueshiQiao/CCSwitcher/compare/v2.1.1...v2.1.2
