@@ -243,6 +243,10 @@ final class PopoverController {
     /// button's action follows on mouse-up: it must not reopen what this same
     /// click just closed, or a second click on the icon never closes the panel.
     private var closedByStatusItemPressAt: Date?
+    /// The pending "finish closing" task of the last `hide()`. Cancelled when the
+    /// panel is shown or hidden again, so an older close cannot cut a newer
+    /// fade-out short.
+    private var hideTask: Task<Void, Never>?
 
     func toggle() {
         if model.shown {
@@ -257,6 +261,8 @@ final class PopoverController {
     }
 
     func show() {
+        hideTask?.cancel()
+        hideTask = nil
         reposition(force: true)
         NSApp.activate(ignoringOtherApps: true)
         panel.orderFrontRegardless()
@@ -288,6 +294,7 @@ final class PopoverController {
         guard model.shown else { return }
         closedByStatusItemPressAt = isPressingStatusItem() ? Date() : nil
         model.shown = false
+        hideTask?.cancel()
         // Classic has no fade-out to wait for; leaving the now-invisible panel
         // up for 180 ms would swallow clicks meant for the window behind it.
         let style = UserDefaults.standard.string(forKey: "panelStyle").flatMap(PanelStyle.init(rawValue:)) ?? .default
@@ -296,9 +303,9 @@ final class PopoverController {
             model.contentMounted = false
             return
         }
-        Task { @MainActor [weak self] in
+        hideTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(180))
-            guard let self, !self.model.shown else { return }
+            guard !Task.isCancelled, let self, !self.model.shown else { return }
             self.panel.orderOut(nil)
             self.model.contentMounted = false
         }
