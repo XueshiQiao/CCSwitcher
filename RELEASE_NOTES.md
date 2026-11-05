@@ -1,3 +1,24 @@
+### Much lower CPU use while the app sits idle
+
+With the panel closed, CCSwitcher kept about 3–8% of a CPU core busy, and one report measured it climbing to 97% after 18 hours of uptime. The cause was that the closed panel's content stayed alive and kept redrawing itself with nothing on screen, on every refresh and for every spinner and pulsing dot. Now the panel's content is only built while the panel is open, so a closed panel costs almost nothing. On our test Mac, the 60-second average CPU use with the panel closed went from about 3.0% to about 0.1%.
+
+Other small changes with the same goal:
+
+- The menu bar strip updates once a minute instead of every 3 seconds.
+- `claude --version` is not run on every refresh any more, only when the `claude` file changes. `claude auth status` still runs on every refresh, so which account is signed in is never out of date.
+- Keychain and file reads during a refresh no longer block the panel.
+- The widget reloads only when what it shows has changed.
+- The refresh timer pauses while the Mac sleeps and refreshes right away on wake if one is due.
+
+What you may notice: when you reopen the panel, the scroll position and an unfinished label edit are reset. The selected tab and the panel size are kept.
+
+### Thanks
+
+- **[@ANGELBERRIOS23](https://github.com/ANGELBERRIOS23)** — the idle CPU work above ([#47](https://github.com/XueshiQiao/CCSwitcher/pull/47)).
+- **[@FXeio](https://github.com/FXeio)** — for measuring the closed panel's CPU use over many hours and tracking it down to the panel content staying alive ([#56](https://github.com/XueshiQiao/CCSwitcher/pull/56)).
+
+#### Included from v2.1.2
+
 ### Usage data no longer fails with "UNIQUE constraint failed"
 
 Some people saw a SQLite error at the bottom of the panel after switching accounts (`19 UNIQUE constraint failed`), and deleting `usage.sqlite` did not help. The cause was the one-time import of the old usage cache (`session-parse-cache-v2.json`): when that cache listed the same message twice, or the same file under two paths, the import stopped, and it stopped again every time the app opened the database. The import now keeps the larger of two duplicate messages and skips a file it already imported, so it finishes. Thanks to **[@pbakkerasfaudits](https://github.com/pbakkerasfaudits)** for reporting it ([#55](https://github.com/XueshiQiao/CCSwitcher/issues/55)).
@@ -56,6 +77,27 @@ Text that was still in English in every language is now translated, and German, 
 - **[@binjto-boop](https://github.com/binjto-boop)** — for asking for the classic interface back ([#50](https://github.com/XueshiQiao/CCSwitcher/issues/50)).
 
 ---
+
+### App 空闲时 CPU 占用大幅降低
+
+面板关着的时候，CCSwitcher 一直占着一个 CPU 核的 3%–8%；有人实测开着 18 小时后涨到了 97%。原因是关掉的面板里的内容并没有销毁，屏幕上明明什么都看不见，每次刷新、每个转圈图标和闪烁的小圆点，它还是在不停地重新绘制。现在面板的内容只在面板打开时才会创建，面板关着就几乎不占 CPU。在我们的测试机上，面板关着时 60 秒内的平均 CPU 占用从约 3.0% 降到了约 0.1%。
+
+同样为了省资源的其他小改动：
+
+- 菜单栏条改为每分钟更新一次，原来是每 3 秒一次。
+- 不再每次刷新都执行 `claude --version`，只有 `claude` 文件发生变化时才会执行。`claude auth status` 仍然每次刷新都会执行，所以当前登录的是哪个账号不会是过期的。
+- 刷新时读取钥匙串和文件，不会再卡住面板。
+- 小组件只在显示的内容变化时才会重新加载。
+- 电脑睡眠时刷新定时器会暂停，唤醒后如果有刷新已经到期，会马上刷新。
+
+你可能会注意到的变化：重新打开面板时，滚动位置和还没改完的名称编辑会被重置。选中的标签页和面板大小会保留。
+
+### 致谢
+
+- **[@ANGELBERRIOS23](https://github.com/ANGELBERRIOS23)** —— 上面这些降低空闲 CPU 占用的改动（[#47](https://github.com/XueshiQiao/CCSwitcher/pull/47)）。
+- **[@FXeio](https://github.com/FXeio)** —— 连续多个小时实测关着的面板占用的 CPU，并查到原因是面板的内容一直没有销毁（[#56](https://github.com/XueshiQiao/CCSwitcher/pull/56)）。
+
+#### 包含 v2.1.2 的更新
 
 ### 用量数据不再因为「UNIQUE constraint failed」而失败
 
@@ -116,4 +158,4 @@ Text that was still in English in every language is now translated, and German, 
 
 ---
 
-**Full Changelog**: https://github.com/XueshiQiao/CCSwitcher/compare/v2.1.1...v2.1.2
+**Full Changelog**: https://github.com/XueshiQiao/CCSwitcher/compare/v2.1.2...v2.1.3
