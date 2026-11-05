@@ -185,7 +185,8 @@ final class PopoverController {
         self.statusItem = statusItem
         hosting = FittingHostingView(rootView: PopoverRoot(appState: appState, config: config, model: model, locale: locale))
         hosting.sizingOptions = [.intrinsicContentSize]
-        panel.contentView = hosting
+        // The hosting view goes into the panel in show(), not here: see
+        // attachContent().
         hosting.onResize = { [weak self] in self?.reposition(force: false) }
         panel.onResignKey = { [weak self] in self?.hide() }
         panel.onCancel = { [weak self] in self?.hide() }
@@ -217,6 +218,7 @@ final class PopoverController {
     }
 
     func show() {
+        attachContent()
         reposition(force: true)
         NSApp.activate(ignoringOtherApps: true)
         panel.orderFrontRegardless()
@@ -247,13 +249,34 @@ final class PopoverController {
         let style = UserDefaults.standard.string(forKey: "panelStyle").flatMap(PanelStyle.init(rawValue:)) ?? .default
         if style == .classic {
             panel.orderOut(nil)
+            detachContent()
             return
         }
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(180))
             guard let self, !self.model.shown else { return }
             self.panel.orderOut(nil)
+            self.detachContent()
         }
+    }
+
+    /// A panel that is ordered out keeps its window's display cycle, so a
+    /// hosting view left inside it keeps rendering the whole SwiftUI graph
+    /// (every AppState change, spinners, the pulsing status dot) with nothing
+    /// on screen: about 20% of a core while idle, more after long uptime.
+    /// Out of a window, the hosting view doesn't render; the graph and its
+    /// @State (selected tab, measured heights) are kept for the next show().
+    private func attachContent() {
+        guard panel.contentView !== hosting else { return }
+        panel.contentView = hosting
+        // Bring the graph up to date now, so reposition() measures the
+        // current content rather than what it was when the panel closed.
+        hosting.layoutSubtreeIfNeeded()
+    }
+
+    private func detachContent() {
+        guard panel.contentView === hosting else { return }
+        panel.contentView = NSView()
     }
 
     /// True while a mouse button is held down over the status item, anywhere
