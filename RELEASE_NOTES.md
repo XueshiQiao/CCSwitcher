@@ -1,3 +1,13 @@
+### More in the menu bar icon's right-click menu
+
+Right-click the CCSwitcher icon in the menu bar and you now also see:
+
+- **Check for Updates** — look for a new version right away, without opening Settings.
+- **Feedback** — opens the CCSwitcher issues page on GitHub, where you can report a problem or ask for a feature.
+- **More Apps by Author** — opens xueshi.dev, where the other apps by the same author are listed.
+
+#### Included from v2.1.3
+
 ### Much lower CPU use while the app sits idle
 
 With the panel closed, CCSwitcher kept about 3–8% of a CPU core busy, and one report measured it climbing to 97% after 18 hours of uptime. The cause was that the closed panel's content stayed alive and kept redrawing itself with nothing on screen, on every refresh and for every spinner and pulsing dot. Now the panel's content is only built while the panel is open, so a closed panel costs almost nothing. On our test Mac, the 60-second average CPU use with the panel closed went from about 3.0% to about 0.1%.
@@ -77,6 +87,16 @@ Text that was still in English in every language is now translated, and German, 
 - **[@binjto-boop](https://github.com/binjto-boop)** — for asking for the classic interface back ([#50](https://github.com/XueshiQiao/CCSwitcher/issues/50)).
 
 ---
+
+### 菜单栏图标的右键菜单里多了几项
+
+在菜单栏上右键点 CCSwitcher 的图标，现在还会看到：
+
+- **检查更新** —— 不用打开设置，直接检查有没有新版本。
+- **反馈问题** —— 打开 GitHub 上 CCSwitcher 的 issues 页面，可以在那里报告问题或提需求。
+- **作者的更多应用** —— 打开 xueshi.dev，那里列着同一位作者做的其他应用。
+
+#### 包含 v2.1.3 的更新
 
 ### App 空闲时 CPU 占用大幅降低
 
@@ -158,4 +178,4 @@ Text that was still in English in every language is now translated, and German, 
 
 ---
 
-**Full Changelog**: https://github.com/XueshiQiao/CCSwitcher/compare/v2.1.2...v2.1.3
+**Full Changelog**: https://github.com/XueshiQiao/CCSwitcher/compare/v2.1.3...v2.1.4
