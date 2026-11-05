@@ -72,8 +72,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: me.xueshi.ccswitcher
         CODE_SIGN_ENTITLEMENTS: CCSwitcher/Resources/CCSwitcher.entitlements
         PRODUCT_NAME: CCSwitcher
-        MARKETING_VERSION: "2.1.2"
-        CURRENT_PROJECT_VERSION: "70"
+        MARKETING_VERSION: "2.1.3"
+        CURRENT_PROJECT_VERSION: "71"
         COMBINE_HIDPI_IMAGES: true
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
@@ -109,8 +109,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: me.xueshi.ccswitcher.widget
         CODE_SIGN_ENTITLEMENTS: CCSwitcherWidget/Resources/CCSwitcherWidget.entitlements
         PRODUCT_NAME: CCSwitcherWidgetExtension
-        MARKETING_VERSION: "2.1.2"
-        CURRENT_PROJECT_VERSION: "70"
+        MARKETING_VERSION: "2.1.3"
+        CURRENT_PROJECT_VERSION: "71"
         SWIFT_VERSION: "6.0"
         MACOSX_DEPLOYMENT_TARGET: "14.0"
         CODE_SIGN_STYLE: Automatic
