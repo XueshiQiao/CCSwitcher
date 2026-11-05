@@ -47,6 +47,7 @@ struct CCSwitcherApp: App {
                     statusItemController.install(
                         appState: appState,
                         config: menuBarConfig,
+                        updateChecker: updateChecker,
                         locale: currentLocale
                     )
                     // Kick off background usage tracking immediately upon app start

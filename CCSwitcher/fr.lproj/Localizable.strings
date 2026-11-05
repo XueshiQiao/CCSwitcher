@@ -223,3 +223,6 @@
 /* Accessibility and small UX fixes */
 "Remove" = "Supprimer";
 "Save" = "Enregistrer";
+
+"Feedback" = "Envoyer un retour";
+"More Apps by Author" = "Plus d’apps de l’auteur";

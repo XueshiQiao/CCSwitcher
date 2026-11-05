@@ -16,16 +16,18 @@ final class StatusItemController: NSObject {
     private var stripController: NSHostingController<AnyView>?
     private var appState: AppState?
     private var menuBarConfig: MenuBarConfig?
+    private var updateChecker: UpdateChecker?
     private var currentLocale: Locale = .autoupdatingCurrent
     private var stripRefreshCancellables = Set<AnyCancellable>()
     private var isStripRefreshScheduled = false
     private var installed = false
 
-    func install(appState: AppState, config: MenuBarConfig, locale: Locale) {
+    func install(appState: AppState, config: MenuBarConfig, updateChecker: UpdateChecker, locale: Locale) {
         guard !installed else { return }
         installed = true
         self.appState = appState
         self.menuBarConfig = config
+        self.updateChecker = updateChecker
         self.currentLocale = locale
 
         let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -94,7 +96,11 @@ final class StatusItemController: NSObject {
         guard let statusItem else { return }
         let menu = NSMenu()
         menu.addItem(menuItem(String(localized: "Refresh", bundle: L10n.bundle), #selector(refreshFromMenu), key: "r"))
+        menu.addItem(menuItem(String(localized: "Check for Updates", bundle: L10n.bundle), #selector(checkForUpdatesFromMenu), key: ""))
         menu.addItem(menuItem(String(localized: "Settings", bundle: L10n.bundle), #selector(openSettingsFromMenu), key: ","))
+        menu.addItem(.separator())
+        menu.addItem(menuItem(String(localized: "Feedback", bundle: L10n.bundle), #selector(openFeedbackFromMenu), key: ""))
+        menu.addItem(menuItem(String(localized: "More Apps by Author", bundle: L10n.bundle), #selector(openAuthorWebsiteFromMenu), key: ""))
         menu.addItem(.separator())
         menu.addItem(menuItem(String(localized: "Quit CCSwitcher", bundle: L10n.bundle), #selector(quitFromMenu), key: "q"))
         statusItem.menu = menu
@@ -116,6 +122,19 @@ final class StatusItemController: NSObject {
     @objc private func openSettingsFromMenu() {
         NSApp.activate(ignoringOtherApps: true)
         NotificationCenter.default.post(name: .ccswitcherOpenSettings, object: nil)
+    }
+
+    @objc private func checkForUpdatesFromMenu() {
+        NSApp.activate(ignoringOtherApps: true)
+        updateChecker?.checkForUpdates(manual: true)
+    }
+
+    @objc private func openFeedbackFromMenu() {
+        if let url = URL(string: "https://github.com/XueshiQiao/CCSwitcher/issues") { NSWorkspace.shared.open(url) }
+    }
+
+    @objc private func openAuthorWebsiteFromMenu() {
+        if let url = URL(string: "https://xueshi.dev") { NSWorkspace.shared.open(url) }
     }
 
     @objc private func quitFromMenu() {
