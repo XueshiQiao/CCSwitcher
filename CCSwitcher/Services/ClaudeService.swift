@@ -22,6 +22,14 @@ final class ClaudeService: @unchecked Sendable {
     private var _setPathGeneration: UInt64 = 0
     private var _activeLoginProcess: Process?
     private var _loginCancelled = false
+    /// Held while the launch-time path lookup runs; CLI calls wait for it.
+    /// Falling through to the login-shell lookup can take up to 3 s, and
+    /// `shared` is first touched on the main thread at launch, so that
+    /// lookup runs in the background instead of in the initializer.
+    private let initialLookup = DispatchGroup()
+    /// The binary `isClaudeAvailable()` last saw run. Cleared by any failed
+    /// CLI call, so a broken install is checked again on the next refresh.
+    private var _verifiedBinary: ClaudeBinaryStamp?
 
     /// Currently active path. Thread-safe.
     var claudePath: String {
@@ -34,13 +42,30 @@ final class ClaudeService: @unchecked Sendable {
         if !preference.isEmpty, FileManager.default.isExecutableFile(atPath: preference) {
             self._claudePath = preference
             log.info("Claude binary path: \(preference) (user preference)")
-        } else {
+            return
+        }
+        if !preference.isEmpty {
+            log.warning("Saved preference \(preference) is no longer valid; falling back to auto")
+        }
+        if let curated = Self.curatedPath() {
+            self._claudePath = curated
+            log.info("Claude binary path: \(curated) (curated)")
+            return
+        }
+
+        // Placeholder until the lookup finishes. Both CLI runners wait for it,
+        // so no CLI call runs with this.
+        self._claudePath = "claude"
+        initialLookup.enter()
+        DispatchQueue.global(qos: .userInitiated).async { [self] in
             let auto = Self.autoSelectedPath()
-            self._claudePath = auto.path
-            log.info("Claude binary path: \(auto.path) (\(auto.source))")
-            if !preference.isEmpty {
-                log.warning("Saved preference \(preference) is no longer valid; falling back to auto")
-            }
+            lock.lock()
+            // A path picked in Settings in the meantime wins.
+            let apply = _setPathGeneration == 0
+            if apply { _claudePath = auto.path }
+            lock.unlock()
+            if apply { log.info("Claude binary path: \(auto.path) (\(auto.source))") }
+            initialLookup.leave()
         }
     }
 
@@ -77,8 +102,8 @@ final class ClaudeService: @unchecked Sendable {
 
     /// Today's 3-tier fallback: curated → shell PATH → bare "claude".
     static func autoSelectedPath() -> (path: String, source: String) {
-        for candidate in curatedPathCandidates() where FileManager.default.fileExists(atPath: candidate) {
-            return (candidate, "curated")
+        if let curated = curatedPath() {
+            return (curated, "curated")
         }
         if let shellPath = shellPathLookup() {
             return (shellPath, "shell PATH")
@@ -111,6 +136,10 @@ final class ClaudeService: @unchecked Sendable {
         }
 
         return result
+    }
+
+    private static func curatedPath() -> String? {
+        curatedPathCandidates().first { FileManager.default.fileExists(atPath: $0) }
     }
 
     private static func curatedPathCandidates() -> [String] {
@@ -209,15 +238,39 @@ final class ClaudeService: @unchecked Sendable {
         return status
     }
 
+    /// Every refresh asks this first. Spawning `claude --version` each time
+    /// costs a full CLI start-up, so once it has succeeded the answer is
+    /// reused for as long as the path still resolves to that same file.
     func isClaudeAvailable() async -> Bool {
+        let path = claudePath
+        let stamp = ClaudeBinaryStamp(path: path)
+        if let stamp, stamp == verifiedBinary {
+            return true
+        }
         do {
             let version = try await runClaude(args: ["--version"])
             log.info("[isClaudeAvailable] YES, version: \(version.trimmingCharacters(in: .whitespacesAndNewlines))")
+            if let stamp, claudePath == path {
+                setVerifiedBinary(stamp)
+            }
             return true
         } catch {
             log.error("[isClaudeAvailable] NO, error: \(error.localizedDescription)")
             return false
         }
+    }
+
+    private var verifiedBinary: ClaudeBinaryStamp? {
+        lock.lock(); defer { lock.unlock() }
+        return _verifiedBinary
+    }
+
+    private func setVerifiedBinary(_ stamp: ClaudeBinaryStamp?) {
+        lock.lock(); _verifiedBinary = stamp; lock.unlock()
+    }
+
+    private func forgetVerifiedBinary() {
+        setVerifiedBinary(nil)
     }
 
     // MARK: - Usage API
@@ -733,10 +786,12 @@ final class ClaudeService: @unchecked Sendable {
     // MARK: - CLI Runner
 
     private func runClaudeLogin(onAuthURL: (@Sendable (URL) -> Void)?) async throws -> String {
-        let claudePath = self.claudePath
-        log.debug("[runClaudeLogin] Running: \(claudePath) auth login")
         return try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async { [weak self, claudePath] in
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                // Returns at once unless the launch-time path lookup is still running.
+                self?.initialLookup.wait()
+                let claudePath = self?.claudePath ?? "claude"
+                log.debug("[runClaudeLogin] Running: \(claudePath) auth login")
                 let process = Process()
                 let pipe = Pipe()
 
@@ -888,10 +943,12 @@ final class ClaudeService: @unchecked Sendable {
     }
 
     private func runClaude(args: [String]) async throws -> String {
-        let claudePath = self.claudePath
-        log.debug("[runClaude] Running: \(claudePath) \(args.joined(separator: " "))")
         return try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async { [claudePath] in
+            DispatchQueue.global(qos: .userInitiated).async { [self] in
+                // Returns at once unless the launch-time path lookup is still running.
+                initialLookup.wait()
+                let claudePath = self.claudePath
+                log.debug("[runClaude] Running: \(claudePath) \(args.joined(separator: " "))")
                 let process = Process()
                 let pipe = Pipe()
 
@@ -936,14 +993,40 @@ final class ClaudeService: @unchecked Sendable {
                         continuation.resume(returning: output)
                     } else {
                         log.error("[runClaude] Failed (exit \(process.terminationStatus))")
+                        forgetVerifiedBinary()
                         continuation.resume(throwing: ClaudeServiceError.cliError("exit \(process.terminationStatus)"))
                     }
                 } catch {
                     log.error("[runClaude] Process launch failed: \(error.localizedDescription)")
+                    forgetVerifiedBinary()
                     continuation.resume(throwing: ClaudeServiceError.processLaunchFailed(error))
                 }
             }
         }
+    }
+}
+
+/// The file a claude path resolves to, as of when it was checked. A changed
+/// stamp means an update, a reinstall or another install, which has to be
+/// run again before it counts as available.
+private struct ClaudeBinaryStamp: Equatable {
+    let path: String
+    let resolvedPath: String
+    let fileNumber: UInt64?
+    let size: UInt64?
+    let modified: Date?
+
+    /// Nil for the bare "claude" fallback, which only the PATH lookup inside
+    /// the subprocess resolves, so it is checked every time as before.
+    init?(path: String) {
+        guard path.hasPrefix("/") else { return nil }
+        let resolved = URL(fileURLWithPath: path).resolvingSymlinksInPath().path
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: resolved) else { return nil }
+        self.path = path
+        self.resolvedPath = resolved
+        self.fileNumber = (attrs[.systemFileNumber] as? NSNumber)?.uint64Value
+        self.size = (attrs[.size] as? NSNumber)?.uint64Value
+        self.modified = attrs[.modificationDate] as? Date
     }
 }
 

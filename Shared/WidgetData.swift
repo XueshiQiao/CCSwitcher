@@ -4,7 +4,7 @@ import Foundation
 ///
 /// The main app (non-sandboxed) writes a JSON file into the widget extension's container directory.
 /// The widget (sandboxed) reads from its own Application Support, which maps to the same path.
-struct WidgetAccountData: Codable, Sendable {
+struct WidgetAccountData: Codable, Sendable, Equatable {
     let email: String          // pre-obfuscated
     let displayName: String    // pre-obfuscated
     let subscriptionType: String?
@@ -94,5 +94,15 @@ extension WidgetData {
     /// Persist without blocking the caller's actor. See `WidgetDataWriter`.
     func saveInBackground() async {
         await WidgetDataWriter.shared.write(self)
+    }
+
+    /// Whether `other` would render the same widget, ignoring `lastUpdated`.
+    func hasSameContent(as other: WidgetData) -> Bool {
+        accounts == other.accounts
+            && todayCost == other.todayCost
+            && conversationTurns == other.conversationTurns
+            && activeCodingTime == other.activeCodingTime
+            && linesWritten == other.linesWritten
+            && modelUsage == other.modelUsage
     }
 }

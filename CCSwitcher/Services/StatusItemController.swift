@@ -129,7 +129,12 @@ final class StatusItemController: NSObject {
                 appState: appState,
                 config: config,
                 onWidth: { [weak statusItem] width in
-                    statusItem?.length = max(width, 1)
+                    // Every assignment re-lays out the status item, even an
+                    // unchanged one, and the strip is rebuilt on each change.
+                    let length = max(width, 1)
+                    if let statusItem, statusItem.length != length {
+                        statusItem.length = length
+                    }
                 }
             )
             .environment(\.locale, locale)
@@ -148,6 +153,19 @@ final class StatusItemController: NSObject {
             .store(in: &stripRefreshCancellables)
 
         config.objectWillChange
+            .sink { [weak self] _ in
+                Task { @MainActor in
+                    self?.scheduleStripRefresh()
+                }
+            }
+            .store(in: &stripRefreshCancellables)
+
+        // @AppStorage settings the strip reads (e.g. "Show full email") used to
+        // be picked up by its 3-second poll; that tick is now once a minute.
+        // The notification is posted on whatever thread wrote the default, and
+        // this sink is main-actor code: Swift 6 traps if it runs anywhere else.
+        NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 Task { @MainActor in
                     self?.scheduleStripRefresh()

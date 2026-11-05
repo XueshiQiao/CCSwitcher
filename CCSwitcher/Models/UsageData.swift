@@ -108,12 +108,23 @@ struct UsageWindow: Codable {
 
     var resetsAtDate: Date? {
         guard let resetsAt else { return nil }
+        if let date = Self.fractionalSecondsFormatter.date(from: resetsAt) { return date }
+        return Self.wholeSecondsFormatter.date(from: resetsAt)
+    }
+
+    // Read by every countdown and pace marker on each render, so built once.
+    // Every caller runs on the main actor; ISO8601DateFormatter just is not
+    // annotated Sendable.
+    nonisolated(unsafe) private static let fractionalSecondsFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatter.date(from: resetsAt) { return date }
+        return formatter
+    }()
+    nonisolated(unsafe) private static let wholeSecondsFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
-        return formatter.date(from: resetsAt)
-    }
+        return formatter
+    }()
 
     var resetTimeString: String? {
         guard let date = resetsAtDate else { return nil }
