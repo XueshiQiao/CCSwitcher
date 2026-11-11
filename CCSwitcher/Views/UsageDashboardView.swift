@@ -328,9 +328,15 @@ struct UsageDashboardView: View {
             refreshUsageButton(account)
 
             if !account.isActive {
+                // Off while this account's usage is being re-read: that can
+                // rotate its stored credential, and a switch should use the
+                // result, not start alongside it.
+                let refreshing = appState.refreshingUsage.contains(account.id)
                 Button("Switch") { Task { await appState.switchTo(account) } }
                     .buttonStyle(PrimaryButtonStyle(height: 24))
                     .focusable(false)
+                    .disabled(refreshing)
+                    .opacity(refreshing ? 0.45 : 1)
             }
         }
     }

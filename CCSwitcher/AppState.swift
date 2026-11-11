@@ -152,36 +152,6 @@ final class AppState: ObservableObject {
         log.info("[init] Loading accounts from UserDefaults...")
         loadAccounts()
         log.info("[init] Loaded \(self.accounts.count) accounts, active: \(self.activeAccount?.id.uuidString ?? "none")")
-        recoverInterruptedSwitch()
-    }
-
-    /// Finishes a switch the app died in the middle of (see `PendingSwitch`).
-    /// Acts only when the live keychain token is provably the target's — the
-    /// first write landed — and then completes the second one. Anything else
-    /// means the switch never touched the credential, or someone else has
-    /// since, and is left alone.
-    private func recoverInterruptedSwitch() {
-        guard let pending = PendingSwitch.load() else { return }
-        PendingSwitch.clear()
-        guard Date().timeIntervalSince(pending.startedAt) < PendingSwitch.maxAge,
-              let target = accounts.first(where: { $0.id == pending.to }),
-              let backup = keychain.getAccountBackup(forAccountId: target.id.uuidString),
-              let expected = ClaudeService.extractAccessToken(from: backup.token),
-              let live = keychain.readClaudeToken().flatMap(ClaudeService.extractAccessToken(from:)),
-              live == expected else {
-            log.info("[recover] Interrupted switch found; the live credential is not the target's, leaving it alone")
-            return
-        }
-        if (keychain.readOAuthAccount()?["emailAddress"]?.value as? String) != target.email {
-            let written = keychain.writeOAuthAccount(backup.oauthAccount)
-            log.warning("[recover] Finished an interrupted switch to \(target.id): identity written=\(written)")
-        }
-        anchorLiveCredential(to: target.id)
-        for i in accounts.indices {
-            accounts[i].isActive = (accounts[i].id == target.id)
-        }
-        activeAccount = accounts.first(where: { $0.id == target.id })
-        saveAccounts()
     }
 
     // MARK: - Refresh
@@ -737,6 +707,15 @@ final class AppState: ObservableObject {
             log.info("[removeAccount] Removing the active account; switching to \(next.id) first")
             Task {
                 await switchTo(next)
+                // Still active means the switch did not happen (it failed and
+                // rolled back, or another switch or a login was in the way).
+                // Dropping the account now would delete its stored credential
+                // while the CLI is still signed in to it; keep it, with the
+                // switch's error on screen, so removing can be tried again.
+                guard activeAccount?.id != account.id else {
+                    log.warning("[removeAccount] Could not switch away from \(account.id); not removing it")
+                    return
+                }
                 dropAccount(account)
             }
             return
@@ -756,9 +735,8 @@ final class AppState: ObservableObject {
         accountUsageErrors[account.id] = nil
         usageRetryNotBefore[account.id] = nil
         if activeAccount?.id == account.id {
-            // The switch away failed (its error is on screen) or there was no
-            // other account. Keep the model consistent; the CLI itself stays
-            // signed in as it was.
+            // There was no other account to switch to. Keep the model
+            // consistent; the CLI itself stays signed in as it was.
             if !accounts.isEmpty {
                 accounts[accounts.startIndex].isActive = true
             }
@@ -1011,6 +989,15 @@ final class AppState: ObservableObject {
             // grant (or a lost rotation) to a plain nil here would leave the
             // account looking healthy — stale usage still shown, still eligible
             // for auto-switch — until a later polling pass happened to notice.
+            //
+            // `account` was captured before the request went out. If it has
+            // become the active account since (a manual switch), its stored
+            // credential is the one the keychain now uses; rotating it here
+            // would kill the live refresh token.
+            guard !loginBusy, accounts.first(where: { $0.id == account.id })?.isActive == false else {
+                log.info("[fetchUsageNow] Accounts changed while reading \(account.id)'s usage; no reading available")
+                return nil
+            }
             switch await refreshBackupInPlace(for: account) {
             case .refreshed(let refreshed):
                 guard let newToken = ClaudeService.extractAccessToken(from: refreshed) else { return nil }
@@ -1020,7 +1007,7 @@ final class AppState: ObservableObject {
                 accountUsageSampledAt[account.id] = nil
                 accountUsageErrors[account.id] = UsageErrorState(isExpired: true, isRateLimited: false, message: String(localized: "Session expired. Re-authenticate (↻) to fix.", bundle: L10n.bundle))
                 return nil
-            case .storeUnavailable:
+            case .storeUnavailable, .deferred:
                 // Nothing spent, nothing lost; keep the stale sample and retry
                 // on a later cycle.
                 return nil
@@ -1215,6 +1202,10 @@ final class AppState: ObservableObject {
         /// The store cannot be read or written right now. Nothing was spent;
         /// heals by itself on a later cycle.
         case storeUnavailable
+        /// Not attempted: a switch, or another refresh of this same account,
+        /// is in progress. Nothing was spent and nothing is wrong; the next
+        /// cycle tries again.
+        case deferred
         /// Worst case: the rotation succeeded but the result could not be
         /// persisted even after a retry. The old refresh token is spent and the
         /// new credential is gone — only re-authentication brings this account
@@ -1235,7 +1226,14 @@ final class AppState: ObservableObject {
         // dead on arrival. Nothing is spent by waiting for the next cycle.
         guard !isSwitching else {
             log.info("[refreshBackup] A switch is in progress; leaving \(account.id) for the next cycle")
-            return .storeUnavailable
+            return .deferred
+        }
+        // Two refreshes of one account would spend the same refresh token;
+        // the endpoint accepts the first and rejects the second, which then
+        // reports a healthy account as expired.
+        guard !backupRefreshesInFlight.contains(account.id) else {
+            log.info("[refreshBackup] \(account.id) is already being refreshed; leaving it for the next cycle")
+            return .deferred
         }
         backupRefreshesInFlight.insert(account.id)
         defer { backupRefreshesInFlight.remove(account.id) }
@@ -1266,6 +1264,12 @@ final class AppState: ObservableObject {
 
         switch await claudeService.refreshOAuthCredentials(backup.token) {
         case .success(let refreshed):
+            // The account may have been removed while the request was out;
+            // saving now would put its credential back in the store.
+            guard accounts.contains(where: { $0.id == account.id }) else {
+                log.info("[refreshBackup] \(account.id) was removed during its refresh; discarding the result")
+                return .deferred
+            }
             if keychain.saveAccountBackup(token: refreshed, oauthAccount: backup.oauthAccount, forAccountId: accountId) {
                 return .refreshed(refreshed)
             }
@@ -1290,9 +1294,12 @@ final class AppState: ObservableObject {
     private func fetchAllAccountUsage() async {
         // Pick this cycle's targets: the active account (always) + one non-active
         // account in round-robin order. Stale samples for the others are kept.
-        // Accounts parked by a server-given Retry-After deadline are skipped.
+        // Accounts parked by a server-given Retry-After deadline are skipped,
+        // and so are accounts being re-read from the button on their card.
         let now = Date()
-        let eligible = accounts.filter { (usageRetryNotBefore[$0.id] ?? .distantPast) <= now }
+        let eligible = accounts.filter {
+            (usageRetryNotBefore[$0.id] ?? .distantPast) <= now && !usageFetchesFromCard.contains($0.id)
+        }
         let others = eligible.filter { !$0.isActive }
         var targets = eligible.filter { $0.isActive }
         if !others.isEmpty {
@@ -1357,10 +1364,19 @@ final class AppState: ObservableObject {
               let current = accounts.first(where: { $0.id == account.id }) else { return }
 
         accountUsageErrors[current.id] = nil
+        usageFetchesFromCard.insert(current.id)
+        defer { usageFetchesFromCard.remove(current.id) }
         let owner = current.isActive ? await liveCredentialOwnerReadingOffMain().credentialAccountId : nil
         await fetchUsage(for: current, liveCredentialOwnerId: owner)
         updateWidgetData()
     }
+
+    /// Accounts whose usage request from the card button is on the wire right
+    /// now. Narrower than `refreshingUsage`, which also covers the time the
+    /// button spends waiting for a polling cycle to finish: a cycle must skip
+    /// only the former, or it would skip the very account that is waiting
+    /// for it.
+    private var usageFetchesFromCard: Set<UUID> = []
 
     /// Take one usage reading for an account and file it on its card: the
     /// sample, or the error state the card shows instead. Used by the polling
@@ -1410,10 +1426,23 @@ final class AppState: ObservableObject {
             }
         } catch ClaudeService.UsageError.expired {
             log.warning("[fetchUsage] Token expired for \(account.email)")
+            // `account` was captured before the request went out, and a switch
+            // may have run since. Recovering on the stale `isActive` would
+            // either read the new account's live credential as this one's, or
+            // rotate a stored credential the keychain is now using.
+            guard !isSwitching, !loginBusy,
+                  accounts.first(where: { $0.id == account.id })?.isActive == account.isActive else {
+                log.info("[fetchUsage] Accounts changed while reading \(account.id)'s usage; leaving it for the next cycle")
+                return
+            }
             if account.isActive {
                 // Active account: delegated refresh via `claude auth status` is safe (no keychain swap)
                 do {
                     _ = try await claudeService.getAuthStatus()
+                    guard !isSwitching, !loginBusy, activeAccount?.id == account.id else {
+                        log.info("[fetchUsage] Accounts changed during the delegated refresh; leaving \(account.id) for the next cycle")
+                        return
+                    }
                     log.info("[fetchUsage] Delegated refresh completed for active account.")
                     // Re-read refreshed token and retry. A refresh rotates the
                     // credential in place without changing whose it is, so
@@ -1464,6 +1493,10 @@ final class AppState: ObservableObject {
                     // Nothing was spent and nothing is lost; this heals by
                     // itself on a later cycle. Keep the stale sample.
                     accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: false, message: String(localized: "Could not save the refreshed sign-in; will retry automatically.", bundle: L10n.bundle))
+                case .deferred:
+                    // Nothing went wrong, so there is nothing to tell the
+                    // user. Keep the stale sample.
+                    break
                 }
             }
         } catch {

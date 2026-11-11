@@ -297,6 +297,10 @@ struct ClassicUsageDashboardView: View {
                     .tint(Classic.brand)
                     .fixedSize()
                     .focusable(false)
+                    // Off while this account's usage is being re-read: that
+                    // can rotate its stored credential, and a switch should
+                    // use the result, not start alongside it.
+                    .disabled(appState.refreshingUsage.contains(account.id))
             }
         }
     }

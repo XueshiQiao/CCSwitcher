@@ -528,13 +528,7 @@ final class ClaudeService: @unchecked Sendable {
         }
 
         // 3. Write target token to keychain + target oauthAccount to ~/.claude.json
-        //
-        // The two writes are not atomic together. The marker lets the next
-        // launch finish the job if the app dies between them (crash, force
-        // quit, power loss); it is cleared once the switch has an outcome.
         log.info("[switchAccount] Step 3: Writing target credentials...")
-        PendingSwitch(from: currentAccount.id, to: targetAccount.id).save()
-        defer { PendingSwitch.clear() }
         guard keychain.writeClaudeToken(targetBackup.token) else {
             log.error("[switchAccount] Step 3: Failed to write token to keychain!")
             rollback(after: "the keychain write failed")
