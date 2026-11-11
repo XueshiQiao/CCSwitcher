@@ -242,3 +242,5 @@
 /* Account switch safety */
 "Could not save %@'s current sign-in, so the switch was stopped before changing anything. Try again." = "Could not save %@'s current sign-in, so the switch was stopped before changing anything. Try again.";
 "Claude CLI did not respond in time." = "Claude CLI did not respond in time.";
+
+"Refresh this account's usage" = "Refresh this account's usage";

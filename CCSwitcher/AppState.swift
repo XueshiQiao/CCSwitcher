@@ -1314,7 +1314,6 @@ final class AppState: ObservableObject {
         // it for whoever the identity block currently names is what put one
         // account's percentages on the other's card for hours.
         let liveCredentialOwnerId = await liveCredentialOwnerReadingOffMain().credentialAccountId
-        let keychain = self.keychain
 
         var isFirstRequest = true
         for account in targets {
@@ -1324,112 +1323,154 @@ final class AppState: ObservableObject {
                 try? await Task.sleep(nanoseconds: 1_500_000_000)
             }
             isFirstRequest = false
+            await fetchUsage(for: account, liveCredentialOwnerId: liveCredentialOwnerId)
+        }
+    }
 
-            let tokenJSON: String?
+    /// Accounts whose usage is being re-read from the refresh button on their card.
+    @Published private(set) var refreshingUsage: Set<UUID> = []
+
+    /// When a rate-limited account may be asked for its usage again; nil if
+    /// it isn't parked.
+    func usageParkedUntil(_ account: Account) -> Date? {
+        guard let notBefore = usageRetryNotBefore[account.id], notBefore > Date() else { return nil }
+        return notBefore
+    }
+
+    /// Re-read one account's usage now, leaving the other accounts alone (the
+    /// refresh button on each card). A parked account is not asked; it waits
+    /// for its Retry-After like everywhere else.
+    func refreshUsage(for account: Account) async {
+        guard !refreshingUsage.contains(account.id), usageParkedUntil(account) == nil else { return }
+        refreshingUsage.insert(account.id)
+        defer { refreshingUsage.remove(account.id) }
+
+        // A polling cycle may be reading this very account; asking again
+        // alongside it is the burst the endpoint answers with a 429.
+        let deadline = Date().addingTimeInterval(20)
+        while isRefreshing, Date() < deadline {
+            try? await Task.sleep(nanoseconds: 250_000_000)
+        }
+        // The cycle may have just taken a fresh reading.
+        if let sampledAt = accountUsageSampledAt[account.id], Date().timeIntervalSince(sampledAt) < 10 { return }
+        guard !isSwitching, !loginBusy, usageParkedUntil(account) == nil,
+              let current = accounts.first(where: { $0.id == account.id }) else { return }
+
+        accountUsageErrors[current.id] = nil
+        let owner = current.isActive ? await liveCredentialOwnerReadingOffMain().credentialAccountId : nil
+        await fetchUsage(for: current, liveCredentialOwnerId: owner)
+        updateWidgetData()
+    }
+
+    /// Take one usage reading for an account and file it on its card: the
+    /// sample, or the error state the card shows instead. Used by the polling
+    /// cycle and by the refresh button on a single account's card.
+    private func fetchUsage(for account: Account, liveCredentialOwnerId: UUID?) async {
+        let keychain = self.keychain
+        let tokenJSON: String?
+        if account.isActive {
+            guard liveCredentialOwnerId == account.id else {
+                log.warning("[fetchUsage] Live credential is not confirmed to be \(account.email)'s; taking no reading rather than filing someone else's")
+                accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: false, message: String(localized: "Can't tell which account the current sign-in belongs to. Switch accounts once to re-sync.", bundle: L10n.bundle))
+                return
+            }
+            tokenJSON = await Self.offMain { keychain.readClaudeToken() }
+        } else {
+            let accountId = account.id.uuidString
+            tokenJSON = await Self.offMain { keychain.getAccountBackup(forAccountId: accountId)?.token }
+        }
+        guard let tokenJSON, let accessToken = ClaudeService.extractAccessToken(from: tokenJSON) else {
+            log.warning("[fetchUsage] No token for \(account.email), skipping")
+            return
+        }
+        do {
+            let usage = try await fetchUsageWithRetry(accessToken: accessToken)
+            accountUsage[account.id] = usage
+            accountUsageSampledAt[account.id] = Date()
+            accountUsageErrors[account.id] = nil
+            log.info("[fetchUsage] \(account.email): session=\(usage.fiveHour?.utilization ?? -1)%, weekly=\(usage.sevenDay?.utilization ?? -1)%")
+        } catch ClaudeService.UsageError.forbidden {
+            // No active Pro/Max subscription on this account (e.g. the plan
+            // lapsed) - usage is meaningless until it recovers. Observed as:
+            // {"error":{"type":"permission_error","message":"OAuth
+            // authentication is currently not allowed for this organization."}}
+            log.warning("[fetchUsage] \(account.email) forbidden (no active subscription?)")
+            accountUsage[account.id] = nil
+            accountUsageSampledAt[account.id] = nil
+            accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: false, message: String(localized: "No active subscription on this account (OAuth not allowed).", bundle: L10n.bundle))
+        } catch ClaudeService.UsageError.rateLimited(let retryAfter) {
+            // Rate-limited: park the account until the server-given deadline
+            // and keep the last known sample - a stale percentage carrying
+            // its "Updated Xm ago" label beats an error banner. The sample
+            // timestamp is deliberately NOT bumped, so the UI keeps telling
+            // the truth about how old the number is.
+            park(account, retryAfter: retryAfter)
+            if accountUsage[account.id] == nil {
+                accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: true, message: String(localized: "API Rate Limited. Try again later.", bundle: L10n.bundle))
+            }
+        } catch ClaudeService.UsageError.expired {
+            log.warning("[fetchUsage] Token expired for \(account.email)")
             if account.isActive {
-                guard liveCredentialOwnerId == account.id else {
-                    log.warning("[fetchUsage] Live credential is not confirmed to be \(account.email)'s; taking no reading rather than filing someone else's")
-                    accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: false, message: String(localized: "Can't tell which account the current sign-in belongs to. Switch accounts once to re-sync.", bundle: L10n.bundle))
-                    continue
-                }
-                tokenJSON = await Self.offMain { keychain.readClaudeToken() }
-            } else {
-                let accountId = account.id.uuidString
-                tokenJSON = await Self.offMain { keychain.getAccountBackup(forAccountId: accountId)?.token }
-            }
-            guard let tokenJSON, let accessToken = ClaudeService.extractAccessToken(from: tokenJSON) else {
-                log.warning("[fetchUsage] No token for \(account.email), skipping")
-                continue
-            }
-            do {
-                let usage = try await fetchUsageWithRetry(accessToken: accessToken)
-                accountUsage[account.id] = usage
-                accountUsageSampledAt[account.id] = Date()
-                accountUsageErrors[account.id] = nil
-                log.info("[fetchUsage] \(account.email): session=\(usage.fiveHour?.utilization ?? -1)%, weekly=\(usage.sevenDay?.utilization ?? -1)%")
-            } catch ClaudeService.UsageError.forbidden {
-                // No active Pro/Max subscription on this account (e.g. the plan
-                // lapsed) - usage is meaningless until it recovers. Observed as:
-                // {"error":{"type":"permission_error","message":"OAuth
-                // authentication is currently not allowed for this organization."}}
-                log.warning("[fetchUsage] \(account.email) forbidden (no active subscription?)")
-                accountUsage[account.id] = nil
-                accountUsageSampledAt[account.id] = nil
-                accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: false, message: String(localized: "No active subscription on this account (OAuth not allowed).", bundle: L10n.bundle))
-            } catch ClaudeService.UsageError.rateLimited(let retryAfter) {
-                // Rate-limited: park the account until the server-given deadline
-                // and keep the last known sample - a stale percentage carrying
-                // its "Updated Xm ago" label beats an error banner. The sample
-                // timestamp is deliberately NOT bumped, so the UI keeps telling
-                // the truth about how old the number is.
-                park(account, retryAfter: retryAfter)
-                if accountUsage[account.id] == nil {
-                    accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: true, message: String(localized: "API Rate Limited. Try again later.", bundle: L10n.bundle))
-                }
-            } catch ClaudeService.UsageError.expired {
-                log.warning("[fetchUsage] Token expired for \(account.email)")
-                if account.isActive {
-                    // Active account: delegated refresh via `claude auth status` is safe (no keychain swap)
-                    do {
-                        _ = try await claudeService.getAuthStatus()
-                        log.info("[fetchUsage] Delegated refresh completed for active account.")
-                        // Re-read refreshed token and retry. A refresh rotates the
-                        // credential in place without changing whose it is, so
-                        // re-anchor to the same account — otherwise the anchor
-                        // goes stale and the next cycle falls back to believing
-                        // the identity block again.
-                        if let refreshedJSON = await Self.offMain({ keychain.readClaudeToken() }),
-                           let refreshedToken = ClaudeService.extractAccessToken(from: refreshedJSON) {
-                            credentialAnchor.anchor(accountId: account.id, accessToken: refreshedToken)
-                            if let usage = await usageRespectingParking(accessToken: refreshedToken, account: account) {
-                                accountUsage[account.id] = usage
-                                accountUsageSampledAt[account.id] = Date()
-                                accountUsageErrors[account.id] = nil
-                                log.info("[fetchUsage] Recovered \(account.email) via delegated refresh.")
-                            }
-                        }
-                    } catch {
-                        log.error("[fetchUsage] Delegated refresh failed for active account: \(error.localizedDescription)")
-                        accountUsage[account.id] = nil
-                        accountUsageSampledAt[account.id] = nil
-                        accountUsageErrors[account.id] = UsageErrorState(isExpired: true, isRateLimited: false, message: String(localized: "Token expired. Switch to refresh.", bundle: L10n.bundle))
-                    }
-                } else {
-                    // Non-active account: refresh the backup credential in place via
-                    // the OAuth token endpoint - no keychain swap, so no race with
-                    // running Claude Code sessions. Access tokens only live a few
-                    // hours, so without this every non-active account would sit in
-                    // a permanent "Token expired" state between switches.
-                    switch await refreshBackupInPlace(for: account) {
-                    case .refreshed(let refreshed):
-                        log.info("[fetchUsage] Silently refreshed backup for \(account.email); retrying usage")
-                        if let newToken = ClaudeService.extractAccessToken(from: refreshed),
-                           let usage = await usageRespectingParking(accessToken: newToken, account: account) {
+                // Active account: delegated refresh via `claude auth status` is safe (no keychain swap)
+                do {
+                    _ = try await claudeService.getAuthStatus()
+                    log.info("[fetchUsage] Delegated refresh completed for active account.")
+                    // Re-read refreshed token and retry. A refresh rotates the
+                    // credential in place without changing whose it is, so
+                    // re-anchor to the same account — otherwise the anchor
+                    // goes stale and the next cycle falls back to believing
+                    // the identity block again.
+                    if let refreshedJSON = await Self.offMain({ keychain.readClaudeToken() }),
+                       let refreshedToken = ClaudeService.extractAccessToken(from: refreshedJSON) {
+                        credentialAnchor.anchor(accountId: account.id, accessToken: refreshedToken)
+                        if let usage = await usageRespectingParking(accessToken: refreshedToken, account: account) {
                             accountUsage[account.id] = usage
                             accountUsageSampledAt[account.id] = Date()
                             accountUsageErrors[account.id] = nil
-                            log.info("[fetchUsage] \(account.email): session=\(usage.fiveHour?.utilization ?? -1)%, weekly=\(usage.sevenDay?.utilization ?? -1)%")
+                            log.info("[fetchUsage] Recovered \(account.email) via delegated refresh.")
                         }
-                    case .grantRejected, .noBackup, .rotationLost:
-                        // Only re-authentication mints a new refresh token or a
-                        // new backup — an honest dead end until the user acts.
-                        // (.rotationLost is the loudest of the three; its log
-                        // line already says exactly what was lost and why.)
-                        accountUsage[account.id] = nil
-                        accountUsageSampledAt[account.id] = nil
-                        accountUsageErrors[account.id] = UsageErrorState(isExpired: true, isRateLimited: false, message: String(localized: "Session expired. Re-authenticate (↻) to fix.", bundle: L10n.bundle))
-                    case .storeUnavailable:
-                        // Nothing was spent and nothing is lost; this heals by
-                        // itself on a later cycle. Keep the stale sample.
-                        accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: false, message: String(localized: "Could not save the refreshed sign-in; will retry automatically.", bundle: L10n.bundle))
                     }
+                } catch {
+                    log.error("[fetchUsage] Delegated refresh failed for active account: \(error.localizedDescription)")
+                    accountUsage[account.id] = nil
+                    accountUsageSampledAt[account.id] = nil
+                    accountUsageErrors[account.id] = UsageErrorState(isExpired: true, isRateLimited: false, message: String(localized: "Token expired. Switch to refresh.", bundle: L10n.bundle))
                 }
-            } catch {
-                log.error("[fetchUsage] Failed to get usage for \(account.email): \(error.localizedDescription)")
-                accountUsage[account.id] = nil
-                accountUsageSampledAt[account.id] = nil
-                accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: false, message: String(localized: "Could not fetch usage: \(error.localizedDescription)", bundle: L10n.bundle))
+            } else {
+                // Non-active account: refresh the backup credential in place via
+                // the OAuth token endpoint - no keychain swap, so no race with
+                // running Claude Code sessions. Access tokens only live a few
+                // hours, so without this every non-active account would sit in
+                // a permanent "Token expired" state between switches.
+                switch await refreshBackupInPlace(for: account) {
+                case .refreshed(let refreshed):
+                    log.info("[fetchUsage] Silently refreshed backup for \(account.email); retrying usage")
+                    if let newToken = ClaudeService.extractAccessToken(from: refreshed),
+                       let usage = await usageRespectingParking(accessToken: newToken, account: account) {
+                        accountUsage[account.id] = usage
+                        accountUsageSampledAt[account.id] = Date()
+                        accountUsageErrors[account.id] = nil
+                        log.info("[fetchUsage] \(account.email): session=\(usage.fiveHour?.utilization ?? -1)%, weekly=\(usage.sevenDay?.utilization ?? -1)%")
+                    }
+                case .grantRejected, .noBackup, .rotationLost:
+                    // Only re-authentication mints a new refresh token or a
+                    // new backup — an honest dead end until the user acts.
+                    // (.rotationLost is the loudest of the three; its log
+                    // line already says exactly what was lost and why.)
+                    accountUsage[account.id] = nil
+                    accountUsageSampledAt[account.id] = nil
+                    accountUsageErrors[account.id] = UsageErrorState(isExpired: true, isRateLimited: false, message: String(localized: "Session expired. Re-authenticate (↻) to fix.", bundle: L10n.bundle))
+                case .storeUnavailable:
+                    // Nothing was spent and nothing is lost; this heals by
+                    // itself on a later cycle. Keep the stale sample.
+                    accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: false, message: String(localized: "Could not save the refreshed sign-in; will retry automatically.", bundle: L10n.bundle))
+                }
             }
+        } catch {
+            log.error("[fetchUsage] Failed to get usage for \(account.email): \(error.localizedDescription)")
+            accountUsage[account.id] = nil
+            accountUsageSampledAt[account.id] = nil
+            accountUsageErrors[account.id] = UsageErrorState(isExpired: false, isRateLimited: false, message: String(localized: "Could not fetch usage: \(error.localizedDescription)", bundle: L10n.bundle))
         }
     }
 
