@@ -142,6 +142,7 @@ targets:
       # For AutoSwitchEngineTests, CLIVersionParsingTests, ClaudeJSONRewriteTests
       - path: CCSwitcher/Services/AutoSwitchEngine.swift
       - path: CCSwitcher/Services/ClaudeService.swift
+      - path: CCSwitcher/Services/SwitchSafety.swift
       - path: CCSwitcher/Services/KeychainService.swift
       - path: CCSwitcher/Models/Account.swift
       - path: CCSwitcher/Models/UsageData.swift
