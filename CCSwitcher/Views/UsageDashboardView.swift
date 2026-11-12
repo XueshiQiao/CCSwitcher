@@ -273,19 +273,18 @@ struct UsageDashboardView: View {
         )
     }
 
-    /// Accounts are polled round-robin (active + one other per cycle), so a
-    /// card's numbers can be several cycles old — say so instead of letting a
-    /// stale percentage render exactly like a live one. Hidden while the sample
-    /// is fresh (< 90s); the relative text then counts up by itself.
+    /// When this card's numbers were read. Accounts are polled round-robin
+    /// (active + one other per cycle), so they can be several cycles old; the
+    /// relative text counts up by itself.
     @ViewBuilder
     private func sampleAgeLabel(_ account: Account) -> some View {
-        if let sampledAt = appState.accountUsageSampledAt[account.id],
-           Date().timeIntervalSince(sampledAt) >= 90 {
+        if let sampledAt = appState.accountUsageSampledAt[account.id] {
             HStack(spacing: 3) {
                 Image(systemName: "clock")
                     .font(.caption2)
                 Text("Updated \(Text(sampledAt, style: .relative)) ago")
-                    .font(.caption2)
+                    .font(.caption2.monospacedDigit())
+                    .lineLimit(1)
             }
             .foregroundStyle(Theme.dim)
         }
@@ -325,34 +324,12 @@ struct UsageDashboardView: View {
                 Badge(text: sub, color: Theme.glow)
             }
 
-            refreshUsageButton(account)
-
             if !account.isActive {
-                // Off while this account's usage is being re-read: that can
-                // rotate its stored credential, and a switch should use the
-                // result, not start alongside it.
-                let refreshing = appState.refreshingUsage.contains(account.id)
                 Button("Switch") { Task { await appState.switchTo(account) } }
                     .buttonStyle(PrimaryButtonStyle(height: 24))
                     .focusable(false)
-                    .disabled(refreshing)
-                    .opacity(refreshing ? 0.45 : 1)
             }
         }
-    }
-
-    /// Re-reads only this account's usage. Off while the server has the
-    /// account rate-limited.
-    private func refreshUsageButton(_ account: Account) -> some View {
-        let parked = appState.usageParkedUntil(account) != nil
-        return CircleIconButton(icon: "arrow.clockwise",
-                                label: parked ? "API Rate Limited. Try again later." : "Refresh this account's usage",
-                                size: 24,
-                                busy: appState.refreshingUsage.contains(account.id)) {
-            Task { await appState.refreshUsage(for: account) }
-        }
-        .disabled(parked)
-        .opacity(parked ? 0.45 : 1)
     }
 
     @ViewBuilder

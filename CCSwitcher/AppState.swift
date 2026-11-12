@@ -1294,12 +1294,9 @@ final class AppState: ObservableObject {
     private func fetchAllAccountUsage() async {
         // Pick this cycle's targets: the active account (always) + one non-active
         // account in round-robin order. Stale samples for the others are kept.
-        // Accounts parked by a server-given Retry-After deadline are skipped,
-        // and so are accounts being re-read from the button on their card.
+        // Accounts parked by a server-given Retry-After deadline are skipped.
         let now = Date()
-        let eligible = accounts.filter {
-            (usageRetryNotBefore[$0.id] ?? .distantPast) <= now && !usageFetchesFromCard.contains($0.id)
-        }
+        let eligible = accounts.filter { (usageRetryNotBefore[$0.id] ?? .distantPast) <= now }
         let others = eligible.filter { !$0.isActive }
         var targets = eligible.filter { $0.isActive }
         if !others.isEmpty {
@@ -1334,53 +1331,8 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// Accounts whose usage is being re-read from the refresh button on their card.
-    @Published private(set) var refreshingUsage: Set<UUID> = []
-
-    /// When a rate-limited account may be asked for its usage again; nil if
-    /// it isn't parked.
-    func usageParkedUntil(_ account: Account) -> Date? {
-        guard let notBefore = usageRetryNotBefore[account.id], notBefore > Date() else { return nil }
-        return notBefore
-    }
-
-    /// Re-read one account's usage now, leaving the other accounts alone (the
-    /// refresh button on each card). A parked account is not asked; it waits
-    /// for its Retry-After like everywhere else.
-    func refreshUsage(for account: Account) async {
-        guard !refreshingUsage.contains(account.id), usageParkedUntil(account) == nil else { return }
-        refreshingUsage.insert(account.id)
-        defer { refreshingUsage.remove(account.id) }
-
-        // A polling cycle may be reading this very account; asking again
-        // alongside it is the burst the endpoint answers with a 429.
-        let deadline = Date().addingTimeInterval(20)
-        while isRefreshing, Date() < deadline {
-            try? await Task.sleep(nanoseconds: 250_000_000)
-        }
-        // The cycle may have just taken a fresh reading.
-        if let sampledAt = accountUsageSampledAt[account.id], Date().timeIntervalSince(sampledAt) < 10 { return }
-        guard !isSwitching, !loginBusy, usageParkedUntil(account) == nil,
-              let current = accounts.first(where: { $0.id == account.id }) else { return }
-
-        accountUsageErrors[current.id] = nil
-        usageFetchesFromCard.insert(current.id)
-        defer { usageFetchesFromCard.remove(current.id) }
-        let owner = current.isActive ? await liveCredentialOwnerReadingOffMain().credentialAccountId : nil
-        await fetchUsage(for: current, liveCredentialOwnerId: owner)
-        updateWidgetData()
-    }
-
-    /// Accounts whose usage request from the card button is on the wire right
-    /// now. Narrower than `refreshingUsage`, which also covers the time the
-    /// button spends waiting for a polling cycle to finish: a cycle must skip
-    /// only the former, or it would skip the very account that is waiting
-    /// for it.
-    private var usageFetchesFromCard: Set<UUID> = []
-
     /// Take one usage reading for an account and file it on its card: the
-    /// sample, or the error state the card shows instead. Used by the polling
-    /// cycle and by the refresh button on a single account's card.
+    /// sample, or the error state the card shows instead.
     private func fetchUsage(for account: Account, liveCredentialOwnerId: UUID?) async {
         let keychain = self.keychain
         let tokenJSON: String?

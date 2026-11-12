@@ -267,7 +267,7 @@ struct ClassicMainMenuView: View {
             Button {
                 Task { await appState.refresh() }
             } label: {
-                Image(systemName: "arrow.clockwise")
+                SpinningRefreshIcon(spinning: appState.isLoading)
                     .font(.caption)
             }
             .buttonStyle(.plain)
@@ -302,5 +302,69 @@ struct ClassicMainMenuView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
+    }
+}
+
+/// The refresh arrow: turns for as long as a refresh runs, then eases round
+/// to upright instead of snapping back. Stays still under Reduce Motion.
+private struct SpinningRefreshIcon: View {
+    let spinning: Bool
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// When the current spin began; nil while at rest.
+    @State private var spinStart: Date?
+    /// The angle shown while at rest (and while easing back to upright).
+    @State private var restAngle: Double = 0
+    /// The ease back to upright in progress, so a refresh starting during it
+    /// carries on from where the arrow is.
+    @State private var settling: (from: Double, start: Date, duration: Double)?
+
+    private static let degreesPerSecond: Double = 360
+
+    var body: some View {
+        TimelineView(.animation(paused: spinStart == nil)) { context in
+            Image(systemName: "arrow.clockwise")
+                .rotationEffect(.degrees(spinStart.map { Self.angle(from: $0, to: context.date) } ?? restAngle))
+        }
+        .onAppear { if spinning { start() } }
+        .onChange(of: spinning) { _, spinning in
+            if spinning { start() } else { stop() }
+        }
+    }
+
+    private static func angle(from start: Date, to date: Date) -> Double {
+        (date.timeIntervalSince(start) * degreesPerSecond).truncatingRemainder(dividingBy: 360)
+    }
+
+    private func start() {
+        guard spinStart == nil, !reduceMotion else { return }
+        let now = Date()
+        var angle = 0.0
+        if let settling {
+            let progress = min(now.timeIntervalSince(settling.start) / settling.duration, 1)
+            angle = (settling.from + (360 - settling.from) * progress).truncatingRemainder(dividingBy: 360)
+        }
+        settling = nil
+        var instantly = Transaction()
+        instantly.disablesAnimations = true
+        withTransaction(instantly) {
+            restAngle = 0
+            spinStart = now.addingTimeInterval(-angle / Self.degreesPerSecond)
+        }
+    }
+
+    private func stop() {
+        guard let spinStart else { return }
+        // Hold the angle the spin reached, then finish the turn at about the
+        // speed it was going.
+        let reached = Self.angle(from: spinStart, to: Date())
+        let duration = max(0.15, (360 - reached) / Self.degreesPerSecond * 1.5)
+        restAngle = reached
+        self.spinStart = nil
+        settling = (reached, Date(), duration)
+        DispatchQueue.main.async {
+            guard self.spinStart == nil else { return }
+            withAnimation(.easeOut(duration: duration)) { restAngle = 360 }
+        }
     }
 }

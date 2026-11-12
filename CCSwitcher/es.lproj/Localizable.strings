@@ -235,5 +235,3 @@
 /* Account switch safety */
 "Could not save %@'s current sign-in, so the switch was stopped before changing anything. Try again." = "No se pudo guardar el inicio de sesión actual de %@, así que el cambio se detuvo antes de modificar nada. Inténtalo de nuevo.";
 "Claude CLI did not respond in time." = "Claude CLI no respondió a tiempo.";
-
-"Refresh this account's usage" = "Actualizar el uso de esta cuenta";
