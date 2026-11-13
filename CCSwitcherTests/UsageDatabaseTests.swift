@@ -718,6 +718,27 @@ final class UsageDatabaseTests: XCTestCase {
         XCTAssertEqual(try db.winners().count, 1)
     }
 
+    func testDeviceNumberChangeAfterRebootKeepsFastPathAndRecoversReview() async throws {
+        let path = root.appendingPathComponent("a.jsonl")
+        try transcript(10).write(to: path)
+        _ = try await SessionUsageStore(databaseURL: databaseURL, projectsRoot: root, timezone: utc).refreshLocalFiles()
+        let live = try SessionFileSignature.read(path.path).identity
+        let db = try database()
+        try db.testingWrite { db in
+            try db.execute(sql: "UPDATE session_files SET extensions_json = json_set(extensions_json, '$.source_identity', ?), updated_at_us = 1", arguments: ["16777230:" + live])
+        }
+        let afterReboot = try await SessionUsageStore(databaseURL: databaseURL, projectsRoot: root, timezone: utc).refreshLocalFiles()
+        XCTAssertNil(afterReboot)
+        XCTAssertEqual(try scalar(db, "SELECT updated_at_us FROM session_files"), 1, "unchanged source must take the fast path")
+
+        try db.testingWrite { try $0.execute(sql: "UPDATE session_files SET source_status = 'needs_review'") }
+        let recovered = try await SessionUsageStore(databaseURL: databaseURL, projectsRoot: root, timezone: utc).refreshLocalFiles()
+        XCTAssertNil(recovered)
+        XCTAssertEqual(try db.files().values.first?.status, "present")
+        XCTAssertEqual(try db.files().values.first?.identity, live)
+        XCTAssertEqual(try db.winners().count, 1)
+    }
+
     func testOverlappingRootRedefinitionReusesExistingSourceRow() async throws {
         let path = root.appendingPathComponent("a.jsonl")
         try transcript(10).write(to: path)
