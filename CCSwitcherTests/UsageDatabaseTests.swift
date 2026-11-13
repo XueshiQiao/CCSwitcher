@@ -739,6 +739,17 @@ final class UsageDatabaseTests: XCTestCase {
         XCTAssertEqual(try db.winners().count, 1)
     }
 
+    func testFullScanOfLocalTranscriptsBenchmark() async throws {
+        guard let benchRoot = ProcessInfo.processInfo.environment["CCSWITCHER_BENCH_ROOT"] else {
+            throw XCTSkip("Set CCSWITCHER_BENCH_ROOT to scan real transcripts")
+        }
+        let started = Date()
+        let store = SessionUsageStore(databaseURL: databaseURL, projectsRoot: URL(fileURLWithPath: benchRoot), timezone: utc)
+        let warning = try await store.refreshLocalFiles()
+        let files = try scalar(try database(), "SELECT COUNT(*) FROM session_files")
+        print("Scan benchmark: \(files) files in \(String(format: "%.1f", Date().timeIntervalSince(started)))s, warning=\(warning ?? "none")")
+    }
+
     func testOverlappingRootRedefinitionReusesExistingSourceRow() async throws {
         let path = root.appendingPathComponent("a.jsonl")
         try transcript(10).write(to: path)
