@@ -150,7 +150,7 @@ final class UsageDatabase: Sendable {
                 let sourceRoot: String = row["root_path"]
                 let path = URL(fileURLWithPath: sourceRoot).appendingPathComponent(relative).path
                 let raw: String = row["extensions_json"]
-                result[path] = FileState(id: row["id"], rootPath: row["root_path"], path: path, mtime: row["source_mtime_ns"], size: row["source_size_bytes"], parserVersion: row["parser_version"], status: row["source_status"], identity: try Self.object(raw)["source_identity"] as? String, timezone: row["statistics_timezone"])
+                result[path] = FileState(id: row["id"], rootPath: row["root_path"], path: path, mtime: row["source_mtime_ns"], size: row["source_size_bytes"], parserVersion: row["parser_version"], status: row["source_status"], identity: try Self.sourceIdentity(raw), timezone: row["statistics_timezone"])
             }
             return result
         }
@@ -170,7 +170,7 @@ final class UsageDatabase: Sendable {
             }
             guard let row else { return nil }
             let raw: String = row["extensions_json"]
-            return FileState(id: row["id"], rootPath: row["root_path"], path: path, mtime: row["source_mtime_ns"], size: row["source_size_bytes"], parserVersion: row["parser_version"], status: row["source_status"], identity: try Self.object(raw)["source_identity"] as? String, timezone: row["statistics_timezone"])
+            return FileState(id: row["id"], rootPath: row["root_path"], path: path, mtime: row["source_mtime_ns"], size: row["source_size_bytes"], parserVersion: row["parser_version"], status: row["source_status"], identity: try Self.sourceIdentity(raw), timezone: row["statistics_timezone"])
         }
     }
 
@@ -255,7 +255,7 @@ final class UsageDatabase: Sendable {
                 let incoming = Self.keyed(parsed.entries)
                 let oldSize: Int64? = prior["source_size_bytes"]
                 let oldExtras = try Self.object(prior["extensions_json"])
-                let oldIdentity = oldExtras["source_identity"] as? String
+                let oldIdentity = (oldExtras["source_identity"] as? String).map(SessionFileSignature.normalizedIdentity)
                 let oldHash = oldExtras["source_sha256"] as? String
                 let oldZone: String? = prior["statistics_timezone"]
                 let oldSession: String? = prior["session_id"]
@@ -502,6 +502,9 @@ final class UsageDatabase: Sendable {
     }
 
     private static func activityDays(_ raw: String) throws -> [String: Any] { try object(raw)["days"] as? [String: Any] ?? [:] }
+    private static func sourceIdentity(_ raw: String) throws -> String? {
+        (try object(raw)["source_identity"] as? String).map(SessionFileSignature.normalizedIdentity)
+    }
     private static func object(_ raw: String) throws -> [String: Any] {
         guard let data = raw.data(using: .utf8), let value = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw StorageError.invalidRecord("expected a JSON object") }
         return value
@@ -640,12 +643,16 @@ struct SessionFileSignature: Equatable, Sendable {
         guard attributes[.type] as? FileAttributeType == .typeRegular,
               let modified = attributes[.modificationDate] as? Date,
               let size = attributes[.size] as? NSNumber,
-              let device = attributes[.systemNumber] as? NSNumber,
               let inode = attributes[.systemFileNumber] as? NSNumber else {
             throw UsageDatabase.StorageError.invalidRecord("could not read source file identity")
         }
         let birth = (attributes[.creationDate] as? Date)?.timeIntervalSince1970 ?? 0
-        return SessionFileSignature(mtime: Int64((modified.timeIntervalSince1970 * 1_000_000_000).rounded()), size: size.int64Value, identity: "\(device):\(inode):\(birth)")
+        return SessionFileSignature(mtime: Int64((modified.timeIntervalSince1970 * 1_000_000_000).rounded()), size: size.int64Value, identity: "\(inode):\(birth)")
+    }
+
+    static func normalizedIdentity(_ stored: String) -> String {
+        let parts = stored.split(separator: ":", omittingEmptySubsequences: false)
+        return parts.count == 3 ? parts.dropFirst().joined(separator: ":") : stored
     }
 }
 

@@ -50,6 +50,12 @@ struct ActivityDayContributionV2: Codable, Sendable {
 
 
 func parseSessionFile(at path: String, relativePath: String, mtime: Double, timezone: TimeZone, previousSize: Int64? = nil) -> CachedFileV2? {
+    autoreleasepool {
+        parseTranscript(at: path, relativePath: relativePath, mtime: mtime, timezone: timezone, previousSize: previousSize)
+    }
+}
+
+private func parseTranscript(at path: String, relativePath: String, mtime: Double, timezone: TimeZone, previousSize: Int64?) -> CachedFileV2? {
     guard let data = FileManager.default.contents(atPath: path) else { return nil }
 
     let isoMain = ISO8601DateFormatter()
@@ -95,7 +101,7 @@ func parseSessionFile(at path: String, relativePath: String, mtime: Double, time
     let versionPattern   = #"^\d+\.\d+\.\d+"#
 
     // JSONL records end at LF bytes; Unicode separators inside strings are content.
-    data.split(separator: 0x0A).forEach { line in
+    data.split(separator: 0x0A).forEach { line in autoreleasepool {
         guard !line.isEmpty,
               let obj = try? JSONSerialization.jsonObject(with: Data(line)) as? [String: Any]
         else { return }
@@ -242,7 +248,7 @@ func parseSessionFile(at path: String, relativePath: String, mtime: Double, time
 
         default: break
         }
-    }
+    } }
 
     // Reduce activity per-day.
     var activityOut: [String: ActivityDayContributionV2] = [:]

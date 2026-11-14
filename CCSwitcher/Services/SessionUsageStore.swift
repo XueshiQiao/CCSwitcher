@@ -138,7 +138,7 @@ actor SessionUsageStore {
                         continue
                     }
                 }
-                if try db.synchronize(relativePath: relative, parsed: parsed, signature: before, parserVersion: Self.parserVersion) {
+                if try autoreleasepool(invoking: { try db.synchronize(relativePath: relative, parsed: parsed, signature: before, parserVersion: Self.parserVersion) }) {
                     changed += 1
                     rejectedSources.removeValue(forKey: path)
                     known[path] = try db.file(at: path)
