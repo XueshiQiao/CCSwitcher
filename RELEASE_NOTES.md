@@ -1,3 +1,13 @@
+### No more multi-GB memory spike after a restart
+
+After restarting the Mac, CCSwitcher could read every Claude Code transcript again on each launch, using many GB of memory and most of a CPU core for a few minutes. macOS can give the disk a different device number after a restart, and CCSwitcher used that number to recognize transcript files, so after a restart it thought every file had been replaced. It refused to update them and then re-read all of them on every launch. Files are now recognized without the device number, and the memory used while reading transcripts is released after each file, not at the end of the whole scan.
+
+If you were affected, the next launch reads your transcripts one more time to fix their state, and later launches are quick again. Your usage history is kept.
+
+Thanks to **[@allanalvaro](https://github.com/allanalvaro)** for tracking this down and fixing it ([#59](https://github.com/XueshiQiao/CCSwitcher/issues/59), [#60](https://github.com/XueshiQiao/CCSwitcher/pull/60)).
+
+#### Included from v2.1.4
+
 ### More in the menu bar icon's right-click menu
 
 Right-click the CCSwitcher icon in the menu bar and you now also see:
@@ -87,6 +97,16 @@ Text that was still in English in every language is now translated, and German, 
 - **[@binjto-boop](https://github.com/binjto-boop)** — for asking for the classic interface back ([#50](https://github.com/XueshiQiao/CCSwitcher/issues/50)).
 
 ---
+
+### 重启电脑后不会再占用好几 GB 内存
+
+重启 Mac 之后，CCSwitcher 每次启动都可能把所有 Claude Code 对话记录重新读一遍，几分钟内占用好几 GB 内存和大半个 CPU 核。原因是 macOS 重启后可能给磁盘换一个设备号，而 CCSwitcher 用这个设备号来认出对话记录文件，所以重启后它以为每个文件都被换掉了，拒绝更新这些文件的数据，之后每次启动又把它们全部重新读一遍。现在认文件时不再用设备号；读对话记录时占用的内存也会在读完每个文件后马上释放，不再等到整次扫描结束。
+
+如果你遇到过这个问题，更新后第一次启动会再读一遍对话记录，把这些文件的状态修好，之后启动就快了。你的用量历史都会保留。
+
+感谢 **[@allanalvaro](https://github.com/allanalvaro)** 查到原因并提交了修复（[#59](https://github.com/XueshiQiao/CCSwitcher/issues/59)、[#60](https://github.com/XueshiQiao/CCSwitcher/pull/60)）。
+
+#### 包含 v2.1.4 的更新
 
 ### 菜单栏图标的右键菜单里多了几项
 
@@ -178,4 +198,4 @@ Text that was still in English in every language is now translated, and German, 
 
 ---
 
-**Full Changelog**: https://github.com/XueshiQiao/CCSwitcher/compare/v2.1.3...v2.1.4
+**Full Changelog**: https://github.com/XueshiQiao/CCSwitcher/compare/v2.1.4...v2.1.5
