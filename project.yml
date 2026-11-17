@@ -21,6 +21,10 @@ packages:
   GRDB:
     url: https://github.com/groue/GRDB.swift
     exactVersion: "7.10.0"
+  # The shared "More Apps" settings tab (the author's other apps, with in-place install).
+  MoreAppsKit:
+    url: https://github.com/XueshiQiao/MoreAppsKit
+    from: "1.1.0"
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
     from: 2.9.0
@@ -89,6 +93,7 @@ targets:
       - package: Sparkle
       - package: GRDB
       - package: Aptabase
+      - package: MoreAppsKit
 
   CCSwitcherWidgetExtension:
     type: extensionkit-extension

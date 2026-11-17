@@ -1,5 +1,6 @@
 import SwiftUI
 import ServiceManagement
+import MoreAppsKit
 
 /// Settings window for configuring the app.
 struct SettingsView: View {
@@ -15,28 +16,43 @@ struct SettingsView: View {
     @AppStorage("autoSwitchEnabled") private var autoSwitchEnabled = false
     @AppStorage("autoSwitchThreshold") private var autoSwitchThreshold = 90.0
     @State private var launchAtLogin = false
+    /// The selected tab is shared so the status menu's "More Apps by Author"
+    /// item and the link on the About tab can open the More Apps tab.
+    @ObservedObject private var navigation = SettingsNavigation.shared
 
     var body: some View {
-        TabView {
+        TabView(selection: $navigation.tab) {
             generalTab
                 .tabItem {
                     Label("General", systemImage: "gear")
                 }
+                .tag(SettingsTab.general)
 
             menuBarTab
                 .tabItem {
                     Label("Menu Bar", systemImage: "menubar.rectangle")
                 }
+                .tag(SettingsTab.menuBar)
 
             ClaudeCLITabView()
                 .tabItem {
                     Label("Claude CLI", systemImage: "terminal")
                 }
+                .tag(SettingsTab.claudeCLI)
+
+            // The author's other apps. Content and behaviour come from the
+            // shared MoreAppsKit package (see `MoreAppsHost`).
+            MoreAppsPage(store: MoreAppsHost.store)
+                .tabItem {
+                    Label("More Apps", systemImage: "square.grid.2x2")
+                }
+                .tag(SettingsTab.moreApps)
 
             aboutTab
                 .tabItem {
                     Label("About", systemImage: "info.circle")
                 }
+                .tag(SettingsTab.about)
         }
         .frame(width: 520, height: 440)
         .onAppear {
@@ -92,6 +108,7 @@ struct SettingsView: View {
                 }
                 .onChange(of: appLanguage) { _, newValue in
                     applyLanguage(newValue)
+                    MoreAppsHost.store.language = MoreAppsHost.language(for: newValue)
                 }
 
                 Toggle("Show full email address", isOn: $showFullEmail)
@@ -226,7 +243,8 @@ struct SettingsView: View {
                     Spacer(minLength: 20)
 
                     HStack(spacing: 12) {
-                        Link("More apps at xueshi.dev", destination: URL(string: "https://xueshi.dev")!)
+                        Button("More Apps") { navigation.tab = .moreApps }
+                            .buttonStyle(.link)
                         Text("© 2026 Xueshi Qiao")
                             .foregroundStyle(.secondary)
                     }

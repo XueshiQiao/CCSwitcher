@@ -100,7 +100,7 @@ final class StatusItemController: NSObject {
         menu.addItem(menuItem(String(localized: "Settings", bundle: L10n.bundle), #selector(openSettingsFromMenu), key: ","))
         menu.addItem(.separator())
         menu.addItem(menuItem(String(localized: "Feedback", bundle: L10n.bundle), #selector(openFeedbackFromMenu), key: ""))
-        menu.addItem(menuItem(String(localized: "More Apps by Author", bundle: L10n.bundle), #selector(openAuthorWebsiteFromMenu), key: ""))
+        menu.addItem(menuItem(String(localized: "More Apps by Author", bundle: L10n.bundle), #selector(openMoreAppsFromMenu), key: ""))
         menu.addItem(.separator())
         menu.addItem(menuItem(String(localized: "Quit CCSwitcher", bundle: L10n.bundle), #selector(quitFromMenu), key: "q"))
         statusItem.menu = menu
@@ -133,8 +133,10 @@ final class StatusItemController: NSObject {
         if let url = URL(string: "https://github.com/XueshiQiao/CCSwitcher/issues") { NSWorkspace.shared.open(url) }
     }
 
-    @objc private func openAuthorWebsiteFromMenu() {
-        if let url = URL(string: "https://xueshi.dev") { NSWorkspace.shared.open(url) }
+    /// Opens the Settings window on the More Apps tab.
+    @objc private func openMoreAppsFromMenu() {
+        SettingsNavigation.shared.tab = .moreApps
+        openSettingsFromMenu()
     }
 
     @objc private func quitFromMenu() {

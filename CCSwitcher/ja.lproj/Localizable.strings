@@ -123,7 +123,7 @@
 /* Promo */
 "%@ - %@ (Weekdays) & Weekends" = "%1$@ - %2$@（平日）& 週末";
 "Double limits: 2 PM - 8 AM ET & Weekends" = "ダブル制限：米国東部時間 午後 2 時〜午前 8 時 & 週末";
-"More apps at xueshi.dev" = "その他のアプリ: xueshi.dev";
+"More Apps" = "その他のアプリ";
 "© 2026 Xueshi Qiao" = "© 2026 Xueshi Qiao";
 
 /* Menu Bar */
