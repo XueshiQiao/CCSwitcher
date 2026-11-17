@@ -1,3 +1,13 @@
+### A More Apps tab in Settings
+
+Settings has a new **More Apps** tab that lists the other apps by the same author. Click **Get** and CCSwitcher downloads the app, checks that it is signed by the same developer, puts it in your Applications folder and opens it. Each row also has a button that leads to the app's source on GitHub or to its App Store page.
+
+**More Apps by Author** in the menu bar icon's right-click menu and the link on the About tab now open this tab instead of the website.
+
+To show the list, the tab fetches one small file from GitHub (or its jsDelivr mirror) when you open it. What CCSwitcher reports about itself has not changed: only launch counts.
+
+#### Included from v2.1.5
+
 ### No more multi-GB memory spike after a restart
 
 After restarting the Mac, CCSwitcher could read every Claude Code transcript again on each launch, using many GB of memory and most of a CPU core for a few minutes. macOS can give the disk a different device number after a restart, and CCSwitcher used that number to recognize transcript files, so after a restart it thought every file had been replaced. It refused to update them and then re-read all of them on every launch. Files are now recognized without the device number, and the memory used while reading transcripts is released after each file, not at the end of the whole scan.
@@ -97,6 +107,16 @@ Text that was still in English in every language is now translated, and German, 
 - **[@binjto-boop](https://github.com/binjto-boop)** — for asking for the classic interface back ([#50](https://github.com/XueshiQiao/CCSwitcher/issues/50)).
 
 ---
+
+### 「设置」里新增「更多应用」标签页
+
+「设置」里新增了「更多应用」标签页，列出同一位作者做的其他应用。点「获取」，CCSwitcher 会下载这个应用、确认它由同一位开发者签名、把它放进「应用程序」文件夹并打开。每一行还有一个按钮，可以打开这个应用在 GitHub 上的源码或它的 App Store 页面。
+
+菜单栏图标右键菜单里的「作者的更多应用」和「关于」标签页里的链接，现在都会打开这个标签页，不再跳转到网站。
+
+为了显示这份列表，打开这个标签页时会从 GitHub（或它的 jsDelivr 镜像）取一个很小的文件。CCSwitcher 上报的内容没有变化：仍然只有启动次数。
+
+#### 包含 v2.1.5 的更新
 
 ### 重启电脑后不会再占用好几 GB 内存
 
