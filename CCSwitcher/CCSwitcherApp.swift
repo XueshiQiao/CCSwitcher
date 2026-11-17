@@ -18,6 +18,31 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
 
+    /// Longest quit waits for an in-flight account switch. A switch is a few
+    /// seconds; its slowest step, `claude auth status`, times out at 30.
+    private static let switchWaitTimeout: Duration = .seconds(35)
+
+    /// True from returning `.terminateLater` until its one reply is sent.
+    private var terminateReplyPending = false
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        // A browser login left running would finish after we exit and replace
+        // the CLI's credentials with nobody here to back up or record them.
+        ClaudeService.shared.cancelLogin()
+
+        // Never exit between a switch's keychain write and its
+        // `~/.claude.json` write (a Sparkle relaunch quits too): that leaves
+        // one account's token under another's identity.
+        guard CredentialWriteGate.isBusy else { return .terminateNow }
+        if terminateReplyPending { return .terminateLater }
+        terminateReplyPending = true
+        Task {
+            await CredentialWriteGate.waitUntilIdle(timeout: Self.switchWaitTimeout)
+            terminateReplyPending = false
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
+    }
 }
 
 @main

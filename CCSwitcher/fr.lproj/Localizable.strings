@@ -226,3 +226,7 @@
 
 "Feedback" = "Envoyer un retour";
 "More Apps by Author" = "Plus d’apps de l’auteur";
+
+/* Account switch safety */
+"Could not save %@'s current sign-in, so the switch was stopped before changing anything. Try again." = "Impossible d’enregistrer la connexion actuelle de %@ : le changement a été arrêté avant toute modification. Réessayez.";
+"Claude CLI did not respond in time." = "Claude CLI n’a pas répondu à temps.";
