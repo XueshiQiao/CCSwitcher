@@ -325,12 +325,28 @@ struct UsageDashboardView: View {
                 Badge(text: sub, color: Theme.glow)
             }
 
+            refreshUsageButton(account)
+
             if !account.isActive {
                 Button("Switch") { Task { await appState.switchTo(account) } }
                     .buttonStyle(PrimaryButtonStyle(height: 24))
                     .focusable(false)
             }
         }
+    }
+
+    /// Re-reads only this account's usage. Off while the server has the
+    /// account rate-limited.
+    private func refreshUsageButton(_ account: Account) -> some View {
+        let parked = appState.usageParkedUntil(account) != nil
+        return CircleIconButton(icon: "arrow.clockwise",
+                                label: parked ? "API Rate Limited. Try again later." : "Refresh this account's usage",
+                                size: 24,
+                                busy: appState.refreshingUsage.contains(account.id)) {
+            Task { await appState.refreshUsage(for: account) }
+        }
+        .disabled(parked)
+        .opacity(parked ? 0.45 : 1)
     }
 
     @ViewBuilder

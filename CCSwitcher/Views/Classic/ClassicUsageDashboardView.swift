@@ -288,6 +288,8 @@ struct ClassicUsageDashboardView: View {
                 ClassicBadge(text: sub, color: Classic.brand)
             }
 
+            refreshUsageButton(account)
+
             if !account.isActive {
                 Button("Switch") { Task { await appState.switchTo(account) } }
                     .buttonStyle(.borderedProminent)
@@ -297,6 +299,29 @@ struct ClassicUsageDashboardView: View {
                     .focusable(false)
             }
         }
+    }
+
+    /// Re-reads only this account's usage. Off while the server has the
+    /// account rate-limited.
+    private func refreshUsageButton(_ account: Account) -> some View {
+        let parked = appState.usageParkedUntil(account) != nil
+        let label: LocalizedStringKey = parked ? "API Rate Limited. Try again later." : "Refresh this account's usage"
+        return Button { Task { await appState.refreshUsage(for: account) } } label: {
+            if appState.refreshingUsage.contains(account.id) {
+                ProgressView()
+                    .controlSize(.mini)
+            } else {
+                Image(systemName: "arrow.clockwise")
+                    .font(.caption)
+            }
+        }
+        .buttonStyle(.borderless)
+        .foregroundStyle(.textSecondary)
+        .frame(width: 18, height: 18)
+        .disabled(parked)
+        .focusable(false)
+        .help(label)
+        .accessibilityLabel(label)
     }
 
     @ViewBuilder
